@@ -1,0 +1,52 @@
+{
+    // Konfigurasi untuk menjalankan dan menguji Flutter di VS Code
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "latihan (debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug"
+        },
+        {
+            "name": "latihan (debug cepat)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "args": [
+                "--disable-service-auth-codes"
+            ]
+        },
+        {
+            "name": "latihan (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "latihan (profile + non-impeller)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "args": [
+                "--disable-impeller"
+            ]
+        },
+        {
+            "name": "latihan (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+    "name": "latihan (release langsung ke device)",
+    "request": "launch",
+    "type": "dart",
+    "flutterMode": "release",
+    "args": [
+        "--no-track-widget-creation"
+    ]
+}
+
+    ]
+}
