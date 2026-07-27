@@ -5,8 +5,42 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../data.dart';
-import '../templates/sound_helper.dart'; // 🔥 import suara
+import '../templates/sound_helper.dart';
 
+// ===================== HEART CLIPPER =====================
+class HeartClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final path = Path();
+
+    path.moveTo(w * 0.5, h * 0.25);
+
+    // Lengkungan kiri
+    path.cubicTo(
+      w * 0.15, h * 0.00,
+      w * -0.05, h * 0.45,
+      w * 0.5, h * 0.95,
+    );
+
+    // Lengkungan kanan
+    path.cubicTo(
+      w * 1.05, h * 0.45,
+      w * 0.85, h * 0.00,
+      w * 0.5, h * 0.25,
+    );
+
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+// ===================== HALAMAN AKUN =====================
 class AkunPage extends StatefulWidget {
   const AkunPage({super.key});
 
@@ -21,6 +55,7 @@ class _AkunPageState extends State<AkunPage> {
   String _nis = 'ADM-2026-001';
   String _phone = '0812-3456-7890';
   String _address = 'Jl. Pendidikan No. 123, Jakarta';
+  bool _isHeartShape = false; // 🔥 State untuk bentuk avatar
 
   String? _profileImagePath;
   final ImagePicker _picker = ImagePicker();
@@ -48,6 +83,7 @@ class _AkunPageState extends State<AkunPage> {
       _phone = prefs.getString('phone') ?? '0812-3456-7890';
       _address = prefs.getString('address') ?? 'Jl. Pendidikan No. 123, Jakarta';
       _profileImagePath = prefs.getString('profileImagePath');
+      _isHeartShape = prefs.getBool('isHeartShape') ?? false; // 🔥 muat preferensi
     } catch (e) {
       debugPrint('Gagal load profil: $e');
     } finally {
@@ -70,6 +106,7 @@ class _AkunPageState extends State<AkunPage> {
       await prefs.setString('email', _email);
       await prefs.setString('phone', _phone);
       await prefs.setString('address', _address);
+      await prefs.setBool('isHeartShape', _isHeartShape); // 🔥 simpan preferensi
       if (_profileImagePath != null) {
         await prefs.setString('profileImagePath', _profileImagePath!);
       } else {
@@ -103,7 +140,7 @@ class _AkunPageState extends State<AkunPage> {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             onPressed: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               _showEditProfileDialog();
             },
             tooltip: 'Edit Profil',
@@ -129,41 +166,51 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // WIDGET: Header Profil
+  // WIDGET: Header Profil (dengan opsi bentuk hati)
   // ============================================================
   Widget _buildProfileHeader() {
+    // Widget avatar yang akan dibungkus dengan ClipPath jika heart shape
+    Widget avatar = CircleAvatar(
+      radius: 60,
+      backgroundImage: _profileImagePath != null
+          ? FileImage(File(_profileImagePath!))
+          : null,
+      backgroundColor: Colors.grey.shade200,
+      child: _profileImagePath == null
+          ? Text(
+              _username.isNotEmpty ? _username[0].toUpperCase() : 'A',
+              style: const TextStyle(
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            )
+          : null,
+    );
+
+    // Jika bentuk hati aktif, bungkus dengan ClipPath
+    if (_isHeartShape) {
+      avatar = ClipPath(
+        clipper: HeartClipper(),
+        child: avatar,
+      );
+    }
+
     return Card(
       elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            // 🔥 Tampilkan avatar (bisa lingkaran atau hati)
             GestureDetector(
               onTap: () {
-                SoundHelper().playClick(); // 🔥 suara
+                SoundHelper().playClick();
                 _showImagePickerDialog();
               },
               child: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundImage: _profileImagePath != null
-                        ? FileImage(File(_profileImagePath!))
-                        : null,
-                    backgroundColor: Colors.grey.shade200,
-                    child: _profileImagePath == null
-                        ? Text(
-                            _username.isNotEmpty
-                                ? _username[0].toUpperCase()
-                                : 'A',
-                            style: const TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          )
-                        : null,
-                  ),
+                  avatar,
                   Positioned(
                     bottom: 0,
                     right: 0,
@@ -220,7 +267,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // WIDGET: Kartu Informasi Detail
+  // WIDGET: Kartu Informasi Detail (tidak berubah)
   // ============================================================
   Widget _buildInfoCard() {
     return Card(
@@ -287,7 +334,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // WIDGET: Kartu Menu Akun
+  // WIDGET: Kartu Menu Akun (tidak berubah)
   // ============================================================
   Widget _buildMenuCard() {
     return Card(
@@ -299,7 +346,7 @@ class _AkunPageState extends State<AkunPage> {
             title: 'Edit Profil',
             subtitle: 'Ubah informasi pribadi',
             onTap: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               _showEditProfileDialog();
             },
           ),
@@ -309,7 +356,7 @@ class _AkunPageState extends State<AkunPage> {
             title: 'Ganti Password',
             subtitle: 'Perbarui kata sandi akun',
             onTap: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               _showChangePasswordDialog();
             },
           ),
@@ -319,7 +366,7 @@ class _AkunPageState extends State<AkunPage> {
             title: 'Logout',
             subtitle: 'Keluar dari aplikasi',
             onTap: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               _showLogoutDialog();
             },
             isLogout: true,
@@ -355,7 +402,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Pilih Foto
+  // DIALOG: Pilih Foto (tidak berubah)
   // ============================================================
   void _showImagePickerDialog() {
     showModalBottomSheet(
@@ -368,7 +415,7 @@ class _AkunPageState extends State<AkunPage> {
               leading: const Icon(Icons.photo_library),
               title: const Text('Pilih dari Galeri'),
               onTap: () {
-                SoundHelper().playClick(); // 🔥 suara
+                SoundHelper().playClick();
                 Navigator.pop(ctx);
                 _pickImage(ImageSource.gallery);
               },
@@ -377,7 +424,7 @@ class _AkunPageState extends State<AkunPage> {
               leading: const Icon(Icons.photo_camera),
               title: const Text('Ambil Foto'),
               onTap: () {
-                SoundHelper().playClick(); // 🔥 suara
+                SoundHelper().playClick();
                 Navigator.pop(ctx);
                 _pickImage(ImageSource.camera);
               },
@@ -419,7 +466,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Edit Profil
+  // DIALOG: Edit Profil (dengan switch bentuk hati)
   // ============================================================
   void _showEditProfileDialog() {
     _nameController.text = _username;
@@ -427,93 +474,112 @@ class _AkunPageState extends State<AkunPage> {
     _phoneController.text = _phone;
     _addressController.text = _address;
 
+    // 🔥 Salin nilai _isHeartShape untuk digunakan di dialog
+    bool localHeartShape = _isHeartShape;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Profil'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nama Lengkap',
-                      border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          title: const Text('Edit Profil'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nama Lengkap',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          v!.trim().isEmpty ? 'Nama wajib diisi' : null,
                     ),
-                    validator: (v) =>
-                        v!.trim().isEmpty ? 'Nama wajib diisi' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          v!.trim().isEmpty ? 'Email wajib diisi' : null,
                     ),
-                    validator: (v) =>
-                        v!.trim().isEmpty ? 'Email wajib diisi' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'No. Telepon',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _phoneController,
+                      decoration: const InputDecoration(
+                        labelText: 'No. Telepon',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Alamat',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _addressController,
+                      decoration: const InputDecoration(
+                        labelText: 'Alamat',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
                     ),
-                    maxLines: 2,
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    // 🔥 Switch untuk bentuk avatar
+                    SwitchListTile(
+                      title: const Text('Bentuk Avatar Hati'),
+                      subtitle: const Text('Ubah avatar menjadi bentuk love'),
+                      value: localHeartShape,
+                      onChanged: (val) {
+                        setStateDialog(() {
+                          localHeartShape = val;
+                        });
+                      },
+                      activeColor: AppColors.primary,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              SoundHelper().playClick(); // 🔥 suara
-              Navigator.pop(ctx);
-            },
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              SoundHelper().playClick(); // 🔥 suara
-              if (_formKey.currentState!.validate()) {
-                setState(() {
-                  _username = _nameController.text.trim();
-                  _email = _emailController.text.trim();
-                  _phone = _phoneController.text.trim();
-                  _address = _addressController.text.trim();
-                });
-                await _saveProfileData();
+          actions: [
+            TextButton(
+              onPressed: () {
+                SoundHelper().playClick();
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Profil berhasil diperbarui')),
-                );
-              }
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
+              },
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                SoundHelper().playClick();
+                if (_formKey.currentState!.validate()) {
+                  setState(() {
+                    _username = _nameController.text.trim();
+                    _email = _emailController.text.trim();
+                    _phone = _phoneController.text.trim();
+                    _address = _addressController.text.trim();
+                    _isHeartShape = localHeartShape; // 🔥 simpan pilihan
+                  });
+                  await _saveProfileData();
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Profil berhasil diperbarui')),
+                  );
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ============================================================
-  // DIALOG: Ganti Password
+  // DIALOG: Ganti Password (tidak berubah)
   // ============================================================
   void _showChangePasswordDialog() {
     final oldPasswordController = TextEditingController();
@@ -561,14 +627,14 @@ class _AkunPageState extends State<AkunPage> {
         actions: [
           TextButton(
             onPressed: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               Navigator.pop(ctx);
             },
             child: const Text('Batal'),
           ),
           ElevatedButton(
             onPressed: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               if (newPasswordController.text != confirmPasswordController.text) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Password baru tidak cocok')),
@@ -594,7 +660,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Logout
+  // DIALOG: Logout (tidak berubah)
   // ============================================================
   void _showLogoutDialog() {
     showDialog(
@@ -605,14 +671,14 @@ class _AkunPageState extends State<AkunPage> {
         actions: [
           TextButton(
             onPressed: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               Navigator.pop(ctx);
             },
             child: const Text('Batal'),
           ),
           ElevatedButton(
             onPressed: () {
-              SoundHelper().playClick(); // 🔥 suara
+              SoundHelper().playClick();
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Berhasil logout')),
