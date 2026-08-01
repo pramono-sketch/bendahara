@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:awesome_dialog/awesome_dialog.dart'; // 🔥 import awesome_dialog
 import '../data.dart';
 import '../templates/sound_helper.dart';
 
@@ -40,6 +41,7 @@ class HeartClipper extends CustomClipper<Path> {
   @override
   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
+
 // ===================== HALAMAN AKUN =====================
 class AkunPage extends StatefulWidget {
   const AkunPage({super.key});
@@ -83,7 +85,7 @@ class _AkunPageState extends State<AkunPage> {
       _phone = prefs.getString('phone') ?? '0812-3456-7890';
       _address = prefs.getString('address') ?? 'Jl. Pendidikan No. 123, Jakarta';
       _profileImagePath = prefs.getString('profileImagePath');
-      _isHeartShape = prefs.getBool('isHeartShape') ?? false; // 🔥 muat preferensi
+      _isHeartShape = prefs.getBool('isHeartShape') ?? false;
     } catch (e) {
       debugPrint('Gagal load profil: $e');
     } finally {
@@ -106,7 +108,7 @@ class _AkunPageState extends State<AkunPage> {
       await prefs.setString('email', _email);
       await prefs.setString('phone', _phone);
       await prefs.setString('address', _address);
-      await prefs.setBool('isHeartShape', _isHeartShape); // 🔥 simpan preferensi
+      await prefs.setBool('isHeartShape', _isHeartShape);
       if (_profileImagePath != null) {
         await prefs.setString('profileImagePath', _profileImagePath!);
       } else {
@@ -169,7 +171,6 @@ class _AkunPageState extends State<AkunPage> {
   // WIDGET: Header Profil (dengan opsi bentuk hati)
   // ============================================================
   Widget _buildProfileHeader() {
-    // Widget avatar yang akan dibungkus dengan ClipPath jika heart shape
     Widget avatar = CircleAvatar(
       radius: 60,
       backgroundImage: _profileImagePath != null
@@ -188,7 +189,6 @@ class _AkunPageState extends State<AkunPage> {
           : null,
     );
 
-    // Jika bentuk hati aktif, bungkus dengan ClipPath
     if (_isHeartShape) {
       avatar = ClipPath(
         clipper: HeartClipper(),
@@ -202,7 +202,6 @@ class _AkunPageState extends State<AkunPage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // 🔥 Tampilkan avatar (bisa lingkaran atau hati)
             GestureDetector(
               onTap: () {
                 SoundHelper().playClick();
@@ -267,7 +266,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // WIDGET: Kartu Informasi Detail (tidak berubah)
+  // WIDGET: Kartu Informasi Detail
   // ============================================================
   Widget _buildInfoCard() {
     return Card(
@@ -334,7 +333,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // WIDGET: Kartu Menu Akun (tidak berubah)
+  // WIDGET: Kartu Menu Akun
   // ============================================================
   Widget _buildMenuCard() {
     return Card(
@@ -402,7 +401,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Pilih Foto (tidak berubah)
+  // DIALOG: Pilih Foto
   // ============================================================
   void _showImagePickerDialog() {
     showModalBottomSheet(
@@ -466,7 +465,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Edit Profil (dengan switch bentuk hati)
+  // DIALOG: Edit Profil (dengan switch + Easter Egg popup)
   // ============================================================
   void _showEditProfileDialog() {
     _nameController.text = _username;
@@ -527,12 +526,33 @@ class _AkunPageState extends State<AkunPage> {
                       maxLines: 2,
                     ),
                     const SizedBox(height: 16),
-                    // 🔥 Switch untuk bentuk avatar
+                    // 🔥 Switch untuk bentuk avatar + Easter Egg popup
                     SwitchListTile(
                       title: const Text('Bentuk Avatar Hati'),
                       subtitle: const Text('Ubah avatar menjadi bentuk love'),
                       value: localHeartShape,
                       onChanged: (val) {
+                        // Putar suara notifikasi
+                        SoundHelper().playNotification();
+
+                        // 🔥 Jika diaktifkan (dari false ke true), tampilkan popup Easter Egg
+                        if (val && !localHeartShape) {
+                          AwesomeDialog(
+                            context: ctx,
+                            dialogType: DialogType.info,
+                            animType: AnimType.bottomSlide,
+                            headerAnimationLoop: false,
+                            title: '💖 Easter Egg!',
+                            desc:
+                                'Selamat! Anda mengaktifkan mode avatar hati.\nSemangat belajar dan berkarya! 🚀',
+                            btnOkOnPress: () {},
+                            btnOkIcon: Icons.favorite,
+                            btnOkColor: AppColors.primary,
+                            btnOkText: '❤️ Mantap!',
+                            useRootNavigator: false, // penting agar tidak konflik dengan dialog
+                          ).show();
+                        }
+
                         setStateDialog(() {
                           localHeartShape = val;
                         });
@@ -561,7 +581,7 @@ class _AkunPageState extends State<AkunPage> {
                     _email = _emailController.text.trim();
                     _phone = _phoneController.text.trim();
                     _address = _addressController.text.trim();
-                    _isHeartShape = localHeartShape; // 🔥 simpan pilihan
+                    _isHeartShape = localHeartShape;
                   });
                   await _saveProfileData();
                   Navigator.pop(ctx);
@@ -579,7 +599,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Ganti Password (tidak berubah)
+  // DIALOG: Ganti Password
   // ============================================================
   void _showChangePasswordDialog() {
     final oldPasswordController = TextEditingController();
@@ -660,7 +680,7 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Logout (tidak berubah)
+  // DIALOG: Logout
   // ============================================================
   void _showLogoutDialog() {
     showDialog(

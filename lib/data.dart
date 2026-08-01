@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 // ================== TEMA & KONSTANTA ==================
 class AppColors {
   static const primary = Color(0xFF1565C0);
+  static const primaryLight = Color(0xFF42A5F5);
   static const surface = Color(0xFFF5F7FA);
   static const card = Colors.white;
   static const success = Color(0xFF2E7D32);
@@ -14,7 +15,21 @@ class AppColors {
   static const textSecondary = Color(0xFF757575);
 }
 
-// ================== MODEL DATA ==================
+// ================== FUNGSI BANTU UMUM ==================
+String formatCurrency(double amount) {
+  final formatter = amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
+  return formatter;
+}
+
+Color getMajorColor(String kelas) {
+  if (kelas.contains('RPL')) return Colors.green;
+  if (kelas.contains('TKR')) return Colors.blue;
+  if (kelas.contains('TKJ')) return Colors.red;
+  return AppColors.primary;
+}
+
+// ================== MODEL DATA LAINNYA (TETAP) ==================
 enum PaymentStatus { lunas, belumBayar, sebagian }
 
 class PaymentItem {
@@ -166,20 +181,6 @@ class ActivityLog {
   }
 }
 
-// ================== FUNGSI BANTU ==================
-String formatCurrency(double amount) {
-  final formatter = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
-  return formatter;
-}
-
-Color getMajorColor(String kelas) {
-  if (kelas.contains('RPL')) return Colors.green;
-  if (kelas.contains('TKR')) return Colors.blue;
-  if (kelas.contains('TKJ')) return Colors.red;
-  return AppColors.primary;
-}
-
 // ================== DATA TAMBAHAN SISWA (EXTRA INFO) ==================
 Map<String, Map<String, String>> extraInfo = {};
 
@@ -205,25 +206,21 @@ String getExtraInfo(String id, String key) {
 
 void setExtraInfo(String id, String key, String value) {
   if (!extraInfo.containsKey(id)) {
-    // Inisialisasi dengan data default terlebih dahulu
-    getExtraInfo(id, key); // panggil getExtraInfo untuk membuat entry
+    getExtraInfo(id, key);
   }
-  extraInfo[id]![key] = value;
+  if (extraInfo.containsKey(id)) {
+    extraInfo[id]?[key] = value;
+  }
 }
 
-// ================== SISTEM TRANSAKSI DENGAN RESET BULANAN ==================
-// Transaksi bulan berjalan
+// ================== SISTEM TRANSAKSI ==================
 List<Transaction> dummyTransactions = [];
-
-// Arsip transaksi per bulan (key: "YYYY-MM")
 Map<String, List<Transaction>> arsipTransaksi = {};
 
-// Fungsi untuk menambah transaksi pemasukan
 void addIncomeTransaction(String description, double amount, {String category = 'Pemasukan'}) {
   _addTransaction(TransType.pemasukan, description, amount, category);
 }
 
-// Fungsi untuk menambah transaksi pengeluaran
 void addExpenseTransaction(String description, double amount, {String category = 'Pengeluaran'}) {
   _addTransaction(TransType.pengeluaran, description, amount, category);
 }
@@ -240,11 +237,9 @@ void _addTransaction(TransType type, String description, double amount, String c
   ));
 }
 
-// ================== RESET BULANAN ==================
 void resetMonthlyTransactions() {
   final now = DateTime.now();
   final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-
   if (dummyTransactions.isNotEmpty) {
     arsipTransaksi.putIfAbsent(monthKey, () => []);
     arsipTransaksi[monthKey]!.addAll(dummyTransactions);
@@ -252,7 +247,6 @@ void resetMonthlyTransactions() {
   }
 }
 
-// Inisialisasi data dummy untuk bulan-bulan sebelumnya agar laporan tidak kosong
 void initDummyTransactions() {
   final now = DateTime.now();
   for (int i = 1; i <= 6; i++) {
@@ -266,7 +260,6 @@ void initDummyTransactions() {
     }
     final key = '$y-${m.toString().padLeft(2, '0')}';
     arsipTransaksi.putIfAbsent(key, () => []);
-
     final random = Random();
     final count = random.nextInt(5) + 3;
     for (int j = 0; j < count; j++) {
@@ -287,7 +280,7 @@ void initDummyTransactions() {
   }
 }
 
-// ================== DATA SISWA DAN LAINNYA (TETAP) ==================
+// ================== DATA SISWA (TETAP) ==================
 const List<String> gradeLevels = ['X', 'XI', 'XII'];
 const List<String> majors = ['TKJ', 'RPL', 'TKR'];
 
@@ -360,7 +353,6 @@ List<Student> generateDummyStudents() {
   List<Student> students = [];
   int idCounter = 1;
   int nisCounter = 1;
-
   for (var grade in gradeLevels) {
     for (var major in majors) {
       for (int i = 1; i <= 5; i++) {
@@ -368,7 +360,6 @@ List<Student> generateDummyStudents() {
         final String name = 'Siswa $grade $major $i';
         final String nis = '2026${(nisCounter++).toString().padLeft(3, '0')}';
         final String id = 'STD${(idCounter++).toString().padLeft(3, '0')}';
-
         List<PaymentItem> payments = getDefaultPaymentsForClass(kelas);
         for (int j = 0; j < payments.length; j++) {
           if (j == 1 && idCounter % 3 == 0) payments[j].status = PaymentStatus.belumBayar;
@@ -382,7 +373,6 @@ List<Student> generateDummyStudents() {
             payments[j].lastPaymentDate = DateTime(2026, 3, 20);
           }
         }
-
         students.add(Student(
           id: id,
           name: name,
@@ -405,23 +395,17 @@ List<Student> dummyStudents = generateDummyStudents();
 Map<String, Map<String, List<Student>>> arsipSiswa = {};
 
 void archiveGraduatedStudents(String tahunAjaran) {
-  List<Student> graduated = dummyStudents.where((s) => 
-    s.kelas.startsWith('XII') && s.isActive
-  ).toList();
-
+  List<Student> graduated = dummyStudents.where((s) => s.kelas.startsWith('XII') && s.isActive).toList();
   if (graduated.isEmpty) return;
-
   Map<String, List<Student>> grouped = {};
   for (var s in graduated) {
     grouped.putIfAbsent(s.kelas, () => []).add(s);
   }
-
   arsipSiswa.putIfAbsent(tahunAjaran, () => {});
   for (var entry in grouped.entries) {
     arsipSiswa[tahunAjaran]!.putIfAbsent(entry.key, () => []);
     arsipSiswa[tahunAjaran]![entry.key]!.addAll(entry.value);
   }
-
   for (var s in graduated) {
     s.isActive = false;
   }
@@ -518,13 +502,11 @@ List<DigitalAccount> dummyAccounts = [
       keterangan: 'Moodle'),
 ];
 
-// ============================================================
-// ⚠️ PERUBAHAN: LOG DIKOSONGKAN (HANYA BAGIAN INI YANG DIUBAH)
-// ============================================================
-List<ActivityLog> dummyLogs = []; // <-- DIKOSONGKAN
+List<ActivityLog> dummyLogs = [];
 
-// ================== INISIALISASI DATA ==================
+// ================== INISIALISASI DATA (TANPA GAJI GURU) ==================
 void initData() {
   initDummyTransactions();
   dummyTransactions.clear();
+  // Inisialisasi gaji guru sekarang ada di gaji_guru.dart
 }

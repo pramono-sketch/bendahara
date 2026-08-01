@@ -44,6 +44,21 @@ class SoundHelper {
     }
   }
 
+  /// 🆕 Putar suara notifikasi (untuk switch, alert, dll)
+  Future<void> playNotification() async {
+    if (!_isInitialized) {
+      debugPrint('⚠️ SoundHelper belum diinisialisasi!');
+      return;
+    }
+    try {
+      await _player.stop();
+      await _player.setVolume(_currentVolume);
+      await _player.play(AssetSource('sound/notification.mp3'));
+    } catch (e) {
+      debugPrint('🔊 Error play notification: $e');
+    }
+  }
+
   /// Set volume global (0.0 - 1.0)
   Future<void> setVolume(double volume) async {
     _currentVolume = volume.clamp(0.0, 1.0);

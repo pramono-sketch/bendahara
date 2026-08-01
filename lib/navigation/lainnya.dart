@@ -6,13 +6,11 @@ import '../features/tambahkan.dart';
 import '../features/ai_assistant.dart';
 import '../features/database_akun.dart';
 import '../features/log_aktivitas.dart';
-import '../features/pemasukan.dart';
-import '../features/pengeluaran.dart';
 import '../features/statistik.dart';
 import '../features/tagihan.dart';
-import '../templates/sound_helper.dart'; // 🔥 import helper global
+import '../features/gaji_guru.dart';
+import '../templates/sound_helper.dart';
 
-// ================== MORE PAGE (JEMBATAN NAVIGASI) ==================
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
 
@@ -20,10 +18,9 @@ class MorePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       {'title': 'Tagihan', 'icon': Icons.receipt_long, 'page': const TagihanPage()},
-      {'title': 'Pemasukan', 'icon': Icons.arrow_downward, 'page': const PemasukanPage()},
-      {'title': 'Pengeluaran', 'icon': Icons.arrow_upward, 'page': const PengeluaranPage()},
       {'title': 'Statistik', 'icon': Icons.bar_chart, 'page': const StatistikPage()},
       {'title': 'AI Assistant', 'icon': Icons.auto_awesome, 'page': const AIAssistantPage()},
+      {'title': 'Gaji Guru', 'icon': Icons.attach_money, 'page': const GajiGuruPage()},
       {'title': 'Tambah Data', 'icon': Icons.person_add, 'page': const ManageStudentsPage()},
       {'title': 'Akun Digital', 'icon': Icons.vpn_key, 'page': const DatabaseAkunPage()},
       {'title': 'Log Aktivitas', 'icon': Icons.history, 'page': const LogAktivitasPage()},
@@ -50,7 +47,6 @@ class MorePage extends StatelessWidget {
           final item = items[index];
           return GestureDetector(
             onTap: () async {
-              // 🔥 Gunakan SoundHelper global
               await SoundHelper().playClick();
               if (context.mounted) {
                 Navigator.push(
