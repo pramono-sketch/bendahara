@@ -6,53 +6,6 @@ import '../data.dart';
 import '../templates/sound_helper.dart';
 
 // ============================================================
-// MODEL AKUN DIGITAL (GURU & SISWA)
-// ============================================================
-class AkunDigital {
-  final String id;
-  String name;
-  String email;
-  String penanggungJawab;
-  String password;
-  String keterangan;
-  String category; // 'guru' atau 'siswa'
-  String? kelas;   // hanya untuk siswa (contoh: 'X RPL')
-
-  AkunDigital({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.penanggungJawab,
-    required this.password,
-    required this.keterangan,
-    required this.category,
-    this.kelas,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'email': email,
-        'penanggungJawab': penanggungJawab,
-        'password': password,
-        'keterangan': keterangan,
-        'category': category,
-        'kelas': kelas,
-      };
-
-  factory AkunDigital.fromJson(Map<String, dynamic> json) => AkunDigital(
-        id: json['id'],
-        name: json['name'],
-        email: json['email'],
-        penanggungJawab: json['penanggungJawab'],
-        password: json['password'],
-        keterangan: json['keterangan'],
-        category: json['category'],
-        kelas: json['kelas'],
-      );
-}
-
-// ============================================================
 // HALAMAN UTAMA
 // ============================================================
 class DatabaseAkunPage extends StatefulWidget {
@@ -73,9 +26,13 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
   // Filter untuk Siswa (kelas)
   String _filterKelasSiswa = 'Semua';
 
+  // Pencarian
+  String _searchQuery = '';
+
   // Controller untuk form
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _namaSiswaController = TextEditingController(); // tambahan
   final _emailController = TextEditingController();
   final _penanggungJawabController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -111,6 +68,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
   void dispose() {
     _tabController.dispose();
     _nameController.dispose();
+    _namaSiswaController.dispose();
     _emailController.dispose();
     _penanggungJawabController.dispose();
     _passwordController.dispose();
@@ -178,6 +136,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
 
     if (existing != null) {
       _nameController.text = existing.name;
+      _namaSiswaController.text = existing.namaSiswa ?? '';
       _emailController.text = existing.email;
       _penanggungJawabController.text = existing.penanggungJawab;
       _passwordController.text = existing.password;
@@ -186,6 +145,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
       _selectedKelas = existing.kelas;
     } else {
       _nameController.clear();
+      _namaSiswaController.clear();
       _emailController.clear();
       _penanggungJawabController.clear();
       _passwordController.clear();
@@ -208,7 +168,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Nama
+                      // Nama Akun / Layanan
                       TextFormField(
                         controller: _nameController,
                         decoration: const InputDecoration(
@@ -219,6 +179,19 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                             v!.trim().isEmpty ? 'Wajib diisi' : null,
                       ),
                       const SizedBox(height: 12),
+
+                      // Nama Siswa (hanya jika kategori siswa)
+                      if (_selectedCategory == 'siswa')
+                        TextFormField(
+                          controller: _namaSiswaController,
+                          decoration: const InputDecoration(
+                            labelText: 'Nama Siswa (untuk tampilan)',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) =>
+                              v!.trim().isEmpty ? 'Wajib diisi' : null,
+                        ),
+                      if (_selectedCategory == 'siswa') const SizedBox(height: 12),
 
                       // Email
                       TextFormField(
@@ -278,6 +251,8 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                           setStateDialog(() {
                             _selectedCategory = val!;
                             if (val == 'guru') _selectedKelas = null;
+                            // reset nama siswa
+                            if (val == 'guru') _namaSiswaController.clear();
                           });
                         },
                         decoration: const InputDecoration(
@@ -326,6 +301,9 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                   SoundHelper().playClick();
                   if (_formKey.currentState!.validate()) {
                     final name = _nameController.text.trim();
+                    final namaSiswa = _selectedCategory == 'siswa'
+                        ? _namaSiswaController.text.trim()
+                        : null;
                     final email = _emailController.text.trim();
                     final penanggungJawab =
                         _penanggungJawabController.text.trim();
@@ -340,6 +318,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                       final newAccount = AkunDigital(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
                         name: name,
+                        namaSiswa: namaSiswa,
                         email: email,
                         penanggungJawab: penanggungJawab,
                         password: password,
@@ -356,6 +335,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                       final updated = AkunDigital(
                         id: existing.id,
                         name: name,
+                        namaSiswa: namaSiswa,
                         email: email,
                         penanggungJawab: penanggungJawab,
                         password: password,
@@ -426,9 +406,10 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
           children: [
             const Text(
               'Proses ini akan:\n'
-              '• Mengarsipkan semua siswa kelas XII (lulus) ke folder arsip\n'
-              '• Menaikkan kelas XI ke XII\n'
-              '• Menaikkan kelas X ke XI\n\n'
+              '• Mengarsipkan semua siswa kelas XII (lulus) ke folder arsip siswa\n'
+              '• Menaikkan kelas siswa X→XI, XI→XII\n'
+              '• Mengarsipkan akun digital siswa kelas XII ke folder arsip akun digital\n'
+              '• Menaikkan kelas akun digital siswa X→XI, XI→XII\n\n'
               'Catatan: Siswa baru untuk kelas X harus ditambahkan secara manual.\n\n'
               'Masukkan nama folder untuk arsip (misal: "2025/2026" atau "Angkatan 2025"):',
             ),
@@ -463,11 +444,20 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                 return;
               }
 
-              // Lakukan kenaikan kelas (menggunakan fungsi dari data.dart)
-              archiveGraduatedStudents(folderName);
-              processClassPromotion();
+              // 1. Proses kenaikan kelas untuk data siswa (dummyStudents)
+              archiveGraduatedStudents(folderName); // arsip siswa XII
+              processClassPromotion(); // naikkan X→XI, XI→XII
 
-              // Catat log
+              // 2. Proses kenaikan kelas untuk akun digital siswa
+              //    Arsipkan akun XII ke arsipAkunSiswa
+              archiveGraduatedAccounts(folderName, _allAccounts);
+              //    Naikkan akun X→XI, XI→XII
+              promoteAccounts(_allAccounts);
+
+              // 3. Simpan perubahan akun digital ke SharedPreferences
+              _saveAccounts();
+
+              // 4. Catat log
               dummyLogs.insert(
                 0,
                 ActivityLog(
@@ -498,29 +488,34 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
     );
   }
 
-  // ===================== LIHAT ARSIP =====================
+  // ===================== LIHAT ARSIP AKUN DIGITAL =====================
   void _viewArchive() {
     SoundHelper().playClick();
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ArchiveRootPage()),
+      MaterialPageRoute(builder: (_) => const ArchiveAkunPage()),
     ).then((_) => setState(() {}));
   }
 
   // ===================== BUILD =====================
   @override
   Widget build(BuildContext context) {
-    // Filter list berdasarkan tab dan filter kelas
-    List<AkunDigital> guruList =
-        _allAccounts.where((a) => a.category == 'guru').toList();
+    // Filter guru (tanpa filter kelas)
+    List<AkunDigital> guruList = _allAccounts
+        .where((a) => a.category == 'guru')
+        .where((a) => _matchesSearch(a))
+        .toList();
 
+    // Filter siswa: hanya yang belum lulus (kelas != 'Lulus') dan sesuai filter kelas & pencarian
     List<AkunDigital> siswaList = _allAccounts
         .where((a) => a.category == 'siswa')
+        .where((a) => a.kelas != 'Lulus') // hilangkan siswa lulus
+        .where((a) {
+          if (_filterKelasSiswa == 'Semua') return true;
+          return a.kelas == _filterKelasSiswa;
+        })
+        .where((a) => _matchesSearch(a))
         .toList();
-    if (_filterKelasSiswa != 'Semua') {
-      siswaList =
-          siswaList.where((a) => a.kelas == _filterKelasSiswa).toList();
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -533,13 +528,13 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
           ],
         ),
         actions: [
-          // Tombol Arsip
+          // Tombol Arsip (khusus untuk akun digital)
           IconButton(
             icon: const Icon(Icons.archive),
             onPressed: _viewArchive,
-            tooltip: 'Lihat Arsip Siswa',
+            tooltip: 'Lihat Arsip Akun Digital',
           ),
-          // Tombol Naik Kelas (hanya untuk tab siswa? tapi kita taruh di app bar saja)
+          // Tombol Naik Kelas
           IconButton(
             icon: const Icon(Icons.arrow_upward),
             onPressed: _promoteClasses,
@@ -555,47 +550,87 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          // TAB GURU
-          _buildAccountList(guruList, isGuru: true),
+          // Pencarian
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Cari akun...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+            ),
+          ),
+          // TabBarView
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // TAB GURU
+                _buildAccountList(guruList, isGuru: true),
 
-          // TAB SISWA (dengan filter kelas)
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
+                // TAB SISWA (dengan filter kelas)
+                Column(
                   children: [
-                    const Text('Filter Kelas:'),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButton<String>(
-                        value: _filterKelasSiswa,
-                        items: _kelasOptions.map((kelas) {
-                          return DropdownMenuItem(
-                            value: kelas,
-                            child: Text(kelas),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          SoundHelper().playClick();
-                          setState(() => _filterKelasSiswa = val!);
-                        },
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        children: [
+                          const Text('Filter Kelas:'),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: _filterKelasSiswa,
+                              items: _kelasOptions.map((kelas) {
+                                return DropdownMenuItem(
+                                  value: kelas,
+                                  child: Text(kelas),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                SoundHelper().playClick();
+                                setState(() => _filterKelasSiswa = val!);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    Expanded(
+                      child: _buildAccountList(siswaList, isGuru: false),
                     ),
                   ],
                 ),
-              ),
-              Expanded(
-                child: _buildAccountList(siswaList, isGuru: false),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
+  }
+
+  // ===================== FUNGSI BANTU PENCARIAN =====================
+  bool _matchesSearch(AkunDigital acc) {
+    if (_searchQuery.isEmpty) return true;
+    final query = _searchQuery.toLowerCase();
+    return acc.name.toLowerCase().contains(query) ||
+        (acc.namaSiswa?.toLowerCase().contains(query) ?? false) ||
+        acc.email.toLowerCase().contains(query) ||
+        acc.penanggungJawab.toLowerCase().contains(query) ||
+        (acc.kelas?.toLowerCase().contains(query) ?? false);
   }
 
   // ===================== WIDGET LIST AKUN =====================
@@ -616,7 +651,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
             ),
             const SizedBox(height: 16),
             Text(
-              'Belum ada akun ${isGuru ? 'guru' : 'siswa'}',
+              'Belum ada akun ${isGuru ? 'guru' : 'siswa aktif'}',
               style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 8),
@@ -640,6 +675,11 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
 
   // ===================== WIDGET KARTU AKUN =====================
   Widget _buildAccountCard(AkunDigital acc) {
+    // Tampilkan nama siswa jika ada, fallback ke nama layanan
+    String displayTitle = acc.category == 'siswa' && acc.namaSiswa != null && acc.namaSiswa!.isNotEmpty
+        ? acc.namaSiswa!
+        : acc.name;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: ExpansionTile(
@@ -651,10 +691,16 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
           ),
         ),
         title: Text(
-          acc.name,
+          displayTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
-        subtitle: Text(acc.email),
+        subtitle: Text(
+          acc.email,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
         onExpansionChanged: (_) => SoundHelper().playClick(),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -665,7 +711,9 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                 padding: const EdgeInsets.only(right: 8),
                 child: Chip(
                   label: Text(acc.kelas!),
-                  backgroundColor: Colors.blue.shade100,
+                  backgroundColor: acc.kelas == 'Lulus'
+                      ? Colors.grey.shade300
+                      : Colors.blue.shade100,
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -699,6 +747,9 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (acc.category == 'siswa' && acc.namaSiswa != null && acc.namaSiswa!.isNotEmpty)
+                  _infoRow('Nama Siswa', acc.namaSiswa!),
+                _infoRow('Layanan', acc.name),
                 _infoRow('Email', acc.email),
                 _infoRow('Penanggung Jawab', acc.penanggungJawab),
                 _infoRow('Keterangan', acc.keterangan),
@@ -730,6 +781,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
             child: Text(
               value.isEmpty ? '-' : value,
               style: const TextStyle(fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -739,25 +791,25 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
 }
 
 // ============================================================
-// HALAMAN ARSIP (diadaptasi dari siswa.dart)
+// HALAMAN ARSIP AKUN DIGITAL (tidak berubah)
 // ============================================================
-class ArchiveRootPage extends StatelessWidget {
-  const ArchiveRootPage({super.key});
+class ArchiveAkunPage extends StatelessWidget {
+  const ArchiveAkunPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final tahunKeys = arsipSiswa.keys.toList()..sort((a, b) => b.compareTo(a));
+    final tahunKeys = arsipAkunSiswa.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Arsip Siswa')),
+      appBar: AppBar(title: const Text('Arsip Akun Digital Siswa')),
       body: tahunKeys.isEmpty
-          ? const Center(child: Text('Belum ada arsip'))
+          ? const Center(child: Text('Belum ada arsip akun digital'))
           : ListView.builder(
               itemCount: tahunKeys.length,
               itemBuilder: (context, index) {
                 final tahun = tahunKeys[index];
-                final kelasMap = arsipSiswa[tahun]!;
-                final totalSiswa = kelasMap.values.fold(
+                final kelasMap = arsipAkunSiswa[tahun]!;
+                final totalAkun = kelasMap.values.fold(
                   0,
                   (sum, list) => sum + list.length,
                 );
@@ -767,7 +819,7 @@ class ArchiveRootPage extends StatelessWidget {
                     leading: const Icon(Icons.folder, color: Colors.amber),
                     title: Text(tahun),
                     subtitle: Text(
-                      '$totalSiswa siswa • ${kelasMap.length} kelas',
+                      '$totalAkun akun • ${kelasMap.length} kelas',
                     ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
@@ -775,7 +827,7 @@ class ArchiveRootPage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ArchiveClassPage(tahun: tahun),
+                          builder: (_) => ArchiveAkunClassPage(tahun: tahun),
                         ),
                       );
                     },
@@ -787,13 +839,13 @@ class ArchiveRootPage extends StatelessWidget {
   }
 }
 
-class ArchiveClassPage extends StatelessWidget {
+class ArchiveAkunClassPage extends StatelessWidget {
   final String tahun;
-  const ArchiveClassPage({super.key, required this.tahun});
+  const ArchiveAkunClassPage({super.key, required this.tahun});
 
   @override
   Widget build(BuildContext context) {
-    final kelasMap = arsipSiswa[tahun] ?? {};
+    final kelasMap = arsipAkunSiswa[tahun] ?? {};
     final kelasKeys = kelasMap.keys.toList()..sort();
 
     return Scaffold(
@@ -804,7 +856,7 @@ class ArchiveClassPage extends StatelessWidget {
               itemCount: kelasKeys.length,
               itemBuilder: (context, index) {
                 final kelas = kelasKeys[index];
-                final siswaList = kelasMap[kelas]!;
+                final akunList = kelasMap[kelas]!;
 
                 return Card(
                   child: ListTile(
@@ -813,17 +865,17 @@ class ArchiveClassPage extends StatelessWidget {
                       color: getMajorColor(kelas),
                     ),
                     title: Text(kelas),
-                    subtitle: Text('${siswaList.length} siswa'),
+                    subtitle: Text('${akunList.length} akun'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       SoundHelper().playClick();
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ArchiveStudentListPage(
+                          builder: (_) => ArchiveAkunListPage(
                             tahun: tahun,
                             kelas: kelas,
-                            siswaList: siswaList,
+                            akunList: akunList,
                           ),
                         ),
                       );
@@ -836,16 +888,16 @@ class ArchiveClassPage extends StatelessWidget {
   }
 }
 
-class ArchiveStudentListPage extends StatelessWidget {
+class ArchiveAkunListPage extends StatelessWidget {
   final String tahun;
   final String kelas;
-  final List<Student> siswaList;
+  final List<AkunDigital> akunList;
 
-  const ArchiveStudentListPage({
+  const ArchiveAkunListPage({
     super.key,
     required this.tahun,
     required this.kelas,
-    required this.siswaList,
+    required this.akunList,
   });
 
   @override
@@ -853,26 +905,28 @@ class ArchiveStudentListPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text('$kelas - $tahun')),
       body: ListView.builder(
-        itemCount: siswaList.length,
+        itemCount: akunList.length,
         itemBuilder: (context, index) {
-          final s = siswaList[index];
+          final a = akunList[index];
           return Card(
             child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.grey.withOpacity(0.3),
-                child: Text(
-                  s.name[0],
-                  style: const TextStyle(color: Colors.grey),
-                ),
+              leading: const Icon(Icons.account_circle, color: Colors.grey),
+              title: Text(
+                a.namaSiswa ?? a.name,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-              title: Text(s.name),
-              subtitle: Text('NIS: ${s.nis} • ${s.alamat}'),
+              subtitle: Text(
+                'Email: ${a.email} • ${a.penanggungJawab}',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
               trailing: IconButton(
                 icon: const Icon(Icons.remove_red_eye, color: Colors.grey),
                 onPressed: () {
                   SoundHelper().playClick();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Siswa sudah lulus (arsip)')),
+                    const SnackBar(content: Text('Akun sudah diarsipkan (lulus)')),
                   );
                 },
               ),
