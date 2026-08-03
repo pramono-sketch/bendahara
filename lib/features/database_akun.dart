@@ -40,9 +40,6 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
   String _selectedCategory = 'guru';
   String? _selectedKelas;
 
-  // Untuk edit
-  AkunDigital? _editingAccount;
-
   // Daftar pilihan kelas
   final List<String> _kelasOptions = [
     'Semua',
@@ -132,7 +129,6 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
 
   // ===================== DIALOG TAMBAH / EDIT =====================
   void _showAccountDialog({AkunDigital? existing}) {
-    _editingAccount = existing;
 
     if (existing != null) {
       _nameController.text = existing.name;
@@ -674,96 +670,103 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
   }
 
   // ===================== WIDGET KARTU AKUN =====================
-  Widget _buildAccountCard(AkunDigital acc) {
-    // Tampilkan nama siswa jika ada, fallback ke nama layanan
-    String displayTitle = acc.category == 'siswa' && acc.namaSiswa != null && acc.namaSiswa!.isNotEmpty
-        ? acc.namaSiswa!
-        : acc.name;
+Widget _buildAccountCard(AkunDigital acc) {
+  // Data untuk tampilan
+  final displayTitle = acc.name;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primary,
-          child: Icon(
-            acc.category == 'guru' ? Icons.person : Icons.school,
-            color: Colors.white,
-          ),
+  final displaySubtitle = acc.category == 'siswa'
+      ? (acc.namaSiswa?.isNotEmpty == true
+          ? acc.namaSiswa!
+          : '-')
+      : acc.email;
+
+  return Card(
+    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: ExpansionTile(
+      leading: CircleAvatar(
+        backgroundColor: AppColors.primary,
+        child: Icon(
+          acc.category == 'guru' ? Icons.person : Icons.school,
+          color: Colors.white,
         ),
-        title: Text(
-          displayTitle,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-        subtitle: Text(
-          acc.email,
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-        onExpansionChanged: (_) => SoundHelper().playClick(),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Tampilkan kelas jika siswa
-            if (acc.category == 'siswa' && acc.kelas != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Chip(
-                  label: Text(acc.kelas!),
-                  backgroundColor: acc.kelas == 'Lulus'
-                      ? Colors.grey.shade300
-                      : Colors.blue.shade100,
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              onPressed: () {
-                SoundHelper().playClick();
-                _showAccountDialog(existing: acc);
-              },
-              tooltip: 'Edit',
-              constraints: const BoxConstraints(),
-              padding: EdgeInsets.zero,
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-              onPressed: () {
-                SoundHelper().playClick();
-                _showDeleteConfirmation(acc.id, acc.name);
-              },
-              tooltip: 'Hapus',
-              constraints: const BoxConstraints(),
-              padding: EdgeInsets.zero,
-            ),
-            const SizedBox(width: 4),
-          ],
-        ),
+      ),
+      title: Text(
+        displayTitle,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+      ),
+      subtitle: Text(
+        displaySubtitle,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+      ),
+      onExpansionChanged: (_) => SoundHelper().playClick(),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (acc.category == 'siswa' && acc.namaSiswa != null && acc.namaSiswa!.isNotEmpty)
-                  _infoRow('Nama Siswa', acc.namaSiswa!),
-                _infoRow('Layanan', acc.name),
-                _infoRow('Email', acc.email),
-                _infoRow('Penanggung Jawab', acc.penanggungJawab),
-                _infoRow('Keterangan', acc.keterangan),
-                _infoRow('Password', acc.password),
-                if (acc.category == 'siswa' && acc.kelas != null)
-                  _infoRow('Kelas', acc.kelas!),
-              ],
+          if (acc.category == 'siswa' && acc.kelas != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Chip(
+                label: Text(acc.kelas!),
+                backgroundColor: acc.kelas == 'Lulus'
+                    ? Colors.grey.shade300
+                    : Colors.blue.shade100,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 20),
+            onPressed: () {
+              SoundHelper().playClick();
+              _showAccountDialog(existing: acc);
+            },
+            tooltip: 'Edit',
+            constraints: const BoxConstraints(),
+            padding: EdgeInsets.zero,
           ),
+          IconButton(
+            icon: const Icon(
+              Icons.delete_outline,
+              size: 20,
+              color: Colors.red,
+            ),
+            onPressed: () {
+              SoundHelper().playClick();
+              _showDeleteConfirmation(acc.id, acc.name);
+            },
+            tooltip: 'Hapus',
+            constraints: const BoxConstraints(),
+            padding: EdgeInsets.zero,
+          ),
+          const SizedBox(width: 4),
         ],
       ),
-    );
-  }
-
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (acc.category == 'siswa' &&
+                  acc.namaSiswa?.isNotEmpty == true)
+                _infoRow('Nama Siswa', acc.namaSiswa!),
+              _infoRow('Layanan', acc.name),
+              _infoRow('Email', acc.email),
+              _infoRow('Penanggung Jawab', acc.penanggungJawab),
+              _infoRow('Keterangan', acc.keterangan),
+              _infoRow('Password', acc.password),
+              if (acc.category == 'siswa' && acc.kelas != null)
+                _infoRow('Kelas', acc.kelas!),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
   Widget _infoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
