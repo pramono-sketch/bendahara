@@ -1,15 +1,16 @@
-// lib/features/gaji_guru.dart
+// features/gaji_guru.dart
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../data.dart';
 import '../templates/sound_helper.dart';
+import '../service/export_gaji_guru.dart';
+import '../cheat.dart';
 
 // ================== KOMPONEN GAJI ==================
 class KomponenGaji {
   String nama;
   double jumlah;
   bool isTunjangan;
-  String kategori; // 'Umum', 'Absen', 'Kehadiran', 'Total Jam Mengajar', 'Jabatan Tambahan'
+  String kategori;
 
   KomponenGaji({
     required this.nama,
@@ -31,6 +32,20 @@ class KomponenGaji {
       kategori: kategori ?? this.kategori,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'nama': nama,
+        'jumlah': jumlah,
+        'isTunjangan': isTunjangan,
+        'kategori': kategori,
+      };
+
+  factory KomponenGaji.fromJson(Map<String, dynamic> json) => KomponenGaji(
+        nama: json['nama'],
+        jumlah: json['jumlah'],
+        isTunjangan: json['isTunjangan'],
+        kategori: json['kategori'],
+      );
 }
 
 // ================== MANAJEMEN GAJI GURU ==================
@@ -44,7 +59,7 @@ class GajiGuru {
   DateTime? tanggalBayar;
   String? metodeBayar;
   String? catatan;
-  bool isArchived; // baru: menandai data yang sudah diarsipkan (tidak ditampilkan di daftar aktif)
+  bool isArchived;
 
   GajiGuru({
     required this.id,
@@ -92,42 +107,51 @@ class GajiGuru {
       isArchived: isArchived ?? this.isArchived,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'namaGuru': namaGuru,
+        'komponen': komponen.map((k) => k.toJson()).toList(),
+        'bulan': bulan,
+        'tahun': tahun,
+        'isPaid': isPaid,
+        'tanggalBayar': tanggalBayar?.toIso8601String(),
+        'metodeBayar': metodeBayar,
+        'catatan': catatan,
+        'isArchived': isArchived,
+      };
+
+  factory GajiGuru.fromJson(Map<String, dynamic> json) => GajiGuru(
+        id: json['id'],
+        namaGuru: json['namaGuru'],
+        komponen: (json['komponen'] as List)
+            .map((e) => KomponenGaji.fromJson(e))
+            .toList(),
+        bulan: json['bulan'],
+        tahun: json['tahun'],
+        isPaid: json['isPaid'],
+        tanggalBayar: json['tanggalBayar'] != null
+            ? DateTime.parse(json['tanggalBayar'])
+            : null,
+        metodeBayar: json['metodeBayar'],
+        catatan: json['catatan'],
+        isArchived: json['isArchived'],
+      );
 }
 
-// ================== MASTER DAFTAR GURU & STATE GLOBAL ==================
-List<String> teacherList = [
-  'Winarno S.E.S, S.Pd',
-  'Ali Faesol, S.Pd.I.',
-  'Susi Wulandari, S.Pd',
-  'Kris Setyowati, S.Pd',
-  'Eko Ardhiyanto, S. Kom.',
-  'Aris Khoirun Ma\'dum, S.E',
-  'Khoirul Ihsan Z. R, S. Sos.',
-  'Didin Arif Setiawan, S. Pd. I',
-  'Ust. Ahmad Sholeh, S.Pd.I',
-  'Farid Fahmi, S. T.',
-  'Rizki Safitri, S. Pd.',
-  'Shyecha Syaidatun Nisa\', S. E.',
-  'Ali Muhlisin, S. Pd.',
-  'Windi Kusumowardani, S. Pd.',
-  'Wiendha Kurnia Pranata, S. Pd.',
-  'Ustz. Afivatun Nadliyah, Al Hafidzah, M.Pd',
-  'Nike Izza Elfana, S.Pd',
-  'Novita Nur Farida, S. Pd.',
-  'Dwi Luvi Nur Ahmad, S. Kom.',
-  'Vera Artanti, S. Kom.',
-  'Hikmah Lailatul Kamalia, S. Pd.',
-  'Niken Octevani Army, S. T.',
-  'Imam Syibawech, S. Kom',
-  'Alfida Zumaroh, S. Kom.',
-  'Nur Khamim',
-  'Mustagfirrin',
-];
-
-Set<String> inactiveTeachers = {}; // guru yang tidak aktif (keluar/pensiun)
-int currentBulan = DateTime.now().month;
-int currentTahun = DateTime.now().year;
-List<GajiGuru> gajiGuruList = [];
+// ================== FUNGSI FORMAT ANGKA ==================
+String formatCurrency(double value) {
+  if (value.isInfinite || value.isNaN) return '0';
+  if (value > 1e15) return '> 1.000.000.000.000.000';
+  if (value < -1e15) return '< -1.000.000.000.000.000';
+  String str = value.toStringAsFixed(2);
+  List<String> parts = str.split('.');
+  String intPart = parts[0];
+  String decPart = parts.length > 1 ? '.${parts[1]}' : '';
+  RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+  String formatted = intPart.replaceAllMapped(reg, (Match match) => '${match[1]}.');
+  return formatted + decPart;
+}
 
 String getBulanNama(int bulan) {
   const nama = [
@@ -135,40 +159,6 @@ String getBulanNama(int bulan) {
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
   return nama[bulan - 1];
-}
-
-List<KomponenGaji> generateKomponenDefault() {
-  return []; // KOSONG
-}
-
-void addTeacher(String nama) {
-  if (nama.trim().isEmpty) return;
-  if (!teacherList.contains(nama)) {
-    teacherList.add(nama);
-  }
-}
-
-void removeTeacher(String nama) {
-  teacherList.remove(nama);
-  inactiveTeachers.remove(nama); // jika dinonaktifkan, hapus dari nonaktif
-}
-
-void moveTeacher(int fromIndex, int toIndex) {
-  if (fromIndex == toIndex) return;
-  final item = teacherList.removeAt(fromIndex);
-  teacherList.insert(toIndex, item);
-}
-
-void toggleTeacherActive(String nama) {
-  if (inactiveTeachers.contains(nama)) {
-    inactiveTeachers.remove(nama);
-  } else {
-    inactiveTeachers.add(nama);
-  }
-}
-
-void initGajiGuruData() {
-  // kosong
 }
 
 // ================== HALAMAN UTAMA ==================
@@ -181,23 +171,60 @@ class GajiGuruPage extends StatefulWidget {
 
 class _GajiGuruPageState extends State<GajiGuruPage>
     with SingleTickerProviderStateMixin {
+  // ===== State Data =====
+  List<String> teacherList = [];
+  List<GajiGuru> gajiGuruList = [];
+  int currentBulan = DateTime.now().month;
+  int currentTahun = DateTime.now().year;
+
+  // ===== UI State =====
   int? filterBulan;
   int? filterTahun;
   String? filterStatus;
-  String? filterGuru;
   String searchQuery = '';
-
-  // Bulk selection
   bool _selectionMode = false;
   Set<String> selectedIds = {};
 
+  // ===== Loading State =====
+  bool _isLoading = false;
+
+  // ===== Controllers =====
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
+
+  // ===== Data dummy guru =====
+  final List<String> _defaultTeachers = [
+    'Ali Faesol, S.Pd.I.',
+    'Susi Wulandari, S.Pd',
+    'Kris Setyowati, S.Pd',
+    'Eko Ardhiyanto, S. Kom.',
+    'Aris Khoirun Ma\'dum, S.E',
+    'Khoirul Ihsan Z. R, S. Sos.',
+    'Didin Arif Setiawan, S. Pd. I',
+    'Ust. Ahmad Sholeh, S.Pd.I',
+    'Farid Fahmi, S. T.',
+    'Rizki Safitri, S. Pd.',
+    'Shyecha Syaidatun Nisa\', S. E.',
+    'Ali Muhlisin, S. Pd.',
+    'Windi Kusumowardani, S. Pd.',
+    'Wiendha Kurnia Pranata, S. Pd.',
+    'Ustz. Afivatun Nadliyah, Al Hafidzah, M.Pd',
+    'Nike Izza Elfana, S.Pd',
+    'Novita Nur Farida, S. Pd.',
+    'Dwi Luvi Nur Ahmad, S. Kom.',
+    'Vera Artanti, S. Kom.',
+    'Hikmah Lailatul Kamalia, S. Pd.',
+    'Niken Octevani Army, S. T.',
+    'Imam Syibawech, S. Kom',
+    'Alfida Zumaroh, S. Kom.',
+    'Nur Khamim',
+    'Mustagfirrin',
+  ];
 
   @override
   void initState() {
     super.initState();
-    // Inisialisasi filter dengan currentBulan/Tahun global
+    teacherList = List.from(_defaultTeachers);
     filterBulan = currentBulan;
     filterTahun = currentTahun;
 
@@ -214,33 +241,28 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     super.dispose();
   }
 
-  // ==================== SIMULASI PERGANTIAN BULAN GLOBAL ====================
-  void _simulateMonthChange() {
-    setState(() {
-      // Naikkan bulan global
-      currentBulan += 1;
-      if (currentBulan > 12) {
-        currentBulan = 1;
-        currentTahun += 1;
-      }
-      // Filter ikut berubah agar daftar menampilkan bulan baru
-      filterBulan = currentBulan;
-      filterTahun = currentTahun;
-      // Kosongkan seleksi
-      selectedIds.clear();
-      _selectionMode = false;
+  // ==================== FUNGSI MANIPULASI DATA ====================
+  void addTeacher(String nama) {
+    if (nama.trim().isEmpty) return;
+    if (!teacherList.contains(nama)) {
+      setState(() {
+        teacherList.add(nama);
+      });
+    }
+  }
 
-      // (Opsional) Tandai data bulan lalu yang belum lunas sebagai arsip
-      _archiveUnpaidPreviousMonth();
+  void removeTeacher(String nama) {
+    setState(() {
+      teacherList.remove(nama);
     });
   }
 
-  void _archiveUnpaidPreviousMonth() {
-    // Data bulan lalu (sebelum kenaikan) tidak perlu diubah,
-    // karena arsip sudah tersimpan di Riwayat.
-    // Namun kita bisa menambahkan flag isArchived jika diperlukan.
-    // Di sini kita hanya contoh: tidak melakukan apa-apa karena data tetap tersimpan.
-    // Jika ingin, bisa loop gajiGuruList dan set isArchived = true untuk bulan sebelumnya yang belum lunas.
+  void moveTeacher(int fromIndex, int toIndex) {
+    if (fromIndex == toIndex) return;
+    setState(() {
+      final item = teacherList.removeAt(fromIndex);
+      teacherList.insert(toIndex, item);
+    });
   }
 
   GajiGuru _getOrCreateGajiRecord(String namaGuru, int bulan, int tahun) {
@@ -258,12 +280,11 @@ class _GajiGuruPageState extends State<GajiGuruPage>
       return existing;
     }
 
-    var komponen = <KomponenGaji>[];
     var id = 'GJ${gajiGuruList.length + 1}'.padLeft(5, '0');
     var baru = GajiGuru(
       id: id,
       namaGuru: namaGuru,
-      komponen: komponen,
+      komponen: [],
       bulan: bulan,
       tahun: tahun,
       isPaid: false,
@@ -272,13 +293,154 @@ class _GajiGuruPageState extends State<GajiGuruPage>
       catatan: null,
       isArchived: false,
     );
-    gajiGuruList.add(baru);
+    setState(() {
+      gajiGuruList.add(baru);
+    });
     return baru;
   }
 
+  void _updateGaji(GajiGuru oldGaji, GajiGuru newGaji) {
+    final index = gajiGuruList.indexOf(oldGaji);
+    if (index != -1) {
+      setState(() {
+        gajiGuruList[index] = newGaji;
+      });
+    }
+  }
+
+  void _deleteGaji(GajiGuru gaji) {
+    setState(() {
+      gajiGuruList.remove(gaji);
+    });
+  }
+
+  void _markAsPaid(GajiGuru gaji) {
+    final index = gajiGuruList.indexOf(gaji);
+    if (index == -1) return;
+    setState(() {
+      gajiGuruList[index] = gaji.copyWith(
+        isPaid: true,
+        tanggalBayar: DateTime.now(),
+        catatan: 'Dibayar lunas pada ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+      );
+    });
+  }
+
+  // ==================== FUNGSI UNTUK CHEAT ====================
+  void simulateMonthChange() {
+    setState(() {
+      currentBulan += 1;
+      if (currentBulan > 12) {
+        currentBulan = 1;
+        currentTahun += 1;
+      }
+      filterBulan = currentBulan;
+      filterTahun = currentTahun;
+    });
+  }
+
+  void generateCurrentMonthData() {
+    setState(() {
+      gajiGuruList.removeWhere((g) => g.bulan == currentBulan && g.tahun == currentTahun);
+      for (var nama in teacherList) {
+        List<KomponenGaji> komp = [
+          KomponenGaji(nama: 'Gaji Pokok', jumlah: 2500000.0, isTunjangan: true, kategori: 'Umum'),
+          KomponenGaji(nama: 'Kehadiran', jumlah: 500000.0, isTunjangan: true, kategori: 'Kehadiran'),
+          KomponenGaji(nama: 'Absen', jumlah: 50000.0, isTunjangan: false, kategori: 'Absen'),
+          KomponenGaji(nama: 'Jabatan', jumlah: 300000.0, isTunjangan: true, kategori: 'Jabatan Tambahan'),
+        ];
+        gajiGuruList.add(GajiGuru(
+          id: 'GJ${gajiGuruList.length + 1}'.padLeft(5, '0'),
+          namaGuru: nama,
+          komponen: komp,
+          bulan: currentBulan,
+          tahun: currentTahun,
+          isPaid: false,
+        ));
+      }
+    });
+  }
+
+  void generateRandomData() {
+    setState(() {
+      gajiGuruList.clear();
+      final now = DateTime.now();
+      int startBulan = currentBulan;
+      int startTahun = currentTahun;
+      for (int i = 0; i < 6; i++) {
+        int bulan = startBulan - i;
+        int tahun = startTahun;
+        if (bulan <= 0) {
+          bulan += 12;
+          tahun -= 1;
+        }
+        for (var nama in teacherList) {
+          List<KomponenGaji> komp = [];
+          int count = 2 + (i % 3);
+          for (int j = 0; j < count; j++) {
+            bool tunjangan = true;
+            String kategori;
+            String namaKomponen;
+            if (j == 0) {
+              kategori = 'Umum';
+              namaKomponen = 'Gaji Pokok';
+            } else if (j == 1) {
+              kategori = 'Kehadiran';
+              namaKomponen = 'Kehadiran';
+              tunjangan = true;
+            } else if (j == 2) {
+              kategori = 'Absen';
+              namaKomponen = 'Absen';
+              tunjangan = false;
+            } else {
+              kategori = 'Jabatan Tambahan';
+              namaKomponen = 'Jabatan';
+              tunjangan = true;
+            }
+            double jumlah = (50 + (i * 10) + (j * 20) + (nama.length % 30)) * 1000.0;
+            komp.add(KomponenGaji(
+              nama: namaKomponen,
+              jumlah: jumlah,
+              isTunjangan: tunjangan,
+              kategori: kategori,
+            ));
+          }
+          gajiGuruList.add(GajiGuru(
+            id: 'GJ${gajiGuruList.length + 1}'.padLeft(5, '0'),
+            namaGuru: nama,
+            komponen: komp,
+            bulan: bulan,
+            tahun: tahun,
+            isPaid: i > 2,
+            tanggalBayar: i > 2 ? DateTime(now.year, now.month - i, 15) : null,
+            catatan: i > 2 ? 'Lunas otomatis' : 'Belum dibayar',
+          ));
+        }
+      }
+    });
+  }
+
+  void clearAllData() {
+    setState(() {
+      gajiGuruList.clear();
+    });
+  }
+
+  void autoLunas() {
+    setState(() {
+      for (var gaji in gajiGuruList) {
+        if (!gaji.isPaid) {
+          gaji.isPaid = true;
+          gaji.tanggalBayar = DateTime.now();
+          gaji.catatan = 'Auto lunas pada ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}';
+        }
+      }
+    });
+  }
+
+  // ==================== FUNGSI FILTER & STATISTIK ====================
   List<Map<String, dynamic>> get _guruListWithSalary {
-    // Hanya guru aktif (tidak ada di inactiveTeachers)
-    var activeGuru = teacherList.where((nama) => !inactiveTeachers.contains(nama)).toList();
+    var activeGuru = teacherList.toList();
 
     var filteredGuru = activeGuru.where((nama) {
       if (searchQuery.isNotEmpty &&
@@ -320,52 +482,49 @@ class _GajiGuruPageState extends State<GajiGuruPage>
           ),
         );
         if (record.namaGuru.isNotEmpty) {
-          result.add({
-            'nama': nama,
-            'record': record,
-          });
+          result.add({'nama': nama, 'record': record});
         } else {
-          result.add({
-            'nama': nama,
-            'record': null,
-          });
+          result.add({'nama': nama, 'record': null});
         }
       } else {
-        result.add({
-          'nama': nama,
-          'record': null,
-        });
+        result.add({'nama': nama, 'record': null});
       }
     }
     return result;
   }
 
-  // ==================== STATISTIK (berdasarkan currentBulan/Tahun) ====================
   Map<String, dynamic> get _statistics {
-    final bulanIni = gajiGuruList.where((g) =>
-        g.bulan == currentBulan && g.tahun == currentTahun && teacherList.contains(g.namaGuru) && !inactiveTeachers.contains(g.namaGuru));
+    final bulanIni = gajiGuruList.where(
+      (g) =>
+          g.bulan == currentBulan &&
+          g.tahun == currentTahun &&
+          teacherList.contains(g.namaGuru),
+    );
     final totalBulanIni = bulanIni.fold(0.0, (s, g) => s + g.totalGaji);
     final paidBulanIni = bulanIni.where((g) => g.isPaid).fold(0.0, (s, g) => s + g.totalGaji);
     final belumBulanIni = totalBulanIni - paidBulanIni;
     final countGuruBulanIni = bulanIni.map((g) => g.namaGuru).toSet().length;
     final paidGuruBulanIni = bulanIni.where((g) => g.isPaid).map((g) => g.namaGuru).toSet().length;
 
-    // Bulan lalu
     int bulanLalu = currentBulan - 1;
     int tahunLalu = currentTahun;
     if (bulanLalu <= 0) {
       bulanLalu = 12;
       tahunLalu -= 1;
     }
-    final dataBulanLalu = gajiGuruList.where((g) =>
-        g.bulan == bulanLalu && g.tahun == tahunLalu && teacherList.contains(g.namaGuru) && !inactiveTeachers.contains(g.namaGuru));
+    final dataBulanLalu = gajiGuruList.where(
+      (g) =>
+          g.bulan == bulanLalu &&
+          g.tahun == tahunLalu &&
+          teacherList.contains(g.namaGuru),
+    );
     final totalBulanLalu = dataBulanLalu.fold(0.0, (s, g) => s + g.totalGaji);
 
     final totalAll = gajiGuruList
-        .where((g) => teacherList.contains(g.namaGuru) && !inactiveTeachers.contains(g.namaGuru))
+        .where((g) => teacherList.contains(g.namaGuru))
         .fold(0.0, (s, g) => s + g.totalGaji);
     final totalPaid = gajiGuruList
-        .where((g) => g.isPaid && teacherList.contains(g.namaGuru) && !inactiveTeachers.contains(g.namaGuru))
+        .where((g) => g.isPaid && teacherList.contains(g.namaGuru))
         .fold(0.0, (s, g) => s + g.totalGaji);
 
     return {
@@ -391,12 +550,16 @@ class _GajiGuruPageState extends State<GajiGuruPage>
         m += 12;
         y -= 1;
       }
-      final data = gajiGuruList
-          .where((g) => g.bulan == m && g.tahun == y && teacherList.contains(g.namaGuru) && !inactiveTeachers.contains(g.namaGuru));
+      final data = gajiGuruList.where(
+        (g) =>
+            g.bulan == m &&
+            g.tahun == y &&
+            teacherList.contains(g.namaGuru),
+      );
       final total = data.fold(0.0, (s, g) => s + g.totalGaji);
       final paid = data.where((g) => g.isPaid).fold(0.0, (s, g) => s + g.totalGaji);
       result.add({
-        'label': '${getBulanNama(m).substring(0, 3)} $y',
+        'label': getBulanNama(m).substring(0, 3),
         'total': total,
         'paid': paid,
         'month': m,
@@ -406,7 +569,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     return result;
   }
 
-  // ==================== DIALOG MANAJEMEN GURU (dengan toggle aktif/nonaktif) ====================
+  // ==================== DIALOG MANAJEMEN GURU ====================
   void _showManageTeachersDialog() {
     final TextEditingController _newTeacherController = TextEditingController();
     showDialog(
@@ -428,10 +591,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                       const Expanded(
                         child: Text(
                           'Manajemen Guru',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                         ),
                       ),
                       IconButton(
@@ -470,9 +630,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
                         child: const Text('Tambah'),
@@ -492,14 +650,11 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                       },
                       itemBuilder: (context, index) {
                         final nama = teacherList[index];
-                        final isInactive = inactiveTeachers.contains(nama);
                         return Card(
                           key: ValueKey(nama),
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           elevation: 1,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                             leading: const Icon(Icons.drag_handle, color: Colors.grey),
@@ -507,61 +662,36 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                               nama,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: isInactive ? Colors.grey : Colors.black,
-                              ),
+                              style: const TextStyle(fontSize: 14),
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    isInactive ? Icons.person_off : Icons.person,
-                                    color: isInactive ? Colors.orange : Colors.green,
-                                    size: 22,
-                                  ),
-                                  onPressed: () {
-                                    toggleTeacherActive(nama);
-                                    setStateDialog(() {});
-                                    setState(() {});
-                                  },
-                                  tooltip: isInactive ? 'Aktifkan' : 'Nonaktifkan',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red, size: 22),
-                                  onPressed: () {
-                                    showDialog(
-                                      context: ctx,
-                                      builder: (confirmCtx) => AlertDialog(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        title: const Text('Konfirmasi Hapus'),
-                                        content: Text('Yakin ingin menghapus guru "$nama" dari daftar?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(confirmCtx),
-                                            child: const Text('Batal'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              removeTeacher(nama);
-                                              Navigator.pop(confirmCtx);
-                                              setStateDialog(() {});
-                                              setState(() {});
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                            ),
-                                            child: const Text('Hapus'),
-                                          ),
-                                        ],
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+                              onPressed: () {
+                                showDialog(
+                                  context: ctx,
+                                  builder: (confirmCtx) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    title: const Text('Konfirmasi Hapus'),
+                                    content: Text('Yakin ingin menghapus guru "$nama" dari daftar? Data gaji yang sudah ada tetap tersimpan di arsip.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(confirmCtx),
+                                        child: const Text('Batal'),
                                       ),
-                                    );
-                                  },
-                                ),
-                              ],
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          removeTeacher(nama);
+                                          Navigator.pop(confirmCtx);
+                                          setStateDialog(() {});
+                                          setState(() {});
+                                        },
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                        child: const Text('Hapus'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         );
@@ -587,7 +717,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     );
   }
 
-  // ==================== DIALOG EDIT GAJI (tanpa dropdown nama guru, bulan & tahun readonly) ====================
+  // ==================== EDIT GAJI ====================
   void _showEditDialog(GajiGuru gaji) {
     String selectedGuru = gaji.namaGuru;
     List<KomponenGaji> komponen = gaji.komponen.map((k) => k.copyWith()).toList();
@@ -615,6 +745,34 @@ class _GajiGuruPageState extends State<GajiGuruPage>
             });
           }
 
+          void copyFromPrevious() {
+            int prevBulan = bulan - 1;
+            int prevTahun = tahun;
+            if (prevBulan <= 0) {
+              prevBulan = 12;
+              prevTahun -= 1;
+            }
+            var prevData = gajiGuruList.firstWhere(
+              (g) => g.namaGuru == selectedGuru && g.bulan == prevBulan && g.tahun == prevTahun,
+              orElse: () => GajiGuru(
+                id: '',
+                namaGuru: '',
+                komponen: [],
+                bulan: prevBulan,
+                tahun: prevTahun,
+              ),
+            );
+            if (prevData.namaGuru.isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Tidak ada data gaji bulan sebelumnya')),
+              );
+              return;
+            }
+            setStateDialog(() {
+              komponen = prevData.komponen.map((k) => k.copyWith()).toList();
+            });
+          }
+
           void showTambahKomponenDialog() {
             String nama = '';
             double jumlah = 0;
@@ -631,7 +789,6 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                     content: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Nama komponen hanya ditampilkan jika kategori == 'Umum'
                         if (kategori == 'Umum')
                           TextField(
                             decoration: const InputDecoration(labelText: 'Nama Komponen'),
@@ -645,7 +802,11 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                         TextField(
                           decoration: const InputDecoration(labelText: 'Jumlah (Rp)'),
                           keyboardType: TextInputType.number,
-                          onChanged: (val) => jumlah = double.tryParse(val) ?? 0,
+                          onChanged: (val) {
+                            double parsed = double.tryParse(val) ?? 0;
+                            if (parsed > 1e15) parsed = 1e15;
+                            jumlah = parsed;
+                          },
                         ),
                         DropdownButtonFormField<String>(
                           value: kategori,
@@ -659,11 +820,13 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                           onChanged: (val) {
                             setStateDialog2(() {
                               kategori = val!;
-                              // Untuk kategori selain Umum, nama otomatis = kategori
                               if (kategori != 'Umum') {
                                 nama = kategori;
                               } else {
                                 nama = '';
+                              }
+                              if (kategori == 'Absen') {
+                                isTunjangan = false;
                               }
                             });
                           },
@@ -671,11 +834,15 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                         ),
                         DropdownButtonFormField<bool>(
                           value: isTunjangan,
-                          items: const [
-                            DropdownMenuItem(value: true, child: Text('Tunjangan (+)')),
-                            DropdownMenuItem(value: false, child: Text('Potongan (-)')),
-                          ],
-                          onChanged: (val) => setStateDialog2(() => isTunjangan = val ?? true),
+                          items: kategori == 'Absen'
+                              ? const [DropdownMenuItem(value: false, child: Text('Potongan (-)'))]
+                              : const [
+                                  DropdownMenuItem(value: true, child: Text('Tunjangan (+)')),
+                                  DropdownMenuItem(value: false, child: Text('Potongan (-)')),
+                                ],
+                          onChanged: kategori == 'Absen'
+                              ? null
+                              : (val) => setStateDialog2(() => isTunjangan = val ?? true),
                           decoration: const InputDecoration(labelText: 'Jenis'),
                         ),
                       ],
@@ -684,7 +851,6 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                       TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Batal')),
                       ElevatedButton(
                         onPressed: () {
-                          // Validasi
                           if (kategori == 'Umum' && nama.isEmpty) {
                             ScaffoldMessenger.of(dialogCtx).showSnackBar(
                               const SnackBar(content: Text('Nama komponen harus diisi')),
@@ -697,7 +863,6 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                             );
                             return;
                           }
-                          // Untuk kategori non-Umum, nama sudah diisi otomatis
                           if (kategori != 'Umum') {
                             nama = kategori;
                           }
@@ -780,6 +945,14 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                       ],
                     ),
                     const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: copyFromPrevious,
+                        icon: const Icon(Icons.copy, size: 18),
+                        label: const Text('Salin dari bulan sebelumnya'),
+                      ),
+                    ),
                     Container(
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade300),
@@ -791,11 +964,10 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                             padding: EdgeInsets.all(8.0),
                             child: Row(
                               children: [
-                                Expanded(child: Text('Komponen', style: TextStyle(fontWeight: FontWeight.bold))),
+                                Expanded(flex: 2, child: Text('Komponen', style: TextStyle(fontWeight: FontWeight.bold))),
+                                Expanded(flex: 1, child: Text('Jumlah', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
                                 SizedBox(width: 8),
-                                Text('Jumlah', style: TextStyle(fontWeight: FontWeight.bold)),
-                                SizedBox(width: 8),
-                                Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold)),
+                                Expanded(flex: 1, child: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
                                 SizedBox(width: 8),
                               ],
                             ),
@@ -817,21 +989,40 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 child: Row(
                                   children: [
-                                    Expanded(child: Text(k.nama, style: const TextStyle(fontSize: 13))),
-                                    const SizedBox(width: 8),
-                                    Text(formatCurrency(k.jumlah), style: const TextStyle(fontSize: 13)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: k.isTunjangan ? Colors.green.shade100 : Colors.red.shade100,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
+                                    Expanded(
+                                      flex: 2,
                                       child: Text(
-                                        k.kategori,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: k.isTunjangan ? Colors.green.shade800 : Colors.red.shade800,
+                                        k.nama,
+                                        style: const TextStyle(fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      flex: 1,
+                                      child: Text(
+                                        formatCurrency(k.jumlah),
+                                        style: const TextStyle(fontSize: 13),
+                                        textAlign: TextAlign.right,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      flex: 1,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: k.isTunjangan ? Colors.green.shade100 : Colors.red.shade100,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          k.kategori,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: k.isTunjangan ? Colors.green.shade800 : Colors.red.shade800,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ),
@@ -854,7 +1045,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
-                                    color: total >= 0 ? AppColors.success : AppColors.error,
+                                    color: total >= 0 ? Colors.green : Colors.red,
                                   ),
                                 ),
                               ],
@@ -907,15 +1098,13 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                     return;
                   }
 
-                  final index = gajiGuruList.indexOf(gaji);
-                  if (index != -1) {
-                    gajiGuruList[index] = gajiGuruList[index].copyWith(
-                      namaGuru: selectedGuru,
-                      komponen: komponen.map((k) => k.copyWith()).toList(),
-                      bulan: bulan,
-                      tahun: tahun,
-                    );
-                  }
+                  final newGaji = gaji.copyWith(
+                    namaGuru: selectedGuru,
+                    komponen: komponen.map((k) => k.copyWith()).toList(),
+                    bulan: bulan,
+                    tahun: tahun,
+                  );
+                  _updateGaji(gaji, newGaji);
                   Navigator.pop(ctx);
                   setState(() {});
                 },
@@ -928,87 +1117,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     );
   }
 
-  void _markAsPaid(GajiGuru gaji) {
-    final index = gajiGuruList.indexOf(gaji);
-    if (index == -1) return;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Konfirmasi Pembayaran'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Tandai gaji ${gaji.namaGuru} sebagai lunas?'),
-            const SizedBox(height: 8),
-            Text('Total: Rp ${formatCurrency(gaji.totalGaji)}',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              SoundHelper().playClick();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              SoundHelper().playClick();
-              setState(() {
-                gajiGuruList[index] = gaji.copyWith(
-                  isPaid: true,
-                  tanggalBayar: DateTime.now(),
-                  catatan:
-                      'Dibayar lunas pada ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-                );
-              });
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-            child: const Text('Ya, Lunas'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _deleteGaji(GajiGuru gaji) {
-    final index = gajiGuruList.indexOf(gaji);
-    if (index == -1) return;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus Data'),
-        content: Text(
-            'Yakin hapus gaji ${gaji.namaGuru} periode ${getBulanNama(gaji.bulan)} ${gaji.tahun}?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              SoundHelper().playClick();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              SoundHelper().playClick();
-              setState(() => gajiGuruList.removeAt(index));
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
-    );
-  }
-
+  // ==================== SLIP GAJI ====================
   void _showSlipGaji(GajiGuru gaji) {
     showDialog(
       context: context,
@@ -1025,6 +1134,15 @@ class _GajiGuruPageState extends State<GajiGuruPage>
               _detailRow('Nama Guru', gaji.namaGuru),
               _detailRow('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}'),
               const Divider(),
+              if (gaji.komponen.isNotEmpty) ...[
+                const Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 120,
+                  child: _buildPieChart(gaji.komponen),
+                ),
+                const Divider(),
+              ],
               const Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
               if (gaji.komponen.isEmpty)
                 const Padding(
@@ -1035,10 +1153,22 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                 ...gaji.komponen.map((k) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})'),
-                          Text('Rp ${formatCurrency(k.jumlah)}'),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              '${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              'Rp ${formatCurrency(k.jumlah)}',
+                              textAlign: TextAlign.right,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     )),
@@ -1067,6 +1197,34 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     );
   }
 
+  Widget _buildPieChart(List<KomponenGaji> komponen) {
+    Map<String, double> grouped = {};
+    for (var k in komponen) {
+      grouped[k.kategori] = (grouped[k.kategori] ?? 0) + k.jumlah;
+    }
+    List<MapEntry<String, double>> entries = grouped.entries.toList();
+    List<Color> colors = [
+      Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red, Colors.teal
+    ];
+    return PieChart(
+      PieChartData(
+        sections: entries.asMap().entries.map((entry) {
+          int idx = entry.key;
+          var e = entry.value;
+          return PieChartSectionData(
+            value: e.value,
+            title: '${e.key}\n${(e.value / komponen.fold(0.0, (sum, k) => sum + k.jumlah) * 100).toStringAsFixed(1)}%',
+            color: colors[idx % colors.length],
+            radius: 50,
+            titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+          );
+        }).toList(),
+        sectionsSpace: 2,
+        centerSpaceRadius: 20,
+      ),
+    );
+  }
+
   Widget _detailRow(String label, String value, {bool bold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1079,14 +1237,85 @@ class _GajiGuruPageState extends State<GajiGuruPage>
               label,
               style: TextStyle(
                 fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-                color: bold ? AppColors.textPrimary : AppColors.textSecondary,
+                color: bold ? Colors.black87 : Colors.black54,
               ),
             ),
           ),
           Expanded(
-            child: Text(value,
-                style:
-                    TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== DIALOG KONFIRMASI ====================
+  void _confirmMarkAsPaid(GajiGuru gaji) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Konfirmasi Pembayaran'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tandai gaji ${gaji.namaGuru} sebagai lunas?'),
+            const SizedBox(height: 8),
+            Text('Total: Rp ${formatCurrency(gaji.totalGaji)}',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              SoundHelper().playClick();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              SoundHelper().playClick();
+              _markAsPaid(gaji);
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Ya, Lunas'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteGaji(GajiGuru gaji) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Hapus Data'),
+        content: Text(
+            'Yakin hapus gaji ${gaji.namaGuru} periode ${getBulanNama(gaji.bulan)} ${gaji.tahun}?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              SoundHelper().playClick();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              SoundHelper().playClick();
+              _deleteGaji(gaji);
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Hapus'),
           ),
         ],
       ),
@@ -1100,20 +1329,6 @@ class _GajiGuruPageState extends State<GajiGuruPage>
       appBar: AppBar(
         title: const Text('Manajemen Gaji Guru'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.recycling, color: Colors.orange),
-            onPressed: () {
-              SoundHelper().playClick();
-              _simulateMonthChange();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Debug: Bulan berubah ke ${getBulanNama(currentBulan)} $currentTahun'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            },
-            tooltip: 'Debug: Simulasi Pergantian Bulan (Global)',
-          ),
           IconButton(
             icon: const Icon(Icons.people),
             onPressed: () {
@@ -1132,13 +1347,26 @@ class _GajiGuruPageState extends State<GajiGuruPage>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildDashboard(),
-          _buildListTab(),
-          _buildRiwayatTab(),
-        ],
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildDashboard(),
+                _buildListTab(),
+                _buildRiwayatTab(),
+              ],
+            ),
+      floatingActionButton: FABcheat(
+        context: context,
+        onRefreshUI: () => setState(() {}),
+        onSimulateMonthChange: simulateMonthChange,
+        onGenerateCurrentMonthData: generateCurrentMonthData,
+        onGenerateRandomData: generateRandomData,
+        onAutoLunas: autoLunas,
+        onClearAllData: clearAllData,
+        currentBulan: currentBulan,
+        currentTahun: currentTahun,
       ),
     );
   }
@@ -1147,21 +1375,31 @@ class _GajiGuruPageState extends State<GajiGuruPage>
   Widget _buildDashboard() {
     final stats = _statistics;
     final bulanIniRecords = gajiGuruList.where((g) =>
-        g.bulan == currentBulan && g.tahun == currentTahun && teacherList.contains(g.namaGuru) && !inactiveTeachers.contains(g.namaGuru)).toList();
-    final paidTeachers = bulanIniRecords.where((g) => g.isPaid).map((g) => g.namaGuru).toSet().toList();
-    final unpaidTeachers = bulanIniRecords.where((g) => !g.isPaid).map((g) => g.namaGuru).toSet().toList();
+        g.bulan == currentBulan && g.tahun == currentTahun && teacherList.contains(g.namaGuru)).toList();
 
     final totalBulanIni = stats['totalBulanIni'] as double;
-    final totalBulanLalu = stats['totalBulanLalu'] as double;
-    double selisih = totalBulanIni - totalBulanLalu;
-    double persentase = totalBulanLalu > 0 ? (selisih / totalBulanLalu) * 100 : 0;
+    final paidBulanIni = stats['paidBulanIni'] as double;
+    final countGuru = stats['countGuruBulanIni'] as int;
+    final paidGuru = stats['paidGuruBulanIni'] as int;
 
-    // Arsip belum bayar (semua bulan kecuali current)
+    double rataRata = countGuru > 0 ? totalBulanIni / countGuru : 0;
+    double tertinggi = 0;
+    double terendah = double.infinity;
+    List<Map<String, dynamic>> topGaji = [];
+    for (var g in bulanIniRecords) {
+      double total = g.totalGaji;
+      if (total > tertinggi) tertinggi = total;
+      if (total < terendah) terendah = total;
+      topGaji.add({'nama': g.namaGuru, 'total': total, 'record': g});
+    }
+    if (terendah == double.infinity) terendah = 0;
+    topGaji.sort((a, b) => b['total'].compareTo(a['total']));
+    topGaji = topGaji.take(5).toList();
+
     final arsipBelumBayar = gajiGuruList.where((g) =>
         !(g.bulan == currentBulan && g.tahun == currentTahun) &&
         !g.isPaid &&
-        teacherList.contains(g.namaGuru) &&
-        !inactiveTeachers.contains(g.namaGuru));
+        teacherList.contains(g.namaGuru));
     final totalArsipBelum = arsipBelumBayar.fold(0.0, (sum, g) => sum + g.totalGaji);
 
     return SingleChildScrollView(
@@ -1170,234 +1408,21 @@ class _GajiGuruPageState extends State<GajiGuruPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildDashboardCards(stats),
-          const SizedBox(height: 24),
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Perbandingan Bulan Ini vs Bulan Lalu',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Bulan Ini', style: TextStyle(fontSize: 12, color: Colors.blue)),
-                              Text('Rp ${formatCurrency(totalBulanIni)}',
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Bulan Lalu', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                              Text('Rp ${formatCurrency(totalBulanLalu)}',
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: selisih >= 0 ? Colors.green.shade50 : Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(selisih >= 0 ? Icons.trending_up : Icons.trending_down,
-                            color: selisih >= 0 ? Colors.green : Colors.red),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${selisih >= 0 ? '+' : ''}Rp ${formatCurrency(selisih)} (${persentase.toStringAsFixed(1)}%)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: selisih >= 0 ? Colors.green : Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _buildChart(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          _buildStatusCard(paidGuru, countGuru, paidBulanIni, totalBulanIni),
+          const SizedBox(height: 16),
+          _buildStatistikCard(rataRata, tertinggi, terendah),
+          const SizedBox(height: 16),
+          _buildTopGajiCard(topGaji),
+          const SizedBox(height: 16),
+          _buildComparisonCard(totalBulanIni, stats['totalBulanLalu'] as double),
+          const SizedBox(height: 16),
           _buildQuickFilter(),
-          const SizedBox(height: 24),
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Status Gaji Bulan Ini (${getBulanNama(currentBulan)} $currentTahun)',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${paidTeachers.length} Guru',
-                                  style: const TextStyle(fontWeight: FontWeight.bold)),
-                              const Text('Lunas', style: TextStyle(fontSize: 12, color: AppColors.success)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${unpaidTeachers.length} Guru',
-                                  style: const TextStyle(fontWeight: FontWeight.bold)),
-                              const Text('Belum Lunas', style: TextStyle(fontSize: 12, color: AppColors.error)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (unpaidTeachers.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: unpaidTeachers.map((nama) => Chip(
-                        label: Text(nama, overflow: TextOverflow.ellipsis),
-                        avatar: const Icon(Icons.person, size: 16),
-                        backgroundColor: Colors.red.shade50,
-                      )).toList(),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          _buildUnpaidTeachers(),
-          const SizedBox(height: 24),
-          // Kartu Arsip Belum Bayar
+          const SizedBox(height: 16),
           if (totalArsipBelum > 0)
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              color: Colors.orange.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.archive, color: Colors.orange),
-                        const SizedBox(width: 8),
-                        const Text('Arsip Belum Bayar',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Total gaji belum lunas dari bulan-bulan sebelumnya:'),
-                    const SizedBox(height: 4),
-                    Text('Rp ${formatCurrency(totalArsipBelum)}',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange)),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ArchiveUnpaidPage(records: arsipBelumBayar.toList()),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.visibility),
-                      label: const Text('Lihat Arsip'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 24),
-          // Kartu Guru Nonaktif
-          if (inactiveTeachers.isNotEmpty)
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              color: Colors.grey.shade100,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.person_off, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        const Text('Guru Nonaktif',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: inactiveTeachers.map((nama) => Chip(
-                        label: Text(nama, overflow: TextOverflow.ellipsis),
-                        avatar: const Icon(Icons.person_off, size: 16),
-                        backgroundColor: Colors.grey.shade300,
-                      )).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildUnpaidArchiveCard(totalArsipBelum, arsipBelumBayar.toList()),
         ],
       ),
     );
@@ -1416,21 +1441,21 @@ class _GajiGuruPageState extends State<GajiGuruPage>
           title: 'Gaji Bulan Ini',
           value: 'Rp ${formatCurrency(stats['totalBulanIni'])}',
           icon: Icons.calendar_month,
-          color: AppColors.primary,
+          color: Colors.blue,
           subtitle: '${stats['countGuruBulanIni']} guru',
         ),
         _StatCard(
           title: 'Sudah Dibayar',
           value: 'Rp ${formatCurrency(stats['paidBulanIni'])}',
           icon: Icons.check_circle,
-          color: AppColors.success,
+          color: Colors.green,
           subtitle: '${stats['paidGuruBulanIni']} guru',
         ),
         _StatCard(
           title: 'Belum Dibayar',
           value: 'Rp ${formatCurrency(stats['belumBulanIni'])}',
           icon: Icons.pending,
-          color: AppColors.error,
+          color: Colors.red,
           subtitle:
               '${stats['countGuruBulanIni'] - stats['paidGuruBulanIni']} guru',
         ),
@@ -1438,7 +1463,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
           title: 'Bulan Lalu',
           value: 'Rp ${formatCurrency(stats['totalBulanLalu'])}',
           icon: Icons.history,
-          color: AppColors.warning,
+          color: Colors.orange,
           subtitle: 'Periode sebelumnya',
         ),
       ],
@@ -1502,7 +1527,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 40,
+                        reservedSize: 60,
                         getTitlesWidget: (value, meta) {
                           return Text(
                             formatCurrency(value),
@@ -1562,6 +1587,304 @@ class _GajiGuruPageState extends State<GajiGuruPage>
         const SizedBox(width: 4),
         Text(label, style: const TextStyle(fontSize: 12)),
       ],
+    );
+  }
+
+  Widget _buildStatusCard(int paidGuru, int countGuru, double paidBulanIni, double totalBulanIni) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Status Gaji Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${paidGuru} / $countGuru guru lunas',
+                          style: const TextStyle(fontSize: 14)),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: countGuru > 0 ? paidGuru / countGuru : 0,
+                        backgroundColor: Colors.grey.shade300,
+                        color: Colors.green,
+                        minHeight: 8,
+                      ),
+                      const SizedBox(height: 4),
+                      Text('${countGuru > 0 ? (paidGuru / countGuru * 100).toStringAsFixed(0) : 0}% guru lunas',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Rp ${formatCurrency(paidBulanIni)} / Rp ${formatCurrency(totalBulanIni)}',
+                          style: const TextStyle(fontSize: 14)),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: totalBulanIni > 0 ? paidBulanIni / totalBulanIni : 0,
+                        backgroundColor: Colors.grey.shade300,
+                        color: Colors.blue,
+                        minHeight: 8,
+                      ),
+                      const SizedBox(height: 4),
+                      Text('${totalBulanIni > 0 ? (paidBulanIni / totalBulanIni * 100).toStringAsFixed(0) : 0}% nominal dibayar',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatistikCard(double rataRata, double tertinggi, double terendah) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Statistik Gaji Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text('Rata-rata', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      Container(
+                        constraints: const BoxConstraints(maxWidth: double.infinity),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Rp ${formatCurrency(rataRata)}',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text('Tertinggi', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      Container(
+                        constraints: const BoxConstraints(maxWidth: double.infinity),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Rp ${formatCurrency(tertinggi)}',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text('Terendah', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      Container(
+                        constraints: const BoxConstraints(maxWidth: double.infinity),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Rp ${formatCurrency(terendah)}',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopGajiCard(List<Map<String, dynamic>> topGaji) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Top 5 Gaji Tertinggi Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (topGaji.isEmpty)
+              const Center(child: Text('Belum ada data', style: TextStyle(color: Colors.grey)))
+            else
+              ...topGaji.asMap().entries.map((entry) {
+                int rank = entry.key + 1;
+                var item = entry.value;
+                return ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Text('#$rank', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(item['nama'], overflow: TextOverflow.ellipsis, maxLines: 2),
+                  trailing: Text('Rp ${formatCurrency(item['total'])}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComparisonCard(double totalBulanIni, double totalBulanLalu) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Perbandingan Bulan Ini vs Bulan Lalu',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Bulan Ini', style: TextStyle(fontSize: 12, color: Colors.blue)),
+                        const SizedBox(height: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Rp ${formatCurrency(totalBulanIni)}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Bulan Lalu', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        const SizedBox(height: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Rp ${formatCurrency(totalBulanLalu)}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: totalBulanIni >= totalBulanLalu ? Colors.green.shade50 : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    totalBulanIni >= totalBulanLalu ? Icons.trending_up : Icons.trending_down,
+                    color: totalBulanIni >= totalBulanLalu ? Colors.green : Colors.red,
+                  ),
+                  const SizedBox(width: 8),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '${totalBulanIni >= totalBulanLalu ? '+' : ''}Rp ${formatCurrency(totalBulanIni - totalBulanLalu)} (${totalBulanLalu > 0 ? ((totalBulanIni - totalBulanLalu) / totalBulanLalu * 100).toStringAsFixed(1) : 0}%)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: totalBulanIni >= totalBulanLalu ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnpaidArchiveCard(double totalArsipBelum, List<GajiGuru> arsipBelumBayar) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Colors.orange.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.archive, color: Colors.orange),
+                const SizedBox(width: 8),
+                const Text('Arsip Belum Bayar',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Total gaji belum lunas dari bulan-bulan sebelumnya:'),
+            const SizedBox(height: 4),
+            Text('Rp ${formatCurrency(totalArsipBelum)}',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange)),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ArchiveUnpaidPage(
+                      records: arsipBelumBayar,
+                      onMarkPaid: _confirmMarkAsPaid,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.visibility),
+              label: const Text('Lihat Arsip'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1633,52 +1956,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     );
   }
 
-  Widget _buildUnpaidTeachers() {
-    final unpaid = gajiGuruList
-        .where((g) =>
-            g.bulan == currentBulan &&
-            g.tahun == currentTahun &&
-            !g.isPaid &&
-            teacherList.contains(g.namaGuru) &&
-            !inactiveTeachers.contains(g.namaGuru))
-        .map((g) => g.namaGuru)
-        .toSet()
-        .toList();
-    if (unpaid.isEmpty) return const SizedBox.shrink();
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.red.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.warning_amber, color: Colors.red),
-                const SizedBox(width: 8),
-                Text('${unpaid.length} guru belum menerima gaji bulan ini',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: unpaid
-                  .map((nama) => Chip(
-                      label: Text(nama, overflow: TextOverflow.ellipsis),
-                      avatar: const Icon(Icons.person, size: 16)))
-                  .toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== TAB DAFTAR GAJI (dengan Selection Mode) ====================
+  // ==================== TAB DAFTAR GAJI ====================
   Widget _buildListTab() {
     final guruData = _guruListWithSalary;
     int selectedCount = selectedIds.length;
@@ -1773,31 +2051,27 @@ class _GajiGuruPageState extends State<GajiGuruPage>
         ),
         if (_selectionMode && selectedCount > 0)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             color: Colors.blue.shade50,
-            child: Row(
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
               children: [
                 Text('$selectedCount terpilih',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Spacer(),
                 TextButton.icon(
-                  onPressed: () {
-                    _bulkMarkPaid();
-                  },
-                  icon: const Icon(Icons.payment, color: AppColors.success),
-                  label: const Text('Tandai Lunas'),
+                  onPressed: _bulkMarkPaid,
+                  icon: const Icon(Icons.payment, color: Colors.green, size: 18),
+                  label: const Text('Lunas', style: TextStyle(fontSize: 12)),
                 ),
-                const SizedBox(width: 8),
                 TextButton.icon(
-                  onPressed: () {
-                    _bulkDelete();
-                  },
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  label: const Text('Hapus'),
+                  onPressed: _bulkDelete,
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                  label: const Text('Hapus', style: TextStyle(fontSize: 12)),
                 ),
-                const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.clear),
+                  icon: const Icon(Icons.clear, size: 18),
                   onPressed: () {
                     setState(() {
                       selectedIds.clear();
@@ -1835,7 +2109,6 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     );
   }
 
-  // ==================== BULK ACTION ====================
   void _bulkMarkPaid() {
     if (selectedIds.isEmpty) return;
     showDialog(
@@ -1868,7 +2141,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
               });
               Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Ya, Lunas Semua'),
           ),
         ],
@@ -1906,7 +2179,6 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     );
   }
 
-  // ==================== CARD GAJI RINGKAS (dengan selection mode) ====================
   Widget _buildCompactGajiCard(String namaGuru, GajiGuru? record, int index) {
     if (record == null) {
       return Card(
@@ -1920,7 +2192,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                icon: const Icon(Icons.add, color: AppColors.primary, size: 24),
+                icon: const Icon(Icons.add, color: Colors.blue, size: 24),
                 onPressed: () {
                   if (filterBulan != null && filterTahun != null) {
                     var baru = _getOrCreateGajiRecord(namaGuru, filterBulan!, filterTahun!);
@@ -1959,10 +2231,10 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : Colors.grey.shade400,
+                    color: isSelected ? Colors.blue : Colors.grey.shade400,
                     width: 2,
                   ),
-                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  color: isSelected ? Colors.blue : Colors.transparent,
                 ),
                 child: isSelected
                     ? const Icon(Icons.check, color: Colors.white, size: 16)
@@ -1970,11 +2242,11 @@ class _GajiGuruPageState extends State<GajiGuruPage>
               )
             else
               CircleAvatar(
-                backgroundColor: record.isPaid ? AppColors.success.withOpacity(0.15) : AppColors.error.withOpacity(0.15),
+                backgroundColor: record.isPaid ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
                 radius: 16,
                 child: Icon(
                   record.isPaid ? Icons.check_circle : Icons.pending,
-                  color: record.isPaid ? AppColors.success : AppColors.error,
+                  color: record.isPaid ? Colors.green : Colors.red,
                   size: 16,
                 ),
               ),
@@ -1984,7 +2256,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
         title: Text(
           namaGuru,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
@@ -2003,10 +2275,10 @@ class _GajiGuruPageState extends State<GajiGuruPage>
           children: [
             if (!record.isPaid && record.komponen.isNotEmpty && !_selectionMode)
               IconButton(
-                icon: const Icon(Icons.payment, color: AppColors.success, size: 20),
+                icon: const Icon(Icons.payment, color: Colors.green, size: 20),
                 onPressed: () {
                   SoundHelper().playClick();
-                  _markAsPaid(record);
+                  _confirmMarkAsPaid(record);
                 },
                 tooltip: 'Bayar',
                 padding: EdgeInsets.zero,
@@ -2038,7 +2310,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
                 icon: const Icon(Icons.delete, size: 20, color: Colors.red),
                 onPressed: () {
                   SoundHelper().playClick();
-                  _deleteGaji(record);
+                  _confirmDeleteGaji(record);
                 },
                 tooltip: 'Hapus',
                 padding: EdgeInsets.zero,
@@ -2048,7 +2320,7 @@ class _GajiGuruPageState extends State<GajiGuruPage>
               IconButton(
                 icon: Icon(
                   isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: isSelected ? AppColors.primary : Colors.grey,
+                  color: isSelected ? Colors.blue : Colors.grey,
                   size: 20,
                 ),
                 onPressed: () {
@@ -2082,10 +2354,8 @@ class _GajiGuruPageState extends State<GajiGuruPage>
     );
   }
 
-  // ==================== TAB RIWAYAT GURU (File Explorer style) ====================
+  // ==================== TAB RIWAYAT ====================
   Widget _buildRiwayatTab() {
-    // Hanya tampilkan data yang belum diarsipkan (isArchived = false) atau semua? Biarkan semua.
-    // Kelompokkan berdasarkan tahun
     Map<int, List<GajiGuru>> groupedByYear = {};
     for (var g in gajiGuruList) {
       groupedByYear.putIfAbsent(g.tahun, () => []).add(g);
@@ -2149,6 +2419,42 @@ class RiwayatBulanPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('Arsip $tahun'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.download),
+            tooltip: 'Download',
+            onSelected: (value) async {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Menyiapkan file...')),
+                );
+                if (value == 'word') {
+                  await DownloadService.exportYearToWord(tahun, data);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                  );
+                } else if (value == 'excel') {
+                  await DownloadService.exportYearToExcel(tahun, data);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Gagal download: $e'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'word', child: Row(
+                children: [Icon(Icons.description, color: Colors.blue), SizedBox(width: 8), Text('Word (.doc)')],
+              )),
+              const PopupMenuItem(value: 'excel', child: Row(
+                children: [Icon(Icons.table_chart, color: Colors.green), SizedBox(width: 8), Text('Excel (.xls)')],
+              )),
+            ],
+          ),
+        ],
       ),
       body: bulanKeys.isEmpty
           ? const Center(child: Text('Tidak ada data bulan'))
@@ -2171,14 +2477,39 @@ class RiwayatBulanPage extends StatelessWidget {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
+                        PopupMenuButton<String>(
                           icon: const Icon(Icons.download, size: 18),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Export ${getBulanNama(bulan)} $tahun ke Excel (placeholder)')),
-                            );
+                          onSelected: (value) async {
+                            try {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Menyiapkan file...')),
+                              );
+                              if (value == 'word') {
+                                await DownloadService.exportMonthToWord(tahun, bulan, items);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                                );
+                              } else if (value == 'excel') {
+                                await DownloadService.exportMonthToExcel(tahun, bulan, items);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                                );
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Gagal download: $e'), backgroundColor: Colors.red),
+                              );
+                            }
                           },
-                          tooltip: 'Export Bulan Ini',
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'word', child: Row(
+                              children: [Icon(Icons.description, size: 16, color: Colors.blue), SizedBox(width: 4), Text('Word', style: TextStyle(fontSize: 12))],
+                            )),
+                            const PopupMenuItem(value: 'excel', child: Row(
+                              children: [Icon(Icons.table_chart, size: 16, color: Colors.green), SizedBox(width: 4), Text('Excel', style: TextStyle(fontSize: 12))],
+                            )),
+                          ],
+                          tooltip: 'Export',
                         ),
                         const Icon(Icons.chevron_right),
                       ],
@@ -2234,10 +2565,10 @@ class RiwayatGuruPage extends StatelessWidget {
             child: ListTile(
               leading: CircleAvatar(
                 backgroundColor: gaji.isPaid
-                    ? AppColors.success.withOpacity(0.1)
-                    : AppColors.error.withOpacity(0.1),
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
                 child: Icon(gaji.isPaid ? Icons.check_circle : Icons.pending,
-                    color: gaji.isPaid ? AppColors.success : AppColors.error, size: 18),
+                    color: gaji.isPaid ? Colors.green : Colors.red, size: 18),
               ),
               title: Text(gaji.namaGuru, overflow: TextOverflow.ellipsis),
               subtitle: Text(
@@ -2252,7 +2583,7 @@ class RiwayatGuruPage extends StatelessWidget {
                   if (gaji.isPaid && gaji.tanggalBayar != null)
                     Text(
                       '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: const TextStyle(fontSize: 12, color: Colors.black54),
                     ),
                   IconButton(
                     icon: const Icon(Icons.visibility, size: 18),
@@ -2272,6 +2603,15 @@ class RiwayatGuruPage extends StatelessWidget {
                                 _detailRow('Nama Guru', gaji.namaGuru),
                                 _detailRow('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}'),
                                 const Divider(),
+                                if (gaji.komponen.isNotEmpty) ...[
+                                  const Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    height: 120,
+                                    child: _buildPieChart(gaji.komponen),
+                                  ),
+                                  const Divider(),
+                                ],
                                 const Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
                                 if (gaji.komponen.isEmpty)
                                   const Padding(
@@ -2282,10 +2622,22 @@ class RiwayatGuruPage extends StatelessWidget {
                                   ...gaji.komponen.map((k) => Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 2),
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})'),
-                                            Text('Rp ${formatCurrency(k.jumlah)}'),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                '${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})',
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                'Rp ${formatCurrency(k.jumlah)}',
+                                                textAlign: TextAlign.right,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       )),
@@ -2333,16 +2685,46 @@ class RiwayatGuruPage extends StatelessWidget {
               label,
               style: TextStyle(
                 fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-                color: bold ? AppColors.textPrimary : AppColors.textSecondary,
+                color: bold ? Colors.black87 : Colors.black54,
               ),
             ),
           ),
           Expanded(
-            child: Text(value,
-                style:
-                    TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPieChart(List<KomponenGaji> komponen) {
+    Map<String, double> grouped = {};
+    for (var k in komponen) {
+      grouped[k.kategori] = (grouped[k.kategori] ?? 0) + k.jumlah;
+    }
+    List<MapEntry<String, double>> entries = grouped.entries.toList();
+    List<Color> colors = [
+      Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red, Colors.teal
+    ];
+    return PieChart(
+      PieChartData(
+        sections: entries.asMap().entries.map((entry) {
+          int idx = entry.key;
+          var e = entry.value;
+          return PieChartSectionData(
+            value: e.value,
+            title: '${e.key}\n${(e.value / komponen.fold(0.0, (sum, k) => sum + k.jumlah) * 100).toStringAsFixed(1)}%',
+            color: colors[idx % colors.length],
+            radius: 50,
+            titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+          );
+        }).toList(),
+        sectionsSpace: 2,
+        centerSpaceRadius: 20,
       ),
     );
   }
@@ -2351,8 +2733,13 @@ class RiwayatGuruPage extends StatelessWidget {
 // ================== HALAMAN ARSIP BELUM BAYAR ==================
 class ArchiveUnpaidPage extends StatelessWidget {
   final List<GajiGuru> records;
+  final Function(GajiGuru) onMarkPaid;
 
-  const ArchiveUnpaidPage({super.key, required this.records});
+  const ArchiveUnpaidPage({
+    super.key,
+    required this.records,
+    required this.onMarkPaid,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2374,56 +2761,113 @@ class ArchiveUnpaidPage extends StatelessWidget {
                     leading: const Icon(Icons.pending, color: Colors.orange),
                     title: Text(g.namaGuru, overflow: TextOverflow.ellipsis),
                     subtitle: Text('${getBulanNama(g.bulan)} ${g.tahun} • Rp ${formatCurrency(g.totalGaji)}'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.visibility),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            title: Text('Slip Gaji ${g.namaGuru}'),
-                            content: Container(
-                              width: double.maxFinite,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _detailRow('ID', g.id),
-                                  _detailRow('Nama Guru', g.namaGuru),
-                                  _detailRow('Periode', '${getBulanNama(g.bulan)} ${g.tahun}'),
-                                  const Divider(),
-                                  const Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  if (g.komponen.isEmpty)
-                                    const Padding(
-                                      padding: EdgeInsets.all(8.0),
-                                      child: Text('Tidak ada komponen gaji', style: TextStyle(color: Colors.grey)),
-                                    )
-                                  else
-                                    ...g.komponen.map((k) => Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 2),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})'),
-                                              Text('Rp ${formatCurrency(k.jumlah)}'),
-                                            ],
-                                          ),
-                                        )),
-                                  const Divider(),
-                                  _detailRow('Total', 'Rp ${formatCurrency(g.totalGaji)}', bold: true),
-                                  _detailRow('Status', g.isPaid ? 'Lunas' : 'Belum'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.payment, color: Colors.green),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Konfirmasi Pembayaran'),
+                                content: Text('Tandai gaji ${g.namaGuru} (${getBulanNama(g.bulan)} ${g.tahun}) sebagai lunas?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Batal'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      onMarkPaid(g);
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Gaji ditandai lunas!')),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                    child: const Text('Ya, Bayar'),
+                                  ),
                                 ],
                               ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Tutup'),
+                            );
+                          },
+                          tooltip: 'Bayar',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.visibility),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: Text('Slip Gaji ${g.namaGuru}'),
+                                content: Container(
+                                  width: double.maxFinite,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _detailRow('ID', g.id),
+                                      _detailRow('Nama Guru', g.namaGuru),
+                                      _detailRow('Periode', '${getBulanNama(g.bulan)} ${g.tahun}'),
+                                      const Divider(),
+                                      if (g.komponen.isNotEmpty) ...[
+                                        const Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        SizedBox(
+                                          height: 120,
+                                          child: _buildPieChart(g.komponen),
+                                        ),
+                                        const Divider(),
+                                      ],
+                                      const Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      if (g.komponen.isEmpty)
+                                        const Padding(
+                                          padding: EdgeInsets.all(8.0),
+                                          child: Text('Tidak ada komponen gaji', style: TextStyle(color: Colors.grey)),
+                                        )
+                                      else
+                                        ...g.komponen.map((k) => Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 2),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Text(
+                                                      '${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})',
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    flex: 1,
+                                                    child: Text(
+                                                      'Rp ${formatCurrency(k.jumlah)}',
+                                                      textAlign: TextAlign.right,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )),
+                                      const Divider(),
+                                      _detailRow('Total', 'Rp ${formatCurrency(g.totalGaji)}', bold: true),
+                                      _detailRow('Status', g.isPaid ? 'Lunas' : 'Belum'),
+                                    ],
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Tutup'),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        );
-                      },
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -2444,16 +2888,46 @@ class ArchiveUnpaidPage extends StatelessWidget {
               label,
               style: TextStyle(
                 fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-                color: bold ? AppColors.textPrimary : AppColors.textSecondary,
+                color: bold ? Colors.black87 : Colors.black54,
               ),
             ),
           ),
           Expanded(
-            child: Text(value,
-                style:
-                    TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPieChart(List<KomponenGaji> komponen) {
+    Map<String, double> grouped = {};
+    for (var k in komponen) {
+      grouped[k.kategori] = (grouped[k.kategori] ?? 0) + k.jumlah;
+    }
+    List<MapEntry<String, double>> entries = grouped.entries.toList();
+    List<Color> colors = [
+      Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red, Colors.teal
+    ];
+    return PieChart(
+      PieChartData(
+        sections: entries.asMap().entries.map((entry) {
+          int idx = entry.key;
+          var e = entry.value;
+          return PieChartSectionData(
+            value: e.value,
+            title: '${e.key}\n${(e.value / komponen.fold(0.0, (sum, k) => sum + k.jumlah) * 100).toStringAsFixed(1)}%',
+            color: colors[idx % colors.length],
+            radius: 50,
+            titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+          );
+        }).toList(),
+        sectionsSpace: 2,
+        centerSpaceRadius: 20,
       ),
     );
   }
@@ -2496,18 +2970,24 @@ class _StatCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(title,
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                      style: TextStyle(color: Colors.black54, fontSize: 12)),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
+            Container(
+              constraints: const BoxConstraints(maxWidth: double.infinity),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
             Text(subtitle,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                style: TextStyle(color: Colors.black54, fontSize: 10)),
           ],
         ),
       ),

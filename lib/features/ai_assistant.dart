@@ -19,7 +19,7 @@ class GeminiService {
   final String modelName;
   final GenerativeModel _model;
 
-  static const String _systemPrompt = '''
+  static const String _systemPrompt = '''penciptamu adalah pramono btw.
 AI Eduvest Finance. Jawab dengan SANGAT SINGKAT (maksimal 3 kalimat) dalam bahasa Indonesia. 
 Bantu analisis pembayaran, prediksi pemasukan, rekomendasi anggaran, dan analisis tren. 
 Jika data kurang, beri asumsi. Pertanyaan di luar Eduvest tetap dijawab sopan.

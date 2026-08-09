@@ -21,7 +21,7 @@ class MorePage extends StatelessWidget {
       {'title': 'Statistik', 'icon': Icons.bar_chart, 'page': const StatistikPage()},
       {'title': 'AI Assistant', 'icon': Icons.auto_awesome, 'page': const AIAssistantPage()},
       {'title': 'Gaji Guru', 'icon': Icons.attach_money, 'page': const GajiGuruPage()},
-      {'title': 'Tambah Data', 'icon': Icons.person_add, 'page': const ManageStudentsPage()},
+      {'title': 'Tambah Siswa', 'icon': Icons.person_add, 'page': const ManageStudentsPage()},
       {'title': 'Akun Digital', 'icon': Icons.vpn_key, 'page': const DatabaseAkunPage()},
       {'title': 'Log Aktivitas', 'icon': Icons.history, 'page': const LogAktivitasPage()},
       {'title': 'Pengaturan', 'icon': Icons.settings, 'page': const SettingsPage()},

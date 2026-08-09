@@ -1,5 +1,7 @@
 // features/tambahkan.dart
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart';
 import '../data.dart';
 
 // ================== HALAMAN MANAJEMEN SISWA ==================
@@ -24,131 +26,100 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     return ['Semua', ...set.toList()..sort()];
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final filteredStudents = _filterKelas == 'Semua'
-        ? _activeStudents
-        : _activeStudents.where((s) => s.kelas == _filterKelas).toList();
+  // ================== FUNGSI IMPORT DARI EXCEL ==================
+  Future<void> _importFromExcel() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+      );
+      if (result == null) return;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manajemen Data Siswa'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddStudentDialog,
-            tooltip: 'Tambah Siswa Baru',
+      final bytes = result.files.first.bytes;
+      if (bytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membaca file.')),
+        );
+        return;
+      }
+
+      var excel = Excel.decodeBytes(bytes);
+      var sheet = excel.tables[excel.tables.keys.first];
+      if (sheet == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tidak ada sheet yang ditemukan.')),
+        );
+        return;
+      }
+
+      // Asumsi: baris pertama adalah header (Nama, NIS, Kelas, Alamat, Telepon)
+      int addedCount = 0;
+      int errorCount = 0;
+
+      for (int rowIndex = 1; rowIndex < sheet.rows.length; rowIndex++) {
+        var row = sheet.rows[rowIndex];
+        if (row.isEmpty) continue;
+
+        String? name = row.length > 0 ? row[0]?.value?.toString().trim() : null;
+        String? nis = row.length > 1 ? row[1]?.value?.toString().trim() : null;
+        String? kelas = row.length > 2 ? row[2]?.value?.toString().trim() : null;
+        String? alamat = row.length > 3 ? row[3]?.value?.toString().trim() : null;
+        String? phone = row.length > 4 ? row[4]?.value?.toString().trim() : null;
+
+        // Validasi minimal
+        if (name == null || name.isEmpty || nis == null || nis.isEmpty || kelas == null || kelas.isEmpty) {
+          errorCount++;
+          continue;
+        }
+
+        // Cek duplikat NIS
+        bool exists = dummyStudents.any((s) => s.nis == nis);
+        if (exists) {
+          errorCount++;
+          continue;
+        }
+
+        // Buat student baru
+        String id = 'STD${(dummyStudents.length + 1).toString().padLeft(3, '0')}';
+        Student newStudent = createStudentWithPayments(
+          id: id,
+          name: name,
+          nis: nis,
+          kelas: kelas,
+          alamat: alamat ?? '-',
+          phone: phone ?? '-',
+        );
+        setState(() {
+          dummyStudents.add(newStudent);
+        });
+        addedCount++;
+      }
+
+      if (addedCount > 0) {
+        dummyLogs.insert(
+          0,
+          ActivityLog(
+            user: 'Admin',
+            action: ActivityAction.tambah,
+            detail: 'Import $addedCount siswa dari Excel',
+            timestamp: DateTime.now(),
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Text('Filter Kelas: '),
-                    Expanded(
-                      child: DropdownButton<String>(
-                        value: _filterKelas,
-                        items: _kelasOptions.map((kelas) {
-                          return DropdownMenuItem(
-                            value: kelas,
-                            child: Text(kelas),
-                          );
-                        }).toList(),
-                        onChanged: (val) => setState(() => _filterKelas = val!),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _promoteClasses,
-                        icon: const Icon(Icons.arrow_upward),
-                        label: const Text('Naik Kelas'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _showAddClassXDialog,
-                        icon: const Icon(Icons.group_add),
-                        label: const Text('Tambah Kelas X'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _managePayments,
-                    icon: const Icon(Icons.payment),
-                    label: const Text('Kelola Pembayaran (per Kelas)'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        );
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Import selesai: $addedCount siswa berhasil ditambahkan, $errorCount gagal.',
           ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: filteredStudents.length,
-              itemBuilder: (context, index) {
-                final s = filteredStudents[index];
-                final majorColor = getMajorColor(s.kelas);
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: majorColor.withOpacity(0.2),
-                      child: Text(
-                        s.name[0],
-                        style: TextStyle(
-                          color: majorColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    title: Text(s.name),
-                    subtitle: Text('${s.nis} • ${s.kelas}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _showEditStudentDialog(s),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _deleteStudent(s),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+      setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
+      );
+    }
   }
 
   // ================== FUNGSI NAIK KELAS ==================
@@ -223,7 +194,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            ),
             child: const Text('Ya, Naikkan Kelas'),
           ),
         ],
@@ -570,10 +544,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     String alamat = student.alamat;
     String phone = student.phone;
     String? selectedKelas = student.kelas;
-    String selectedGender = getExtraInfo(
-      student.id,
-      'jenisKelamin',
-    ); // ambil gender saat ini
+    String selectedGender = getExtraInfo(student.id, 'jenisKelamin');
 
     showDialog(
       context: context,
@@ -621,7 +592,6 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                   decoration: const InputDecoration(labelText: 'No. Telepon'),
                   onChanged: (v) => phone = v,
                 ),
-                // DROPDOWN JENIS KELAMIN
                 DropdownButtonFormField<String>(
                   value: selectedGender,
                   decoration: const InputDecoration(labelText: 'Jenis Kelamin'),
@@ -655,7 +625,6 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                   student.kelas = selectedKelas!;
                   student.alamat = alamat;
                   student.phone = phone;
-                  // Simpan gender ke extraInfo
                   setExtraInfo(student.id, 'jenisKelamin', selectedGender);
                 });
                 dummyLogs.insert(
@@ -704,7 +673,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
               );
               Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             child: const Text('Hapus'),
           ),
         ],
@@ -818,6 +790,173 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
               }
             },
             child: const Text('Tambah'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================== BUILD ==================
+  @override
+  Widget build(BuildContext context) {
+    final filteredStudents = _filterKelas == 'Semua'
+        ? _activeStudents
+        : _activeStudents.where((s) => s.kelas == _filterKelas).toList();
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Manajemen Data Siswa'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showAddStudentDialog,
+            tooltip: 'Tambah Siswa Baru',
+          ),
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: _importFromExcel,
+            tooltip: 'Import dari Excel',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // ========== CARD FILTER & AKSI ==========
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Filter Kelas
+                    Row(
+                      children: [
+                        const Text('Filter Kelas: '),
+                        Expanded(
+                          child: DropdownButton<String>(
+                            value: _filterKelas,
+                            isExpanded: true,
+                            items: _kelasOptions.map((kelas) {
+                              return DropdownMenuItem(
+                                value: kelas,
+                                child: Text(kelas),
+                              );
+                            }).toList(),
+                            onChanged: (val) => setState(() => _filterKelas = val!),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Tombol aksi
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _promoteClasses,
+                          icon: const Icon(Icons.arrow_upward),
+                          label: const Text('Naik Kelas'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: _showAddClassXDialog,
+                          icon: const Icon(Icons.group_add),
+                          label: const Text('Tambah Kelas X'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.secondary,
+                            foregroundColor: colorScheme.onSecondary,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: _managePayments,
+                          icon: const Icon(Icons.payment),
+                          label: const Text('Kelola Pembayaran'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.tertiary,
+                            foregroundColor: colorScheme.onTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // ========== STATISTIK ==========
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              children: [
+                Text(
+                  'Total siswa: ${_activeStudents.length}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const Spacer(),
+                if (_filterKelas != 'Semua')
+                  Text(
+                    'Filter: $_filterKelas (${filteredStudents.length})',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // ========== DAFTAR SISWA ==========
+          Expanded(
+            child: ListView.separated(
+              itemCount: filteredStudents.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final s = filteredStudents[index];
+                final majorColor = getMajorColor(s.kelas);
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: majorColor.withOpacity(0.2),
+                      child: Text(
+                        s.name[0],
+                        style: TextStyle(
+                          color: majorColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(s.name),
+                    subtitle: Text('${s.nis} • ${s.kelas}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () => _showEditStudentDialog(s),
+                          tooltip: 'Edit',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _deleteStudent(s),
+                          tooltip: 'Hapus',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
