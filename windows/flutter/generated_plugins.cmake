@@ -4,7 +4,9 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
+  cloud_firestore
   file_selector_windows
+  firebase_core
   rive_common
   share_plus
   url_launcher_windows

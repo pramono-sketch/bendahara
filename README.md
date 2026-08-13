@@ -30,4 +30,5 @@ dashboard
 gaji guru: testing mulai dari popup manajement guru ,riwayat guru yang kompleks dan rapi hingga arsip sampai folder,arsip excel dari per tahun hingga per bulan.buat template.
 pilahkan kategory karyawan dan guru
 
-nice tersimpan di folder download nah btw aku tadi ingin anda membuat folder lagi di folder download storage/emulated/0/Download/bendaharaku/lalu disini ,jadi nanti di dalam folder download ada folder baru yang anda buat 
+nice tersimpan di folder download nah btw aku tadi ingin anda membuat folder lagi di folder download storage/emulated/0/Download/bendaharaku/lalu disini ,jadi nanti di dalam folder download ada folder baru yang anda buat
+

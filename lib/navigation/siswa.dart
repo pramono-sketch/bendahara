@@ -1,7 +1,7 @@
 // navigation/siswa.dart
 import 'package:flutter/material.dart';
 import '../data.dart';
-import '../templates/sound_helper.dart'; // 🔥 import
+import '../templates/sound_helper.dart';
 
 // ========== FUNGSI BANTU UNTUK PROGRES ==========
 double _getPaymentProgress(Student student) {
@@ -29,26 +29,34 @@ class _StudentsPageState extends State<StudentsPage> {
   String _searchQuery = '';
   String _filterKelas = 'Semua';
 
-  List<String> get _kelasOptions {
+  // Stream untuk data siswa aktif
+  Stream<List<Student>> get _studentsStream {
+    return studentsCollection
+        .where('isActive', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+    .map((doc) => Student.fromMap(doc.data()))
+    .toList();
+        });
+  }
+
+  // Ambil daftar kelas unik untuk filter
+  Future<List<String>> _getKelasOptions() async {
+    final snapshot = await studentsCollection
+        .where('isActive', isEqualTo: true)
+        .get();
     final set = <String>{};
-    for (var s in dummyStudents.where((s) => s.isActive)) {
-      set.add(s.kelas);
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final kelas = data['kelas'] as String?;
+      if (kelas != null) set.add(kelas);
     }
     return ['Semua', ...set.toList()..sort()];
   }
 
   @override
   Widget build(BuildContext context) {
-    final activeStudents = dummyStudents.where((s) => s.isActive).toList();
-    final filtered = activeStudents.where((s) {
-      final query = _searchQuery.toLowerCase();
-      bool matchName = s.name.toLowerCase().contains(query);
-      bool matchNis = s.nis.toLowerCase().contains(query);
-      bool matchKelas = s.kelas.toLowerCase().contains(query);
-      bool matchFilter = (_filterKelas == 'Semua') || (s.kelas == _filterKelas);
-      return (matchName || matchNis || matchKelas) && matchFilter;
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Data Siswa Aktif'),
@@ -56,7 +64,7 @@ class _StudentsPageState extends State<StudentsPage> {
           IconButton(
             icon: const Icon(Icons.archive),
             onPressed: () {
-              SoundHelper().playClick(); // 🔥
+              SoundHelper().playClick();
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ArchiveRootPage()),
@@ -88,84 +96,123 @@ class _StudentsPageState extends State<StudentsPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                DropdownButton<String>(
-                  value: _filterKelas,
-                  items: _kelasOptions.map((kelas) {
-                    return DropdownMenuItem(value: kelas, child: Text(kelas));
-                  }).toList(),
-                  onChanged: (val) {
-                    SoundHelper().playClick(); // 🔥
-                    setState(() => _filterKelas = val!);
+                FutureBuilder<List<String>>(
+                  future: _getKelasOptions(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final options = snapshot.data!;
+                    return DropdownButton<String>(
+                      value: _filterKelas,
+                      items: options.map((kelas) {
+                        return DropdownMenuItem(
+                          value: kelas,
+                          child: Text(kelas),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        SoundHelper().playClick();
+                        setState(() => _filterKelas = val!);
+                      },
+                    );
                   },
                 ),
               ],
             ),
           ),
           Expanded(
-            child: filtered.isEmpty
-                ? const Center(child: Text('Tidak ada siswa aktif'))
-                : ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final student = filtered[index];
-                      final majorColor = getMajorColor(student.kelas);
-                      final progress = _getPaymentProgress(student);
-                      final progressColor = _getProgressColor(progress);
-                      final progressText = '${(progress * 100).toInt()}%';
+            child: StreamBuilder<List<Student>>(
+              stream: _studentsStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('Tidak ada siswa aktif'));
+                }
 
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: majorColor.withOpacity(0.2),
-                            child: Text(
-                              student.name[0],
-                              style: TextStyle(
-                                color: majorColor,
-                                fontWeight: FontWeight.bold,
-                              ),
+                final allStudents = snapshot.data!;
+                // Filter berdasarkan query dan kelas
+                final filtered = allStudents.where((s) {
+                  final query = _searchQuery.toLowerCase();
+                  bool matchName = s.name.toLowerCase().contains(query);
+                  bool matchNis = s.nis.toLowerCase().contains(query);
+                  bool matchKelas = s.kelas.toLowerCase().contains(query);
+                  bool matchFilter =
+                      (_filterKelas == 'Semua') || (s.kelas == _filterKelas);
+                  return (matchName || matchNis || matchKelas) && matchFilter;
+                }).toList();
+
+                if (filtered.isEmpty) {
+                  return const Center(child: Text('Tidak ada siswa aktif'));
+                }
+
+                return ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final student = filtered[index];
+                    final majorColor = getMajorColor(student.kelas);
+                    final progress = _getPaymentProgress(student);
+                    final progressColor = _getProgressColor(progress);
+                    final progressText = '${(progress * 100).toInt()}%';
+
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: majorColor.withOpacity(0.2),
+                          child: Text(
+                            student.name[0],
+                            style: TextStyle(
+                              color: majorColor,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          title: Text(student.name),
-                          subtitle: Row(
-                            children: [
-                              Text('${student.nis} • ${student.kelas}'),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: progressColor.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: progressColor),
-                                ),
-                                child: Text(
-                                  progressText,
-                                  style: TextStyle(
-                                    color: progressColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () {
-                            SoundHelper().playClick(); // 🔥
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    StudentDetailPage(student: student),
-                              ),
-                            ).then((_) => setState(() {}));
-                          },
                         ),
-                      );
-                    },
-                  ),
+                        title: Text(student.name),
+                        subtitle: Row(
+                          children: [
+                            Text('${student.nis} • ${student.kelas}'),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: progressColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: progressColor),
+                              ),
+                              child: Text(
+                                progressText,
+                                style: TextStyle(
+                                  color: progressColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          SoundHelper().playClick();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  StudentDetailPage(student: student),
+                            ),
+                          ).then((_) => setState(() {}));
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -179,114 +226,76 @@ class ArchiveRootPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tahunKeys = arsipSiswa.keys.toList()..sort((a, b) => b.compareTo(a));
-
+    // Kita ambil semua siswa dengan isActive = false, lalu kelompokkan berdasarkan tahun arsip (field tahunArsip)
+    // Untuk sederhana, kita asumsikan field 'tahunArsip' ada, atau kita bisa kelompokkan berdasarkan kelas XII dan set isActive false.
+    // Di sini kita gunakan Stream untuk siswa tidak aktif.
     return Scaffold(
       appBar: AppBar(title: const Text('Arsip Siswa')),
-      body: tahunKeys.isEmpty
-          ? const Center(child: Text('Belum ada arsip'))
-          : ListView.builder(
-              itemCount: tahunKeys.length,
-              itemBuilder: (context, index) {
-                final tahun = tahunKeys[index];
-                final kelasMap = arsipSiswa[tahun]!;
-                final totalSiswa = kelasMap.values.fold(
-                  0,
-                  (sum, list) => sum + list.length,
-                );
-
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.folder, color: Colors.amber),
-                    title: Text(tahun),
-                    subtitle: Text(
-                      '$totalSiswa siswa • ${kelasMap.length} kelas',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      SoundHelper().playClick(); // 🔥
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ArchiveClassPage(tahun: tahun),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
+      body: StreamBuilder<List<Student>>(
+        stream: studentsCollection
+            .where('isActive', isEqualTo: false)
+            .snapshots()
+            .map(
+              (snapshot) => snapshot.docs
+                  .map((doc) => Student.fromMap(doc.data()))
+                  .toList(),
             ),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+          final arsip = snapshot.data!;
+          if (arsip.isEmpty)
+            return const Center(child: Text('Belum ada arsip'));
+
+          // Kelompokkan berdasarkan tahunArsip (jika ada) atau berdasarkan kelas
+          Map<String, List<Student>> grouped = {};
+          for (var s in arsip) {
+            // Kita asumsikan ada field tahunArsip, atau kita buat dari kelas?
+            // Untuk demo, kita pakai 'XII' sebagai kelompok.
+            String key = s.kelas; // atau ambil dari field tahunArsip jika ada
+            grouped.putIfAbsent(key, () => []).add(s);
+          }
+          final tahunKeys = grouped.keys.toList()..sort();
+
+          return ListView.builder(
+            itemCount: tahunKeys.length,
+            itemBuilder: (context, index) {
+              final key = tahunKeys[index];
+              final list = grouped[key]!;
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.folder, color: Colors.amber),
+                  title: Text(key),
+                  subtitle: Text('${list.length} siswa'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    SoundHelper().playClick();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ArchiveStudentListPage(siswaList: list),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
 
 // ================== HALAMAN ARSIP PER KELAS ==================
-class ArchiveClassPage extends StatelessWidget {
-  final String tahun;
-  const ArchiveClassPage({super.key, required this.tahun});
-
-  @override
-  Widget build(BuildContext context) {
-    final kelasMap = arsipSiswa[tahun] ?? {};
-    final kelasKeys = kelasMap.keys.toList()..sort();
-
-    return Scaffold(
-      appBar: AppBar(title: Text('Arsip $tahun')),
-      body: kelasKeys.isEmpty
-          ? const Center(child: Text('Kosong'))
-          : ListView.builder(
-              itemCount: kelasKeys.length,
-              itemBuilder: (context, index) {
-                final kelas = kelasKeys[index];
-                final siswaList = kelasMap[kelas]!;
-
-                return Card(
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.folder_open,
-                      color: getMajorColor(kelas),
-                    ),
-                    title: Text(kelas),
-                    subtitle: Text('${siswaList.length} siswa'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      SoundHelper().playClick(); // 🔥
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ArchiveStudentListPage(
-                            tahun: tahun,
-                            kelas: kelas,
-                            siswaList: siswaList,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-    );
-  }
-}
-
-// ================== HALAMAN DAFTAR SISWA DALAM ARSIP ==================
 class ArchiveStudentListPage extends StatelessWidget {
-  final String tahun;
-  final String kelas;
   final List<Student> siswaList;
-
-  const ArchiveStudentListPage({
-    super.key,
-    required this.tahun,
-    required this.kelas,
-    required this.siswaList,
-  });
+  const ArchiveStudentListPage({super.key, required this.siswaList});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('$kelas - $tahun')),
+      appBar: AppBar(title: const Text('Arsip Siswa')),
       body: ListView.builder(
         itemCount: siswaList.length,
         itemBuilder: (context, index) {
@@ -301,11 +310,11 @@ class ArchiveStudentListPage extends StatelessWidget {
                 ),
               ),
               title: Text(s.name),
-              subtitle: Text('NIS: ${s.nis} • ${s.alamat}'),
+              subtitle: Text('NIS: ${s.nis} • ${s.kelas}'),
               trailing: IconButton(
                 icon: const Icon(Icons.remove_red_eye, color: Colors.grey),
                 onPressed: () {
-                  SoundHelper().playClick(); // 🔥
+                  SoundHelper().playClick();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Siswa sudah lulus (arsip)')),
                   );
@@ -339,7 +348,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   }
 
   // ========== FUNGSI PEMBAYARAN CEPAT ==========
-  void _quickPayment() {
+  void _quickPayment() async {
     final input = _quickPayController.text.trim();
     if (input.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -355,6 +364,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
       return;
     }
 
+    // Proses pembayaran (sama seperti sebelumnya)
     setState(() {
       List<PaymentItem> unpaid = student.payments
           .where((p) => p.status != PaymentStatus.lunas && p.type != 'Saldo')
@@ -385,7 +395,12 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             ),
           );
         }
-        addIncomeTransaction('Saldo tabungan - ${student.name}', amount);
+        // Tambah transaksi
+        _addTransaction(
+          TransType.pemasukan,
+          'Saldo tabungan - ${student.name}',
+          amount,
+        );
         _log('Pembayaran saldo tabungan sebesar Rp ${formatCurrency(amount)}');
         _quickPayController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -395,6 +410,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             ),
           ),
         );
+        _saveStudentToFirestore();
         return;
       }
 
@@ -435,7 +451,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               ),
             );
           }
-          addIncomeTransaction(
+          _addTransaction(
+            TransType.pemasukan,
             'Pembayaran lunas semua - ${student.name}',
             amount,
           );
@@ -450,7 +467,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             ),
           );
         } else {
-          addIncomeTransaction(
+          _addTransaction(
+            TransType.pemasukan,
             'Pembayaran lunas semua - ${student.name}',
             amount,
           );
@@ -474,7 +492,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
           }
           p.lastPaymentDate = DateTime.now();
         }
-        addIncomeTransaction('Pembayaran parsial - ${student.name}', amount);
+        _addTransaction(
+          TransType.pemasukan,
+          'Pembayaran parsial - ${student.name}',
+          amount,
+        );
         _log('Pembayaran cepat parsial sebesar Rp ${formatCurrency(amount)}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -485,23 +507,39 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         );
       }
       _quickPayController.clear();
+      _saveStudentToFirestore();
     });
   }
 
+  // ========== FUNGSI BANTU ==========
   void _log(String detail) {
-    dummyLogs.insert(
-      0,
-      ActivityLog(
-        user: 'Admin',
-        action: ActivityAction.bayar,
-        detail: '$detail (${student.name})',
-        timestamp: DateTime.now(),
-      ),
+    final log = ActivityLog(
+      user: 'Admin',
+      action: ActivityAction.bayar,
+      detail: '$detail (${student.name})',
+      timestamp: DateTime.now(),
     );
+    addActivityLog(log);
+  }
+
+  void _addTransaction(TransType type, String desc, double amount) {
+    final t = Transaction(
+      id: 'TRX${DateTime.now().millisecondsSinceEpoch}', // ID unik
+      type: type,
+      amount: amount,
+      description: desc,
+      date: DateTime.now(),
+      category: type == TransType.pemasukan ? 'Pemasukan' : 'Pengeluaran',
+    );
+    addTransaction(t);
+  }
+
+  Future<void> _saveStudentToFirestore() async {
+    await saveStudent(student);
   }
 
   // ========== TOGGLE PEMBAYARAN ==========
-  void _togglePayment(int index) {
+  void _togglePayment(int index) async {
     setState(() {
       final item = student.payments[index];
       if (item.type == 'Saldo') {
@@ -517,7 +555,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         item.status = PaymentStatus.lunas;
         item.paidAmount = item.amount;
         item.lastPaymentDate = DateTime.now();
-        addIncomeTransaction('${item.type} - ${student.name}', amountToPay);
+        _addTransaction(
+          TransType.pemasukan,
+          '${item.type} - ${student.name}',
+          amountToPay,
+        );
         _log('Melunasi ${item.type}');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -525,8 +567,10 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             content: Text('Pembayaran sudah lunas dan tidak dapat dibatalkan'),
           ),
         );
+        return;
       }
     });
+    await _saveStudentToFirestore();
   }
 
   @override
@@ -576,7 +620,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -604,7 +647,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
                           onPressed: () {
-                            SoundHelper().playClick(); // 🔥
+                            SoundHelper().playClick();
                             _quickPayment();
                           },
                           icon: const Icon(Icons.payment),
@@ -629,7 +672,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-
             Text(
               'Riwayat Pembayaran',
               style: Theme.of(context).textTheme.titleMedium,
@@ -672,7 +714,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                       ? const Icon(Icons.check_circle, color: AppColors.success)
                       : TextButton(
                           onPressed: () {
-                            SoundHelper().playClick(); // 🔥
+                            SoundHelper().playClick();
                             _togglePayment(idx);
                           },
                           child: const Text('Lunas'),
@@ -681,7 +723,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               );
             }).toList(),
             const SizedBox(height: 16),
-
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -781,6 +822,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     );
   }
 
+  // ========== WIDGET PEMBANTU ==========
   Widget _infoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),

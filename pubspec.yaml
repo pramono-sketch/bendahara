@@ -29,6 +29,8 @@ dependencies:
   share_plus: ^7.0.2
   file_picker: ^8.0.7
   excel: ^2.0.0
+  firebase_core: ^4.13.0
+  cloud_firestore: ^6.8.0
 
 
 

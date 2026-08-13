@@ -1,11 +1,15 @@
+<!-- android/app/src/main/AndroidManifest.xml -->
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Permission untuk akses jaringan/internet -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="bendahara"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
-        <!-- android/app/src/main/AndroidManifest.xml -->
 
         <activity
             android:name=".MainActivity"

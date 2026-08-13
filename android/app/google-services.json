@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "588460462664",
+    "project_id": "eduvest-bendahara",
+    "storage_bucket": "eduvest-bendahara.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:588460462664:android:431c0a14edde5ff1503e7d",
+        "android_client_info": {
+          "package_name": "com.example.bendahara"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7wzkuoXBH_H93tFWS0Ok56Bw5KjP7Ty8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

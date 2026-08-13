@@ -1,6 +1,7 @@
 // lib/data.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ================== TEMA & KONSTANTA ==================
 class AppColors {
@@ -58,28 +59,55 @@ class AkunDigital {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'namaSiswa': namaSiswa,
-    'email': email,
-    'penanggungJawab': penanggungJawab,
-    'password': password,
-    'keterangan': keterangan,
-    'category': category,
-    'kelas': kelas,
-  };
+        'id': id,
+        'name': name,
+        'namaSiswa': namaSiswa,
+        'email': email,
+        'penanggungJawab': penanggungJawab,
+        'password': password,
+        'keterangan': keterangan,
+        'category': category,
+        'kelas': kelas,
+      };
 
   factory AkunDigital.fromJson(Map<String, dynamic> json) => AkunDigital(
-    id: json['id'],
-    name: json['name'],
-    namaSiswa: json['namaSiswa'],
-    email: json['email'],
-    penanggungJawab: json['penanggungJawab'],
-    password: json['password'],
-    keterangan: json['keterangan'],
-    category: json['category'],
-    kelas: json['kelas'],
-  );
+        id: json['id'],
+        name: json['name'],
+        namaSiswa: json['namaSiswa'],
+        email: json['email'],
+        penanggungJawab: json['penanggungJawab'],
+        password: json['password'],
+        keterangan: json['keterangan'],
+        category: json['category'],
+        kelas: json['kelas'],
+      );
+
+  // ===== FIRESTORE HELPERS =====
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'namaSiswa': namaSiswa,
+        'email': email,
+        'penanggungJawab': penanggungJawab,
+        'password': password,
+        'keterangan': keterangan,
+        'category': category,
+        'kelas': kelas,
+      };
+
+  static AkunDigital fromMap(Map<String, dynamic> map) {
+    return AkunDigital(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      namaSiswa: map['namaSiswa'],
+      email: map['email'] ?? '',
+      penanggungJawab: map['penanggungJawab'] ?? '',
+      password: map['password'] ?? '',
+      keterangan: map['keterangan'] ?? '',
+      category: map['category'] ?? '',
+      kelas: map['kelas'],
+    );
+  }
 }
 
 // ================== MODEL DATA LAINNYA ==================
@@ -115,6 +143,27 @@ class PaymentItem {
       lastPaymentDate: lastPaymentDate ?? this.lastPaymentDate,
     );
   }
+
+  // ===== FIRESTORE HELPERS =====
+  Map<String, dynamic> toMap() => {
+        'type': type,
+        'amount': amount,
+        'status': status.index,
+        'paidAmount': paidAmount,
+        'lastPaymentDate': lastPaymentDate?.toIso8601String(),
+      };
+
+  static PaymentItem fromMap(Map<String, dynamic> map) {
+    return PaymentItem(
+      type: map['type'] ?? '',
+      amount: (map['amount'] ?? 0).toDouble(),
+      status: PaymentStatus.values[map['status'] ?? 0],
+      paidAmount: (map['paidAmount'] ?? 0).toDouble(),
+      lastPaymentDate: map['lastPaymentDate'] != null
+          ? DateTime.parse(map['lastPaymentDate'])
+          : null,
+    );
+  }
 }
 
 class Student {
@@ -140,13 +189,41 @@ class Student {
 
   double get totalDue => payments.fold(0, (sum, p) => sum + p.amount);
   double get totalPaid => payments.fold(0, (sum, p) {
-    if (p.status == PaymentStatus.lunas) return sum + p.amount;
-    if (p.status == PaymentStatus.sebagian) return sum + p.paidAmount;
-    return sum;
-  });
+        if (p.status == PaymentStatus.lunas) return sum + p.amount;
+        if (p.status == PaymentStatus.sebagian) return sum + p.paidAmount;
+        return sum;
+      });
   double get remaining => totalDue - totalPaid;
   bool get hasOutstanding =>
       payments.any((p) => p.status != PaymentStatus.lunas);
+
+  // ===== FIRESTORE HELPERS =====
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'nis': nis,
+        'kelas': kelas,
+        'alamat': alamat,
+        'phone': phone,
+        'isActive': isActive,
+        'payments': payments.map((p) => p.toMap()).toList(),
+      };
+
+  static Student fromMap(Map<String, dynamic> map) {
+    return Student(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      nis: map['nis'] ?? '',
+      kelas: map['kelas'] ?? '',
+      alamat: map['alamat'] ?? '',
+      phone: map['phone'] ?? '',
+      payments: (map['payments'] as List<dynamic>?)
+              ?.map((e) => PaymentItem.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      isActive: map['isActive'] ?? true,
+    );
+  }
 }
 
 enum TransType { pemasukan, pengeluaran }
@@ -167,6 +244,27 @@ class Transaction {
     required this.date,
     this.category = '',
   });
+
+  // ===== FIRESTORE HELPERS =====
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'type': type.index,
+        'amount': amount,
+        'description': description,
+        'date': Timestamp.fromDate(date),
+        'category': category,
+      };
+
+  static Transaction fromMap(Map<String, dynamic> map) {
+    return Transaction(
+      id: map['id'] ?? '',
+      type: TransType.values[map['type'] ?? 0],
+      amount: (map['amount'] ?? 0).toDouble(),
+      description: map['description'] ?? '',
+      date: (map['date'] as Timestamp).toDate(),
+      category: map['category'] ?? '',
+    );
+  }
 }
 
 enum ActivityAction { tambah, edit, hapus, login, logout, bayar }
@@ -216,6 +314,23 @@ class ActivityLog {
       case ActivityAction.bayar:
         return Icons.payment;
     }
+  }
+
+  // ===== FIRESTORE HELPERS =====
+  Map<String, dynamic> toMap() => {
+        'user': user,
+        'action': action.index,
+        'detail': detail,
+        'timestamp': Timestamp.fromDate(timestamp),
+      };
+
+  static ActivityLog fromMap(Map<String, dynamic> map) {
+    return ActivityLog(
+      user: map['user'] ?? '',
+      action: ActivityAction.values[map['action'] ?? 0],
+      detail: map['detail'] ?? '',
+      timestamp: (map['timestamp'] as Timestamp).toDate(),
+    );
   }
 }
 
@@ -269,7 +384,7 @@ void setExtraInfo(String id, String key, String value) {
   }
 }
 
-// ================== SISTEM TRANSAKSI ==================
+// ================== SISTEM TRANSAKSI (Lokal) ==================
 List<Transaction> dummyTransactions = [];
 Map<String, List<Transaction>> arsipTransaksi = {};
 
@@ -338,7 +453,7 @@ void initDummyTransactions() {
       final amount = (random.nextDouble() * 3000000 + 500000).roundToDouble();
       final desc = isIncome
           ? ['Pembayaran SPP', 'Bantuan', 'Sumbangan', 'Pendaftaran'][random
-                .nextInt(4)]
+              .nextInt(4)]
           : ['ATK', 'Listrik', 'Perbaikan', 'Honor'][random.nextInt(4)];
       arsipTransaksi[key]!.add(
         Transaction(
@@ -585,6 +700,25 @@ class DigitalAccount {
     required this.keterangan,
     this.passwordMasked = '••••••••',
   });
+
+  // ===== FIRESTORE HELPERS =====
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'email': email,
+        'penanggungJawab': penanggungJawab,
+        'keterangan': keterangan,
+        'passwordMasked': passwordMasked,
+      };
+
+  static DigitalAccount fromMap(Map<String, dynamic> map) {
+    return DigitalAccount(
+      name: map['name'] ?? '',
+      email: map['email'] ?? '',
+      penanggungJawab: map['penanggungJawab'] ?? '',
+      keterangan: map['keterangan'] ?? '',
+      passwordMasked: map['passwordMasked'] ?? '••••••••',
+    );
+  }
 }
 
 // ================== AKUN DIGITAL & LOG ==================
@@ -683,8 +817,157 @@ List<DigitalAccount> dummyAccounts = [
 
 List<ActivityLog> dummyLogs = [];
 
-// ================== INISIALISASI DATA ==================
+// ================== INISIALISASI DATA (Lokal) ==================
 void initData() {
   initDummyTransactions();
   dummyTransactions.clear();
+}
+
+// ================================================================
+// ================== FIRESTORE INTEGRATION ========================
+// ================================================================
+
+/// Referensi koleksi Firestore
+final studentsCollection = FirebaseFirestore.instance.collection('students');
+final transactionsCollection = FirebaseFirestore.instance.collection('transactions');
+final logsCollection = FirebaseFirestore.instance.collection('activity_logs');
+final accountsCollection = FirebaseFirestore.instance.collection('digital_accounts');
+
+// ================== FIRESTORE CRUD FUNCTIONS ==================
+
+/// Ambil semua siswa aktif dari Firestore
+Future<List<Student>> fetchActiveStudents() async {
+  final snapshot =
+      await studentsCollection.where('isActive', isEqualTo: true).get();
+  return snapshot.docs.map((doc) => Student.fromMap(doc.data())).toList();
+}
+
+/// Ambil semua siswa (termasuk tidak aktif)
+Future<List<Student>> fetchAllStudents() async {
+  final snapshot = await studentsCollection.get();
+  return snapshot.docs.map((doc) => Student.fromMap(doc.data())).toList();
+}
+
+/// Simpan atau perbarui siswa
+Future<void> saveStudent(Student student) async {
+  await studentsCollection.doc(student.id).set(student.toMap());
+}
+
+/// Hapus siswa (jika diperlukan)
+Future<void> deleteStudent(String id) async {
+  await studentsCollection.doc(id).delete();
+}
+
+/// Ambil transaksi terbaru
+Future<List<Transaction>> fetchTransactions({int limit = 50}) async {
+  final snapshot = await transactionsCollection
+      .orderBy('date', descending: true)
+      .limit(limit)
+      .get();
+  return snapshot.docs.map((doc) => Transaction.fromMap(doc.data())).toList();
+}
+
+/// Ambil semua transaksi
+Future<List<Transaction>> fetchAllTransactions() async {
+  final snapshot = await transactionsCollection.get();
+  return snapshot.docs.map((doc) => Transaction.fromMap(doc.data())).toList();
+}
+
+/// Tambah transaksi baru
+Future<void> addTransaction(Transaction transaction) async {
+  await transactionsCollection.doc(transaction.id).set(transaction.toMap());
+}
+
+/// Tambah log aktivitas
+Future<void> addActivityLog(ActivityLog log) async {
+  await logsCollection.add(log.toMap());
+}
+
+/// Ambil log terbaru
+Future<List<ActivityLog>> fetchRecentLogs({int limit = 20}) async {
+  final snapshot = await logsCollection
+      .orderBy('timestamp', descending: true)
+      .limit(limit)
+      .get();
+  return snapshot.docs.map((doc) => ActivityLog.fromMap(doc.data())).toList();
+}
+
+/// Ambil akun digital
+Future<List<DigitalAccount>> fetchDigitalAccounts() async {
+  final snapshot = await accountsCollection.get();
+  return snapshot.docs.map((doc) => DigitalAccount.fromMap(doc.data())).toList();
+}
+
+/// Mengarsipkan siswa lulus (kelas XII) – set isActive = false
+Future<void> archiveGraduatedStudentsFirestore(String tahunAjaran) async {
+  final snapshot = await studentsCollection
+      .where('kelas', isGreaterThanOrEqualTo: 'XII')
+      .where('kelas', isLessThan: 'XIII') // hanya XII
+      .where('isActive', isEqualTo: true)
+      .get();
+
+  final batch = FirebaseFirestore.instance.batch();
+  for (var doc in snapshot.docs) {
+    final data = doc.data();
+    data['isActive'] = false;
+    data['tahunArsip'] = tahunAjaran;
+    batch.update(doc.reference, data);
+  }
+  await batch.commit();
+}
+
+/// Menaikkan kelas siswa aktif (X→XI, XI→XII)
+Future<void> promoteStudentsFirestore() async {
+  final snapshot =
+      await studentsCollection.where('isActive', isEqualTo: true).get();
+  final batch = FirebaseFirestore.instance.batch();
+  for (var doc in snapshot.docs) {
+    final data = doc.data();
+    String kelas = data['kelas'] ?? '';
+    if (kelas.startsWith('X ')) {
+      data['kelas'] = kelas.replaceFirst('X ', 'XI ');
+    } else if (kelas.startsWith('XI ')) {
+      data['kelas'] = kelas.replaceFirst('XI ', 'XII ');
+    }
+    batch.update(doc.reference, data);
+  }
+  await batch.commit();
+}
+
+// ================== SEED DATA AWAL ==================
+/// Isi data dummy ke Firestore jika koleksi kosong
+Future<void> seedFirestoreIfEmpty() async {
+  // Seed students
+  final studentSnapshot = await studentsCollection.limit(1).get();
+  if (studentSnapshot.docs.isEmpty) {
+    final dummyList = generateDummyStudents();
+    for (var s in dummyList) {
+      await studentsCollection.doc(s.id).set(s.toMap());
+    }
+  }
+
+  // Seed transactions
+  final transSnapshot = await transactionsCollection.limit(1).get();
+  if (transSnapshot.docs.isEmpty) {
+    // Gunakan data dari arsipTransaksi dan dummyTransactions lokal
+    // (pastikan initDummyTransactions sudah dipanggil)
+    initDummyTransactions();
+    final allTransactions = <Transaction>[];
+    arsipTransaksi.forEach((key, list) => allTransactions.addAll(list));
+    allTransactions.addAll(dummyTransactions);
+    for (var t in allTransactions) {
+      await transactionsCollection.doc(t.id).set(t.toMap());
+    }
+    // Kosongkan lokal agar tidak tumpang tindih
+    dummyTransactions.clear();
+    arsipTransaksi.clear();
+  }
+
+  // Seed digital accounts
+  final accSnapshot = await accountsCollection.limit(1).get();
+  if (accSnapshot.docs.isEmpty) {
+    for (var acc in dummyAccounts) {
+      await accountsCollection.add(acc.toMap());
+    }
+  }
 }
