@@ -3,6 +3,7 @@
 2.Responsiveness:buat handling untuk layar kecil
 3.Loading state:indikator loading saat proses
 4.Error handling
+5.tema:neomorphism
 
 5.Global variables
 6.Separation of concerns
@@ -26,4 +27,7 @@ dashboard
 
 <!-- Database akun digital: tambah/edit/hapus akun, filter kelas, pencarian, kenaikan kelas, arsip akun lulus, tab guru/siswa. -->
 
-gaji guru: testing mulai dari popup manajement guru ,riwayat guru yang kompleks dan rapi hingga arsip sampai folder,arsip excel dari per tahun hingga per bulan.buat template
+gaji guru: testing mulai dari popup manajement guru ,riwayat guru yang kompleks dan rapi hingga arsip sampai folder,arsip excel dari per tahun hingga per bulan.buat template.
+pilahkan kategory karyawan dan guru
+
+nice tersimpan di folder download nah btw aku tadi ingin anda membuat folder lagi di folder download storage/emulated/0/Download/bendaharaku/lalu disini ,jadi nanti di dalam folder download ada folder baru yang anda buat 

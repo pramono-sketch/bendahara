@@ -5,20 +5,27 @@ import 'package:path_provider/path_provider.dart';
 import '../features/gaji_guru.dart';
 
 class DownloadService {
-  // ============= TULIS FILE KE DOWNLOAD FOLDER =============
+  // ============= TULIS FILE KE DOWNLOAD FOLDER / BENDARAHAKU =============
   static Future<Directory> _getDownloadsDirectory() async {
+    // Tujuan: storage/emulated/0/Download/bendaharaku/
     if (Platform.isAndroid) {
       try {
         final extDir = await getExternalStorageDirectory();
         if (extDir != null) {
           final parts = extDir.path.split('/');
           if (parts.length >= 4) {
+            // Ambil base path seperti /storage/emulated/0
             var base = '/${parts[1]}/${parts[2]}/${parts[3]}';
             var downloadDir = Directory('$base/Download');
             if (!await downloadDir.exists()) {
               await downloadDir.create(recursive: true);
             }
-            return downloadDir;
+            // Buat subfolder bendaharaku
+            var appDir = Directory('$base/Download/bendaharaku');
+            if (!await appDir.exists()) {
+              await appDir.create(recursive: true);
+            }
+            return appDir;
           }
         }
       } catch (e) {
@@ -26,7 +33,12 @@ class DownloadService {
       }
     }
     // Fallback: temporary
-    return await getTemporaryDirectory();
+    final tempDir = await getTemporaryDirectory();
+    final fallbackDir = Directory('${tempDir.path}/bendaharaku');
+    if (!await fallbackDir.exists()) {
+      await fallbackDir.create(recursive: true);
+    }
+    return fallbackDir;
   }
 
   static Future<void> _saveFile(String fileName, String content) async {
@@ -142,7 +154,7 @@ class DownloadService {
     }
   }
 
-  // ============= HELPERS (tidak berubah) =============
+  // ============= HELPERS =============
   static String _getWordHeader(String title) {
     return '''
     <html xmlns:o='urn:schemas-microsoft-com:office:office'
