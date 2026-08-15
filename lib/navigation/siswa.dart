@@ -1,5 +1,7 @@
 // navigation/siswa.dart
 import 'package:flutter/material.dart';
+
+import '../constants/appearance.dart'; // 🔥 import warna
 import '../data.dart';
 import '../templates/sound_helper.dart';
 

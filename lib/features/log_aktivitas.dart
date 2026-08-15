@@ -1,5 +1,7 @@
 // features/log_aktivitas.dart
 import 'package:flutter/material.dart';
+
+import '../constants/appearance.dart'; // 🔥 import warna
 import '../data.dart';
 
 /// Halaman untuk menampilkan log aktivitas dengan filter dan pencarian.

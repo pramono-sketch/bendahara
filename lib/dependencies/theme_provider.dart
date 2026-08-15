@@ -1,7 +1,8 @@
 // dependencies/theme_provider.dart
 import 'package:flutter/material.dart';
 import 'package:riverpod/riverpod.dart';
-import '../data.dart'; // untuk warna seed (AppColors.primary)
+
+import '../constants/appearance.dart'; // 🔥 import warna
 
 // State untuk menyimpan status mode gelap (true = gelap)
 final isDarkProvider = StateProvider<bool>((ref) => false);

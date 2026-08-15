@@ -1,6 +1,6 @@
-// lib/cheat.dart
+// lib/features/data/cheat.dart
 import 'package:flutter/material.dart';
-import 'features/gaji_guru.dart';
+import '../gaji_guru.dart';
 
 // Fungsi FAB yang menerima callback dan data
 FloatingActionButton FABcheat({

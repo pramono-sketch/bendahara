@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data.dart';
 import '../templates/sound_helper.dart';
+import '../constants/appearance.dart'; // 🔥 import warna
 
 // ============================================================
 // HALAMAN UTAMA

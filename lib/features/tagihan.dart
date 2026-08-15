@@ -1,7 +1,9 @@
 // features/tagihan.dart
 import 'package:flutter/material.dart';
+
 import '../data.dart';
 import '../templates/sound_helper.dart'; // 🔥 import suara
+import '../constants/appearance.dart'; // 🔥 import warna
 
 class TagihanPage extends StatelessWidget {
   const TagihanPage({super.key});

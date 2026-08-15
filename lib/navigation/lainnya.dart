@@ -1,6 +1,7 @@
 // navigation/lainnya.dart
 import 'package:flutter/material.dart';
-import '../data.dart';
+
+import '../constants/appearance.dart'; // 🔥 import warna
 import '../features/settings.dart';
 import '../features/tambahkan.dart';
 import '../features/ai_assistant.dart';

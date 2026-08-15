@@ -1,7 +1,9 @@
 // navigation/laporan.dart
 import 'package:flutter/material.dart';
+
 import '../data.dart';
 import '../templates/sound_helper.dart'; // 🔥 import
+import '../constants/appearance.dart'; // 🔥 import warna
 
 class ReportsPage extends StatelessWidget {
   const ReportsPage({super.key});

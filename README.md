@@ -1,3 +1,9 @@
+cd C:\project_flutter\bendahara\
+cd C:\project_flutter\bendahara\lib\
+tree /F /A > "C:\Users\Hype AMD\Archives\Structure three\struktur_bendahara.txt"
+
+
+
 <!-- gaji guru dan karyawan=berbeda tergantung jam mengajar -->
 1.Card konsisten
 2.Responsiveness:buat handling untuk layar kecil
@@ -30,5 +36,5 @@ dashboard
 gaji guru: testing mulai dari popup manajement guru ,riwayat guru yang kompleks dan rapi hingga arsip sampai folder,arsip excel dari per tahun hingga per bulan.buat template.
 pilahkan kategory karyawan dan guru
 
-nice tersimpan di folder download nah btw aku tadi ingin anda membuat folder lagi di folder download storage/emulated/0/Download/bendaharaku/lalu disini ,jadi nanti di dalam folder download ada folder baru yang anda buat
+nah sekarang aku tidak ingin ada data dummynya menjadi data reel dan anda dapat membuat memanipulasi data
 

@@ -1,6 +1,8 @@
 // features/statistik.dart
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+
+import '../constants/appearance.dart'; // 🔥 import warna
 import '../data.dart';
 
 class StatistikPage extends StatelessWidget {
