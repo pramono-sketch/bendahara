@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../templates/sound_helper.dart';
 import '../service/export_gaji_guru.dart';
-import 'data/cheat.dart';
+import '../simulation/cheat_guru.dart';
 
 // ================== KOMPONEN GAJI ==================
 class KomponenGaji {

@@ -1,20 +1,19 @@
 // lib/data.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'constants/appearance.dart'; // ← import untuk menggunakan AppColors dan fungsi jika diperlukan (tapi di sini tidak digunakan langsung)
+import 'package:cloud_firestore/cloud_firestore.dart';  // ← DULU ADA
 
 // ================== MODEL AKUN DIGITAL (GURU & SISWA) ==================
 class AkunDigital {
   final String id;
-  String name; // nama layanan
-  String? namaSiswa; // nama siswa (khusus kategori siswa)
+  String name;
+  String? namaSiswa;
   String email;
   String penanggungJawab;
   String password;
   String keterangan;
-  String category; // 'guru' atau 'siswa'
-  String? kelas; // hanya untuk siswa
+  String category;
+  String? kelas;
 
   AkunDigital({
     required this.id,
@@ -593,13 +592,10 @@ void processClassPromotion() {
   }
 }
 
-// ================== ARSIP AKUN DIGITAL SISWA (khusus untuk database_akun) ==================
+// ================== ARSIP AKUN DIGITAL SISWA ==================
 Map<String, Map<String, List<AkunDigital>>> arsipAkunSiswa = {};
 
-/// Mengarsipkan akun siswa yang berstatus 'XII ...' ke dalam folder arsip,
-/// dan mengubah kelasnya menjadi 'Lulus'.
 void archiveGraduatedAccounts(String tahunAjaran, List<AkunDigital> accounts) {
-  // Ambil akun siswa dengan kelas XII
   List<AkunDigital> graduated = accounts
       .where(
         (a) =>
@@ -611,27 +607,23 @@ void archiveGraduatedAccounts(String tahunAjaran, List<AkunDigital> accounts) {
 
   if (graduated.isEmpty) return;
 
-  // Kelompokkan berdasarkan kelas asal (misal 'XII RPL')
   Map<String, List<AkunDigital>> grouped = {};
   for (var acc in graduated) {
     String kelasAsal = acc.kelas!;
     grouped.putIfAbsent(kelasAsal, () => []).add(acc);
   }
 
-  // Simpan ke arsip
   arsipAkunSiswa.putIfAbsent(tahunAjaran, () => {});
   for (var entry in grouped.entries) {
     arsipAkunSiswa[tahunAjaran]!.putIfAbsent(entry.key, () => []);
     arsipAkunSiswa[tahunAjaran]![entry.key]!.addAll(entry.value);
   }
 
-  // Tandai sebagai lulus dengan mengubah kelas menjadi 'Lulus'
   for (var acc in graduated) {
     acc.kelas = 'Lulus';
   }
 }
 
-/// Fungsi untuk menaikkan kelas akun digital siswa (X→XI, XI→XII)
 void promoteAccounts(List<AkunDigital> accounts) {
   for (var acc in accounts) {
     if (acc.category != 'siswa' || acc.kelas == null) continue;
@@ -652,7 +644,6 @@ void promoteAccounts(List<AkunDigital> accounts) {
     } else if (kelas.startsWith('XI ')) {
       acc.kelas = 'XII $jurusan';
     }
-    // Siswa XII sudah ditangani oleh archiveGraduatedAccounts
   }
 }
 
@@ -791,153 +782,4 @@ List<ActivityLog> dummyLogs = [];
 void initData() {
   initDummyTransactions();
   dummyTransactions.clear();
-}
-
-// ================================================================
-// ================== FIRESTORE INTEGRATION ========================
-// ================================================================
-
-/// Referensi koleksi Firestore
-final studentsCollection = FirebaseFirestore.instance.collection('students');
-final transactionsCollection = FirebaseFirestore.instance.collection('transactions');
-final logsCollection = FirebaseFirestore.instance.collection('activity_logs');
-final accountsCollection = FirebaseFirestore.instance.collection('digital_accounts');
-
-// ================== FIRESTORE CRUD FUNCTIONS ==================
-
-/// Ambil semua siswa aktif dari Firestore
-Future<List<Student>> fetchActiveStudents() async {
-  final snapshot =
-      await studentsCollection.where('isActive', isEqualTo: true).get();
-  return snapshot.docs.map((doc) => Student.fromMap(doc.data())).toList();
-}
-
-/// Ambil semua siswa (termasuk tidak aktif)
-Future<List<Student>> fetchAllStudents() async {
-  final snapshot = await studentsCollection.get();
-  return snapshot.docs.map((doc) => Student.fromMap(doc.data())).toList();
-}
-
-/// Simpan atau perbarui siswa
-Future<void> saveStudent(Student student) async {
-  await studentsCollection.doc(student.id).set(student.toMap());
-}
-
-/// Hapus siswa (jika diperlukan)
-Future<void> deleteStudent(String id) async {
-  await studentsCollection.doc(id).delete();
-}
-
-/// Ambil transaksi terbaru
-Future<List<Transaction>> fetchTransactions({int limit = 50}) async {
-  final snapshot = await transactionsCollection
-      .orderBy('date', descending: true)
-      .limit(limit)
-      .get();
-  return snapshot.docs.map((doc) => Transaction.fromMap(doc.data())).toList();
-}
-
-/// Ambil semua transaksi
-Future<List<Transaction>> fetchAllTransactions() async {
-  final snapshot = await transactionsCollection.get();
-  return snapshot.docs.map((doc) => Transaction.fromMap(doc.data())).toList();
-}
-
-/// Tambah transaksi baru
-Future<void> addTransaction(Transaction transaction) async {
-  await transactionsCollection.doc(transaction.id).set(transaction.toMap());
-}
-
-/// Tambah log aktivitas
-Future<void> addActivityLog(ActivityLog log) async {
-  await logsCollection.add(log.toMap());
-}
-
-/// Ambil log terbaru
-Future<List<ActivityLog>> fetchRecentLogs({int limit = 20}) async {
-  final snapshot = await logsCollection
-      .orderBy('timestamp', descending: true)
-      .limit(limit)
-      .get();
-  return snapshot.docs.map((doc) => ActivityLog.fromMap(doc.data())).toList();
-}
-
-/// Ambil akun digital
-Future<List<DigitalAccount>> fetchDigitalAccounts() async {
-  final snapshot = await accountsCollection.get();
-  return snapshot.docs.map((doc) => DigitalAccount.fromMap(doc.data())).toList();
-}
-
-/// Mengarsipkan siswa lulus (kelas XII) – set isActive = false
-Future<void> archiveGraduatedStudentsFirestore(String tahunAjaran) async {
-  final snapshot = await studentsCollection
-      .where('kelas', isGreaterThanOrEqualTo: 'XII')
-      .where('kelas', isLessThan: 'XIII') // hanya XII
-      .where('isActive', isEqualTo: true)
-      .get();
-
-  final batch = FirebaseFirestore.instance.batch();
-  for (var doc in snapshot.docs) {
-    final data = doc.data();
-    data['isActive'] = false;
-    data['tahunArsip'] = tahunAjaran;
-    batch.update(doc.reference, data);
-  }
-  await batch.commit();
-}
-
-/// Menaikkan kelas siswa aktif (X→XI, XI→XII)
-Future<void> promoteStudentsFirestore() async {
-  final snapshot =
-      await studentsCollection.where('isActive', isEqualTo: true).get();
-  final batch = FirebaseFirestore.instance.batch();
-  for (var doc in snapshot.docs) {
-    final data = doc.data();
-    String kelas = data['kelas'] ?? '';
-    if (kelas.startsWith('X ')) {
-      data['kelas'] = kelas.replaceFirst('X ', 'XI ');
-    } else if (kelas.startsWith('XI ')) {
-      data['kelas'] = kelas.replaceFirst('XI ', 'XII ');
-    }
-    batch.update(doc.reference, data);
-  }
-  await batch.commit();
-}
-
-// ================== SEED DATA AWAL ==================
-/// Isi data dummy ke Firestore jika koleksi kosong
-Future<void> seedFirestoreIfEmpty() async {
-  // Seed students
-  final studentSnapshot = await studentsCollection.limit(1).get();
-  if (studentSnapshot.docs.isEmpty) {
-    final dummyList = generateDummyStudents();
-    for (var s in dummyList) {
-      await studentsCollection.doc(s.id).set(s.toMap());
-    }
-  }
-
-  // Seed transactions
-  final transSnapshot = await transactionsCollection.limit(1).get();
-  if (transSnapshot.docs.isEmpty) {
-    // Gunakan data dari arsipTransaksi dan dummyTransactions lokal
-    // (pastikan initDummyTransactions sudah dipanggil)
-    initDummyTransactions();
-    final allTransactions = <Transaction>[];
-    arsipTransaksi.forEach((key, list) => allTransactions.addAll(list));
-    allTransactions.addAll(dummyTransactions);
-    for (var t in allTransactions) {
-      await transactionsCollection.doc(t.id).set(t.toMap());
-    }
-    // Kosongkan lokal agar tidak tumpang tindih
-    dummyTransactions.clear();
-    arsipTransaksi.clear();
-  }
-
-  // Seed digital accounts
-  final accSnapshot = await accountsCollection.limit(1).get();
-  if (accSnapshot.docs.isEmpty) {
-    for (var acc in dummyAccounts) {
-      await accountsCollection.add(acc.toMap());
-    }
-  }
 }

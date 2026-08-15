@@ -1,95 +1,220 @@
 // lib/main.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'addon/splash_screen.dart';
 import 'addon/navigation.dart';
-import 'templates/sound_helper.dart';
-import 'dependencies/theme_provider.dart';
-import 'l10n/translations.dart';
-import 'firebase_options.dart';
+import 'addon/splash_screen.dart';
+import 'constants/appearance.dart';
 import 'data.dart';
+import 'firebase_options.dart';
+import 'l10n/translations.dart';
+import 'templates/sound_helper.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔥 Inisialisasi Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // ============================================================
+  // MULAI STARTUP DI BACKGROUND
+  // ============================================================
+  //
+  // Jangan await di main().
+  //
+  // Dengan begitu runApp() bisa langsung berjalan dan splash
+  // langsung terlihat, sementara Firebase dan Firestore dimuat.
+  final startupFuture = initializeApplication();
 
-  // (Opsional) Seed data awal jika Firestore kosong
-  await seedFirestoreIfEmpty();
+  // ============================================================
+  // RUN APP LANGSUNG
+  // ============================================================
 
   runApp(
-    const ProviderScope(
-      child: EduvestApp(),
+    ProviderScope(
+      child: EduvestApp(
+        startupFuture: startupFuture,
+      ),
     ),
   );
 }
 
-/// Fungsi untuk mengisi data awal (dummy) ke Firestore jika koleksi kosong
+// ============================================================
+// ================= INITIALIZE APPLICATION =====================
+// ============================================================
+
+Future<void> initializeApplication() async {
+  // ==========================================================
+  // FIREBASE
+  // ==========================================================
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ==========================================================
+  // SEED DATA
+  // ==========================================================
+  //
+  // Hanya berjalan jika koleksi Firestore masih kosong.
+  // Splash tetap tampil selama proses ini.
+
+  await seedFirestoreIfEmpty();
+}
+
+// ============================================================
+// ================= SEED FIRESTORE =============================
+// ============================================================
+
+/// Mengisi data awal Firestore jika koleksi masih kosong.
 Future<void> seedFirestoreIfEmpty() async {
-  // Perbaiki di sini: gunakan firestore.FirebaseFirestore
-  final firestoreInstance = firestore.FirebaseFirestore.instance;
+  final firestoreInstance =
+      firestore.FirebaseFirestore.instance;
 
-  // Cek koleksi students
-  final studentsSnapshot = await firestoreInstance.collection('students').limit(1).get();
+  // ==========================================================
+  // STUDENTS
+  // ==========================================================
+
+  final studentsSnapshot = await firestoreInstance
+      .collection('students')
+      .limit(1)
+      .get();
+
   if (studentsSnapshot.docs.isEmpty) {
-    // Generate dummy students dari data.dart
-    final dummyStudents = generateDummyStudents();
-    for (var student in dummyStudents) {
-      await firestoreInstance.collection('students').doc(student.id).set(student.toMap());
+    final students = generateDummyStudents();
+
+    for (final student in students) {
+      await firestoreInstance
+          .collection('students')
+          .doc(student.id)
+          .set(student.toMap());
     }
   }
 
-  // Cek koleksi transactions
-  final transSnapshot = await firestoreInstance.collection('transactions').limit(1).get();
+  // ==========================================================
+  // TRANSACTIONS
+  // ==========================================================
+
+  final transSnapshot = await firestoreInstance
+      .collection('transactions')
+      .limit(1)
+      .get();
+
   if (transSnapshot.docs.isEmpty) {
-    // Inisialisasi dummy transactions (dari data.dart)
     initDummyTransactions();
-    // Kita simpan semua transaksi dari arsipTransaksi dan dummyTransactions ke Firestore
+
     final allTransactions = <Transaction>[];
-    arsipTransaksi.forEach((key, list) => allTransactions.addAll(list));
+
+    arsipTransaksi.forEach(
+      (key, transactions) {
+        allTransactions.addAll(transactions);
+      },
+    );
+
     allTransactions.addAll(dummyTransactions);
-    for (var t in allTransactions) {
-      await firestoreInstance.collection('transactions').doc(t.id).set(t.toMap());
+
+    for (final transaction in allTransactions) {
+      await firestoreInstance
+          .collection('transactions')
+          .doc(transaction.id)
+          .set(transaction.toMap());
     }
   }
 
-  // Cek koleksi digital_accounts
-  final accSnapshot = await firestoreInstance.collection('digital_accounts').limit(1).get();
-  if (accSnapshot.docs.isEmpty) {
-    for (var acc in dummyAccounts) {
-      await firestoreInstance.collection('digital_accounts').add(acc.toMap());
+  // ==========================================================
+  // DIGITAL ACCOUNTS
+  // ==========================================================
+
+  final accountSnapshot = await firestoreInstance
+      .collection('digital_accounts')
+      .limit(1)
+      .get();
+
+  if (accountSnapshot.docs.isEmpty) {
+    for (final account in dummyAccounts) {
+      await firestoreInstance
+          .collection('digital_accounts')
+          .add(account.toMap());
     }
   }
 }
+
+// ============================================================
+// ====================== EDUVEST APP ===========================
+// ============================================================
 
 class EduvestApp extends ConsumerStatefulWidget {
-  const EduvestApp({super.key});
+  final Future<void> startupFuture;
+
+  const EduvestApp({
+    super.key,
+    required this.startupFuture,
+  });
 
   @override
-  ConsumerState<EduvestApp> createState() => _EduvestAppState();
+  ConsumerState<EduvestApp> createState() =>
+      _EduvestAppState();
 }
 
-class _EduvestAppState extends ConsumerState<EduvestApp> with WidgetsBindingObserver {
+class _EduvestAppState
+    extends ConsumerState<EduvestApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
+
+    // ==========================================================
+    // SOUND
+    // ==========================================================
+
     SoundHelper().init();
+
+    // ==========================================================
+    // SYSTEM BRIGHTNESS
+    // ==========================================================
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateSystemBrightness();
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+
     SoundHelper().dispose();
+
     super.dispose();
   }
+
+  @override
+  void didChangePlatformBrightness() {
+    _updateSystemBrightness();
+  }
+
+  // ============================================================
+  // UPDATE SYSTEM BRIGHTNESS
+  // ============================================================
+
+  void _updateSystemBrightness() {
+    if (!mounted) return;
+
+    final brightness = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .platformBrightness;
+
+    ref
+        .read(systemBrightnessProvider.notifier)
+        .state = brightness;
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -99,18 +224,33 @@ class _EduvestAppState extends ConsumerState<EduvestApp> with WidgetsBindingObse
 
     return MaterialApp(
       title: translations.t('app_title'),
+
       debugShowCheckedModeBanner: false,
+
       theme: theme,
+
       darkTheme: theme,
+
       locale: locale,
+
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('id'), Locale('en')],
-      home: const SimpleSplashScreen(
-        nextPage: HomePage(),
+
+      supportedLocales: const [
+        Locale('id'),
+        Locale('en'),
+      ],
+
+      // ========================================================
+      // SPLASH
+      // ========================================================
+
+      home: SimpleSplashScreen(
+        nextPage: const HomePage(),
+        startupFuture: widget.startupFuture,
       ),
     );
   }

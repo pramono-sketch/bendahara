@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/appearance.dart'; // 🔥 import warna
 import '../data.dart';
+import '../firebase/firestore_service.dart';
 import '../templates/sound_helper.dart';
 
 // ========== FUNGSI BANTU UNTUK PROGRES ==========
