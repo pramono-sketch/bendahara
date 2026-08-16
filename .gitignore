@@ -40,7 +40,7 @@ app.*.symbols
 app.*.map.json
 
 # API Key
-lib/dependencies/api_key.dart
+lib/env/api_key.dart
 
 # Android Studio will place build artifacts here
 /android/app/debug

@@ -1,10 +1,9 @@
 // features/tambahkan.dart
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
 
-import '../constants/appearance.dart'; // 🔥 import warna
+import '../constants/appearance.dart';
 import '../data.dart';
+import '../service/import_tambahkan.dart'; // Import file excel_import.dart
 
 // ================== HALAMAN MANAJEMEN SISWA ==================
 class ManageStudentsPage extends StatefulWidget {
@@ -15,6 +14,8 @@ class ManageStudentsPage extends StatefulWidget {
 }
 
 class _ManageStudentsPageState extends State<ManageStudentsPage> {
+  final ExcelImportManager _excelImporter = ExcelImportManager();
+
   List<Student> get _activeStudents =>
       dummyStudents.where((s) => s.isActive).toList();
 
@@ -28,103 +29,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     return ['Semua', ...set.toList()..sort()];
   }
 
-  // ================== FUNGSI IMPORT DARI EXCEL ==================
-  Future<void> _importFromExcel() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'],
-      );
-      if (result == null) return;
-
-      final bytes = result.files.first.bytes;
-      if (bytes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal membaca file.')),
-        );
-        return;
-      }
-
-      var excel = Excel.decodeBytes(bytes);
-      var sheet = excel.tables[excel.tables.keys.first];
-      if (sheet == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak ada sheet yang ditemukan.')),
-        );
-        return;
-      }
-
-      // Asumsi: baris pertama adalah header (Nama, NIS, Kelas, Alamat, Telepon)
-      int addedCount = 0;
-      int errorCount = 0;
-
-      for (int rowIndex = 1; rowIndex < sheet.rows.length; rowIndex++) {
-        var row = sheet.rows[rowIndex];
-        if (row.isEmpty) continue;
-
-        String? name = row.length > 0 ? row[0]?.value?.toString().trim() : null;
-        String? nis = row.length > 1 ? row[1]?.value?.toString().trim() : null;
-        String? kelas = row.length > 2 ? row[2]?.value?.toString().trim() : null;
-        String? alamat = row.length > 3 ? row[3]?.value?.toString().trim() : null;
-        String? phone = row.length > 4 ? row[4]?.value?.toString().trim() : null;
-
-        // Validasi minimal
-        if (name == null || name.isEmpty || nis == null || nis.isEmpty || kelas == null || kelas.isEmpty) {
-          errorCount++;
-          continue;
-        }
-
-        // Cek duplikat NIS
-        bool exists = dummyStudents.any((s) => s.nis == nis);
-        if (exists) {
-          errorCount++;
-          continue;
-        }
-
-        // Buat student baru
-        String id = 'STD${(dummyStudents.length + 1).toString().padLeft(3, '0')}';
-        Student newStudent = createStudentWithPayments(
-          id: id,
-          name: name,
-          nis: nis,
-          kelas: kelas,
-          alamat: alamat ?? '-',
-          phone: phone ?? '-',
-        );
-        setState(() {
-          dummyStudents.add(newStudent);
-        });
-        addedCount++;
-      }
-
-      if (addedCount > 0) {
-        dummyLogs.insert(
-          0,
-          ActivityLog(
-            user: 'Admin',
-            action: ActivityAction.tambah,
-            detail: 'Import $addedCount siswa dari Excel',
-            timestamp: DateTime.now(),
-          ),
-        );
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Import selesai: $addedCount siswa berhasil ditambahkan, $errorCount gagal.',
-          ),
-        ),
-      );
-      setState(() {});
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
-      );
-    }
-  }
-
+  // ═════════════════════════════════════════════════════════════
   // ================== FUNGSI NAIK KELAS ==================
+  // ═════════════════════════════════════════════════════════════
+
   void _promoteClasses() {
     final TextEditingController folderController = TextEditingController();
 
@@ -207,7 +115,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     );
   }
 
+  // ═════════════════════════════════════════════════════════════
   // ================== KELOLA PEMBAYARAN ==================
+  // ═════════════════════════════════════════════════════════════
+
   void _managePayments() {
     showDialog(
       context: context,
@@ -272,11 +183,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  size: 18,
-                                  color: Colors.red,
-                                ),
+                                icon: const Icon(Icons.delete, size: 18, color: Colors.red),
                                 onPressed: () {
                                   tempList.removeAt(index);
                                   setStateDialog(() {});
@@ -309,9 +216,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
               ),
               ElevatedButton(
                 onPressed: () {
-                  defaultPaymentsByClass[grade] = tempList
-                      .map((p) => p.copyWith())
-                      .toList();
+                  defaultPaymentsByClass[grade] = tempList.map((p) => p.copyWith()).toList();
                   dummyLogs.insert(
                     0,
                     ActivityLog(
@@ -323,9 +228,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                   );
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Pembayaran kelas $grade diperbarui'),
-                    ),
+                    SnackBar(content: Text('Pembayaran kelas $grade diperbarui')),
                   );
                 },
                 child: const Text('Simpan'),
@@ -337,17 +240,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     );
   }
 
-  void _editPaymentItem(
-    BuildContext context,
-    PaymentItem item,
-    Function(PaymentItem) onSaved,
-  ) {
-    final TextEditingController nameController = TextEditingController(
-      text: item.type,
-    );
-    final TextEditingController amountController = TextEditingController(
-      text: item.amount.toString(),
-    );
+  void _editPaymentItem(BuildContext context, PaymentItem item, Function(PaymentItem) onSaved) {
+    final TextEditingController nameController = TextEditingController(text: item.type);
+    final TextEditingController amountController = TextEditingController(text: item.amount.toString());
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -374,13 +270,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
           ElevatedButton(
             onPressed: () {
               final newName = nameController.text.trim();
-              final newAmount =
-                  double.tryParse(amountController.text.trim()) ?? 0;
+              final newAmount = double.tryParse(amountController.text.trim()) ?? 0;
               if (newName.isEmpty || newAmount <= 0) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Nama dan nominal harus diisi dengan benar'),
-                  ),
+                  const SnackBar(content: Text('Nama dan nominal harus diisi dengan benar')),
                 );
                 return;
               }
@@ -403,6 +296,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
   void _addNewPaymentItem(BuildContext context, Function(PaymentItem) onAdd) {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController amountController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -432,9 +326,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
               final amount = double.tryParse(amountController.text.trim()) ?? 0;
               if (name.isEmpty || amount <= 0) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Nama dan nominal harus diisi dengan benar'),
-                  ),
+                  const SnackBar(content: Text('Nama dan nominal harus diisi dengan benar')),
                 );
                 return;
               }
@@ -449,7 +341,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     );
   }
 
+  // ═════════════════════════════════════════════════════════════
   // ================== FUNGSI CRUD SISWA ==================
+  // ═════════════════════════════════════════════════════════════
+
   void _showAddStudentDialog() {
     final _formKey = GlobalKey<FormState>();
     String name = '', nis = '', alamat = '', phone = '';
@@ -598,14 +493,8 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                   value: selectedGender,
                   decoration: const InputDecoration(labelText: 'Jenis Kelamin'),
                   items: const [
-                    DropdownMenuItem(
-                      value: 'Laki-laki',
-                      child: Text('Laki-laki'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Perempuan',
-                      child: Text('Perempuan'),
-                    ),
+                    DropdownMenuItem(value: 'Laki-laki', child: Text('Laki-laki')),
+                    DropdownMenuItem(value: 'Perempuan', child: Text('Perempuan')),
                   ],
                   onChanged: (v) => selectedGender = v!,
                 ),
@@ -707,8 +596,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       initialValue: '5',
                       keyboardType: TextInputType.number,
                       onChanged: (v) => tkjCount = int.tryParse(v) ?? 0,
-                      validator: (v) =>
-                          int.tryParse(v!) == null ? 'Angka' : null,
+                      validator: (v) => int.tryParse(v!) == null ? 'Angka' : null,
                     ),
                   ),
                 ],
@@ -721,8 +609,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       initialValue: '5',
                       keyboardType: TextInputType.number,
                       onChanged: (v) => rplCount = int.tryParse(v) ?? 0,
-                      validator: (v) =>
-                          int.tryParse(v!) == null ? 'Angka' : null,
+                      validator: (v) => int.tryParse(v!) == null ? 'Angka' : null,
                     ),
                   ),
                 ],
@@ -735,8 +622,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       initialValue: '5',
                       keyboardType: TextInputType.number,
                       onChanged: (v) => tkrCount = int.tryParse(v) ?? 0,
-                      validator: (v) =>
-                          int.tryParse(v!) == null ? 'Angka' : null,
+                      validator: (v) => int.tryParse(v!) == null ? 'Angka' : null,
                     ),
                   ),
                 ],
@@ -758,10 +644,8 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                   void addStudentsForMajor(String major, int count) {
                     for (int i = 1; i <= count; i++) {
                       final name = 'Siswa X $major $i';
-                      final nis =
-                          '2026${(nisCounter++).toString().padLeft(3, '0')}';
-                      final id =
-                          'STD${(idCounter++).toString().padLeft(3, '0')}';
+                      final nis = '2026${(nisCounter++).toString().padLeft(3, '0')}';
+                      final id = 'STD${(idCounter++).toString().padLeft(3, '0')}';
                       final newStudent = createStudentWithPayments(
                         id: id,
                         name: name,
@@ -783,8 +667,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                   ActivityLog(
                     user: 'Admin',
                     action: ActivityAction.tambah,
-                    detail:
-                        'Menambah kelas X (TKJ:$tkjCount, RPL:$rplCount, TKR:$tkrCount)',
+                    detail: 'Menambah kelas X (TKJ:$tkjCount, RPL:$rplCount, TKR:$tkrCount)',
                     timestamp: DateTime.now(),
                   ),
                 );
@@ -798,7 +681,10 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     );
   }
 
+  // ═════════════════════════════════════════════════════════════
   // ================== BUILD ==================
+  // ═════════════════════════════════════════════════════════════
+
   @override
   Widget build(BuildContext context) {
     final filteredStudents = _filterKelas == 'Semua'
@@ -816,8 +702,20 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
             tooltip: 'Tambah Siswa Baru',
           ),
           IconButton(
+            icon: const Icon(Icons.help_outline), // Tombol Tanda Tanya
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => GuideDialog(
+                  onExport: () => _excelImporter.exportGuideFile(context),
+                ),
+              );
+            },
+            tooltip: 'Petunjuk Import Excel',
+          ),
+          IconButton(
             icon: const Icon(Icons.upload_file),
-            onPressed: _importFromExcel,
+            onPressed: () => _excelImporter.showImportFileDialog(context),
             tooltip: 'Import dari Excel',
           ),
         ],
@@ -829,14 +727,11 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
             padding: const EdgeInsets.all(12.0),
             child: Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    // Filter Kelas
                     Row(
                       children: [
                         const Text('Filter Kelas: '),
@@ -856,7 +751,6 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Tombol aksi
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -924,18 +818,13 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                 final majorColor = getMajorColor(s.kelas);
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: majorColor.withOpacity(0.2),
                       child: Text(
                         s.name[0],
-                        style: TextStyle(
-                          color: majorColor,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(color: majorColor, fontWeight: FontWeight.bold),
                       ),
                     ),
                     title: Text(s.name),

@@ -5,9 +5,9 @@ import 'package:path_provider/path_provider.dart';
 import '../features/gaji_guru.dart';
 
 class DownloadService {
-  // ============= TULIS FILE KE DOWNLOAD FOLDER / BENDARAHAKU =============
+  // ============= TULIS FILE KE DOWNLOAD FOLDER / BENDARAHAKU/EKSPORT =============
   static Future<Directory> _getDownloadsDirectory() async {
-    // Tujuan: storage/emulated/0/Download/bendaharaku/
+    // Tujuan: storage/emulated/0/Download/bendaharaku/eksport/
     if (Platform.isAndroid) {
       try {
         final extDir = await getExternalStorageDirectory();
@@ -25,7 +25,12 @@ class DownloadService {
             if (!await appDir.exists()) {
               await appDir.create(recursive: true);
             }
-            return appDir;
+            // Buat subfolder eksport di dalam bendaharaku
+            var exportDir = Directory('$base/Download/bendaharaku/eksport');
+            if (!await exportDir.exists()) {
+              await exportDir.create(recursive: true);
+            }
+            return exportDir;
           }
         }
       } catch (e) {
@@ -34,7 +39,7 @@ class DownloadService {
     }
     // Fallback: temporary
     final tempDir = await getTemporaryDirectory();
-    final fallbackDir = Directory('${tempDir.path}/bendaharaku');
+    final fallbackDir = Directory('${tempDir.path}/bendaharaku/eksport');
     if (!await fallbackDir.exists()) {
       await fallbackDir.create(recursive: true);
     }
@@ -203,10 +208,11 @@ class DownloadService {
     ''';
   }
 
+  // ===== TABEL BARU: No, Nama, Total Gaji, Keterangan, Tanda Tangan =====
   static String _buildTable(List<GajiGuru> items) {
     StringBuffer html = StringBuffer();
     html.writeln('<table>');
-    html.writeln('<tr><th>No</th><th>Nama Guru</th><th>Total Gaji</th><th>Status</th><th>Tanggal Bayar</th></tr>');
+    html.writeln('<tr><th>No</th><th>Nama</th><th>Total Gaji</th><th>Keterangan</th><th>Tanda Tangan</th></tr>');
     int no = 1;
     for (var g in items) {
       html.writeln('''
@@ -214,8 +220,8 @@ class DownloadService {
         <td>$no</td>
         <td style="white-space: normal; word-wrap: break-word;">${g.namaGuru}</td>
         <td style="text-align:right;">Rp ${formatCurrency(g.totalGaji)}</td>
-        <td>${g.isPaid ? 'Lunas' : 'Belum'}</td>
-        <td>${g.isPaid && g.tanggalBayar != null ? '${g.tanggalBayar!.day}/${g.tanggalBayar!.month}/${g.tanggalBayar!.year}' : '-'}</td>
+        <td style="white-space: normal; word-wrap: break-word;">${g.keterangan ?? ''}</td>
+        <td style="text-align:center;"></td>
       </tr>
       ''');
       no++;
@@ -231,7 +237,7 @@ class DownloadService {
   static String _buildExcelTable(List<GajiGuru> items) {
     StringBuffer html = StringBuffer();
     html.writeln('<table>');
-    html.writeln('<tr><th>No</th><th>Nama Guru</th><th>Total Gaji</th><th>Status</th><th>Tanggal Bayar</th></tr>');
+    html.writeln('<tr><th>No</th><th>Nama</th><th>Total Gaji</th><th>Keterangan</th><th>Tanda Tangan</th></tr>');
     int no = 1;
     for (var g in items) {
       html.writeln('''
@@ -239,8 +245,8 @@ class DownloadService {
         <td>$no</td>
         <td>${g.namaGuru}</td>
         <td style="text-align:right;">Rp ${formatCurrency(g.totalGaji)}</td>
-        <td>${g.isPaid ? 'Lunas' : 'Belum'}</td>
-        <td>${g.isPaid && g.tanggalBayar != null ? '${g.tanggalBayar!.day}/${g.tanggalBayar!.month}/${g.tanggalBayar!.year}' : '-'}</td>
+        <td>${g.keterangan ?? ''}</td>
+        <td style="text-align:center;"></td>
       </tr>
       ''');
       no++;

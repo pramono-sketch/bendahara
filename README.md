@@ -34,7 +34,8 @@ dashboard
 <!-- Database akun digital: tambah/edit/hapus akun, filter kelas, pencarian, kenaikan kelas, arsip akun lulus, tab guru/siswa. -->
 
 gaji guru: testing mulai dari popup manajement guru ,riwayat guru yang kompleks dan rapi hingga arsip sampai folder,arsip excel dari per tahun hingga per bulan.buat template.
-pilahkan kategory karyawan dan guru
+
 
 nah sekarang aku tidak ingin ada data dummynya menjadi data reel dan anda dapat membuat memanipulasi data
 
+nah pada tambahkan.dart uinya menurutku belum bisa disebut bagus,responsives dan design yang kurang relavan jika ditawarkan ke guruku untuk penilaian,aku ingin anda merombak pages ini menjadi bagus dan bisa disesuaikan dengan ketiga tema ini

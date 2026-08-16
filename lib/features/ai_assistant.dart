@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 // import '../data.dart';
-import '../dependencies/api_key.dart';
+import '../env/api_key.dart';
 import '../templates/sound_helper.dart'; // 🔥 import suara
 import '../constants/appearance.dart'; // 🔥 import warna
 

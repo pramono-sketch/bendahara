@@ -5,11 +5,17 @@
     <!-- Permission untuk akses jaringan/internet -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- 🔥 TAMBAHAN: Permission untuk akses file Excel di folder Download -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+
     <application
         android:label="bendahara"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true"> <!-- 🔥 TAMBAHAN: Wajib untuk Android 10 -->
 
         <activity
             android:name=".MainActivity"

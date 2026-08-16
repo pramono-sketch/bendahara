@@ -30,6 +30,7 @@ dependencies:
   excel: ^2.0.0
   firebase_core: ^4.13.0
   cloud_firestore: ^6.8.0
+  permission_handler: ^11.3.1
 
   # Lottie versi kompatibel dengan excel ^2.0.0
   lottie: ^3.3.0

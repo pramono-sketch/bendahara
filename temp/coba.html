@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HOROLOGE — 3D Watch Configurator</title>
+
+<style>
+:root{
+  --bg:#07090d;
+  --panel:rgba(13,16,22,.78);
+  --panel2:rgba(20,24,32,.72);
+  --line:rgba(255,255,255,.09);
+  --line2:rgba(255,255,255,.16);
+  --text:#f2f0e9;
+  --muted:#858b96;
+  --gold:#d7b56d;
+  --gold2:#f3d798;
+  --green:#7ee0af;
+  --red:#ff7474;
+}
+
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
+
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 30%,#18202c 0%,#090c12 38%,#050608 100%);
+  color:var(--text);
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+button{
+  font:inherit;
+}
+
+#app{
+  position:fixed;
+  inset:0;
+}
+
+canvas{
+  display:block;
+}
+
+.webgl{
+  position:absolute;
+  inset:0;
+}
+
+.hud{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:5;
+}
+
+.topbar{
+  position:absolute;
+  top:24px;
+  left:28px;
+  right:28px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+}
+
+.brand{
+  pointer-events:auto;
+}
+
+.brand small{
+  display:block;
+  color:var(--gold);
+  font-size:10px;
+  letter-spacing:.34em;
+  margin-bottom:8px;
+}
+
+.brand h1{
+  font-size:24px;
+  font-weight:600;
+  letter-spacing:.18em;
+}
+
+.brand p{
+  margin-top:6px;
+  color:var(--muted);
+  font-size:11px;
+  letter-spacing:.12em;
+}
+
+.clock{
+  text-align:right;
+}
+
+.clock-label{
+  color:var(--muted);
+  font-size:9px;
+  letter-spacing:.22em;
+}
+
+#digitalTime{
+  margin-top:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:18px;
+  letter-spacing:.08em;
+}
+
+#timezone{
+  margin-top:3px;
+  color:var(--gold);
+  font-size:9px;
+  letter-spacing:.14em;
+}
+
+.panel{
+  position:absolute;
+  width:300px;
+  right:28px;
+  top:50%;
+  transform:translateY(-50%);
+  pointer-events:auto;
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:linear-gradient(
+    145deg,
+    rgba(22,27,36,.86),
+    rgba(10,12,17,.72)
+  );
+  backdrop-filter:blur(22px);
+  box-shadow:
+    0 30px 80px rgba(0,0,0,.38),
+    inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.section{
+  margin-bottom:19px;
+}
+
+.section:last-child{
+  margin-bottom:0;
+}
+
+.section-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
+
+.section-title span:first-child{
+  font-size:10px;
+  letter-spacing:.22em;
+  color:var(--muted);
+}
+
+.section-title span:last-child{
+  font-size:9px;
+  color:var(--gold);
+  letter-spacing:.13em;
+}
+
+.options{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:7px;
+}
+
+.option{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.025);
+  color:var(--muted);
+  padding:9px 10px;
+  border-radius:9px;
+  text-align:left;
+  cursor:pointer;
+  transition:.2s ease;
+}
+
+.option:hover{
+  border-color:var(--line2);
+  color:var(--text);
+}
+
+.option.active{
+  border-color:rgba(215,181,109,.75);
+  color:var(--gold2);
+  background:rgba(215,181,109,.08);
+}
+
+.swatches{
+  display:flex;
+  gap:9px;
+}
+
+.swatch{
+  width:39px;
+  height:39px;
+  border-radius:50%;
+  border:2px solid transparent;
+  cursor:pointer;
+  position:relative;
+}
+
+.swatch.active{
+  border-color:white;
+  box-shadow:0 0 0 2px rgba(215,181,109,.55);
+}
+
+.swatch.steel{
+  background:linear-gradient(
+    135deg,
+    #d8dde2,
+    #707780 45%,
+    #f4f6f8
+  );
+}
+
+.swatch.black{
+  background:linear-gradient(
+    135deg,
+    #22262b,
+    #050608 60%,
+    #343941
+  );
+}
+
+.swatch.gold{
+  background:linear-gradient(
+    135deg,
+    #f7dda2,
+    #ad7f37 48%,
+    #ffedbb
+  );
+}
+
+.swatch.blue{
+  background:linear-gradient(
+    135deg,
+    #4b78ad,
+    #152d50 50%,
+    #739ad0
+  );
+}
+
+.actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+
+.action{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.035);
+  color:var(--text);
+  padding:10px;
+  border-radius:9px;
+  cursor:pointer;
+}
+
+.action.primary{
+  border-color:rgba(215,181,109,.38);
+  color:var(--gold2);
+  background:rgba(215,181,109,.09);
+}
+
+.action:hover{
+  background:rgba(255,255,255,.07);
+}
+
+.bottom-left{
+  position:absolute;
+  left:28px;
+  bottom:26px;
+  pointer-events:auto;
+}
+
+.hints{
+  display:flex;
+  gap:10px;
+  color:var(--muted);
+  font-size:9px;
+  letter-spacing:.12em;
+}
+
+.hint{
+  border:1px solid var(--line);
+  padding:7px 9px;
+  border-radius:7px;
+  background:rgba(5,7,10,.5);
+}
+
+.readout{
+  margin-top:10px;
+  color:var(--muted);
+  font-size:10px;
+  letter-spacing:.13em;
+}
+
+.readout strong{
+  color:var(--gold2);
+  font-weight:500;
+}
+
+.ar{
+  position:absolute;
+  inset:0;
+  background:#040506;
+  display:none;
+  z-index:20;
+}
+
+.ar.active{
+  display:block;
+}
+
+#webcam{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transform:scaleX(-1);
+  opacity:.9;
+}
+
+.arCanvas{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+}
+
+.ar-ui{
+  position:absolute;
+  left:20px;
+  right:20px;
+  top:20px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.ar-badge{
+  padding:8px 11px;
+  border:1px solid rgba(255,255,255,.15);
+  background:rgba(0,0,0,.45);
+  border-radius:8px;
+  font-size:9px;
+  letter-spacing:.18em;
+}
+
+#closeAR{
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.45);
+  color:white;
+  padding:9px 12px;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.ar-message{
+  position:absolute;
+  left:50%;
+  bottom:30px;
+  transform:translateX(-50%);
+  padding:10px 15px;
+  border-radius:9px;
+  background:rgba(0,0,0,.55);
+  border:1px solid rgba(255,255,255,.12);
+  color:#ddd;
+  font-size:10px;
+  letter-spacing:.12em;
+}
+
+.status{
+  position:absolute;
+  top:90px;
+  left:28px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:9px;
+  letter-spacing:.15em;
+  color:var(--muted);
+}
+
+.status-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 12px var(--green);
+}
+
+@media(max-width:900px){
+  .panel{
+    width:270px;
+    right:16px;
+  }
+
+  .topbar{
+    left:18px;
+    right:18px;
+  }
+
+  .bottom-left{
+    left:18px;
+  }
+}
+
+@media(max-width:680px){
+  .panel{
+    top:auto;
+    bottom:14px;
+    left:14px;
+    right:14px;
+    width:auto;
+    transform:none;
+    max-height:46vh;
+    overflow:auto;
+  }
+
+  .clock{
+    display:none;
+  }
+
+  .status{
+    top:78px;
+    left:18px;
+  }
+
+  .bottom-left{
+    display:none;
+  }
+
+  .brand h1{
+    font-size:20px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="app">
+
+  <div id="webgl" class="webgl"></div>
+
+  <div class="hud">
+
+    <div class="topbar">
+
+      <div class="brand">
+        <small>HOROLOGE LAB / 03</small>
+        <h1>WATCH CONFIGURATOR</h1>
+        <p>MECHANICAL TIMEPIECE / LIVE PREVIEW</p>
+      </div>
+
+      <div class="clock">
+        <div class="clock-label">LOCAL TIME</div>
+        <div id="digitalTime">00:00:00</div>
+        <div id="timezone">UTC</div>
+      </div>
+
+    </div>
+
+    <div class="status">
+      <span class="status-dot"></span>
+      <span id="statusText">LIVE MATERIAL PREVIEW</span>
+    </div>
+
+    <div class="panel">
+
+      <div class="section">
+
+        <div class="section-title">
+          <span>CASE</span>
+          <span id="caseLabel">STEEL</span>
+        </div>
+
+        <div class="swatches">
+
+          <button
+            class="swatch steel active"
+            data-metal="steel"
+            title="Steel"
+          ></button>
+
+          <button
+            class="swatch black"
+            data-metal="black"
+            title="Black"
+          ></button>
+
+          <button
+            class="swatch gold"
+            data-metal="gold"
+            title="Gold"
+          ></button>
+
+          <button
+            class="swatch blue"
+            data-metal="blue"
+            title="Blue Steel"
+          ></button>
+
+        </div>
+
+      </div>
+
+      <div class="section">
+
+        <div class="section-title">
+          <span>DIAL</span>
+          <span id="dialLabel">OBSIDIAN</span>
+        </div>
+
+        <div class="options">
+
+          <button
+            class="option active"
+            data-dial="black"
+          >
+            OBSIDIAN
+          </button>
+
+          <button
+            class="option"
+            data-dial="blue"
+          >
+            MIDNIGHT
+          </button>
+
+          <button
+            class="option"
+            data-dial="silver"
+          >
+            SILVER
+          </button>
+
+          <button
+            class="option"
+            data-dial="green"
+          >
+            FOREST
+          </button>
+
+        </div>
+
+      </div>
+
+      <div class="section">
+
+        <div class="section-title">
+          <span>STRAP</span>
+          <span id="strapLabel">STEEL BRACELET</span>
+        </div>
+
+        <div class="options">
+
+          <button
+            class="option active"
+            data-strap="steel"
+          >
+            STEEL
+          </button>
+
+          <button
+            class="option"
+            data-strap="leather"
+          >
+            LEATHER
+          </button>
+
+          <button
+            class="option"
+            data-strap="rubber"
+          >
+            RUBBER
+          </button>
+
+          <button
+            class="option"
+            data-strap="fabric"
+          >
+            FABRIC
+          </button>
+
+        </div>
+
+      </div>
+
+      <div class="section">
+
+        <div class="section-title">
+          <span>COMPLICATION</span>
+          <span>HOVER TO GLOW</span>
+        </div>
+
+        <div class="options">
+
+          <button
+            class="option active"
+            data-comp="date"
+          >
+            DATE
+          </button>
+
+          <button
+            class="option"
+            data-comp="chrono"
+          >
+            CHRONO
+          </button>
+
+          <button
+            class="option"
+            data-comp="gmt"
+          >
+            GMT
+          </button>
+
+          <button
+            class="option"
+            data-comp="power"
+          >
+            POWER RESERVE
+          </button>
+
+        </div>
+
+      </div>
+
+      <div class="section">
+
+        <div class="actions">
+          <button
+            class="action"
+            id="resetBtn"
+          >
+            RESET VIEW
+          </button>
+
+          <button
+            class="action primary"
+            id="arBtn"
+          >
+            TRY ON WRIST
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="bottom-left">
+
+      <div class="hints">
+        <div class="hint">DRAG · ORBIT</div>
+        <div class="hint">WHEEL · ZOOM</div>
+        <div class="hint">HOVER · COMPLICATION</div>
+      </div>
+
+      <div class="readout">
+        CONFIG:
+        <strong id="configReadout">STEEL / OBSIDIAN / STEEL</strong>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="ar" id="arMode">
+
+    <video
+      id="webcam"
+      autoplay
+      muted
+      playsinline
+    ></video>
+
+    <canvas
+      id="arCanvas"
+      class="arCanvas"
+    ></canvas>
+
+    <div class="ar-ui">
+
+      <div class="ar-badge">
+        AR TRY-ON / HAND TRACKING
+      </div>
+
+      <button id="closeAR">
+        CLOSE
+      </button>
+
+    </div>
+
+    <div class="ar-message" id="arMessage">
+      Show your wrist to the camera
+    </div>
+
+  </div>
+
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.2/examples/jsm/"
+  }
+}
+</script>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"
+  crossorigin="anonymous"
+></script>
+
+<script type="module">
+
+import * as THREE from "three";
+import { OrbitControls }
+  from "three/addons/controls/OrbitControls.js";
+import { RGBELoader }
+  from "three/addons/loaders/RGBELoader.js";
+
+
+// ============================================================
+// CONFIG
+// ============================================================
+
+const CONFIG = {
+
+  case: "steel",
+  dial: "black",
+  strap: "steel",
+  complication: "date"
+
+};
+
+
+// ============================================================
+// THREE.JS SETUP
+// ============================================================
+
+const scene = new THREE.Scene();
+
+scene.background =
+  new THREE.Color(0x07090d);
+
+scene.fog =
+  new THREE.FogExp2(0x07090d, 0.04);
+
+
+const camera =
+  new THREE.PerspectiveCamera(
+    38,
+    innerWidth / innerHeight,
+    0.1,
+    100
+  );
+
+camera.position.set(
+  5.8,
+  3.7,
+  6.2
+);
+
+
+const renderer =
+  new THREE.WebGLRenderer({
+    antialias:true,
+    alpha:true
+  });
+
+renderer.setSize(
+  innerWidth,
+  innerHeight
+);
+
+renderer.setPixelRatio(
+  Math.min(devicePixelRatio,2)
+);
+
+renderer.outputColorSpace =
+  THREE.SRGBColorSpace;
+
+renderer.toneMapping =
+  THREE.ACESFilmicToneMapping;
+
+renderer.toneMappingExposure =
+  1.15;
+
+document
+  .getElementById("webgl")
+  .appendChild(renderer.domElement);
+
+
+// ============================================================
+// CONTROLS
+// ============================================================
+
+const controls =
+  new OrbitControls(
+    camera,
+    renderer.domElement
+  );
+
+controls.enableDamping = true;
+controls.dampingFactor = 0.055;
+
+controls.minDistance = 3.4;
+controls.maxDistance = 10;
+
+controls.maxPolarAngle =
+  Math.PI * 0.83;
+
+controls.target.set(
+  0,
+  0.3,
+  0
+);
+
+
+// ============================================================
+// LIGHTING
+// ============================================================
+
+scene.add(
+  new THREE.HemisphereLight(
+    0xcfd9e5,
+    0x080a0e,
+    1.5
+  )
+);
+
+const key =
+  new THREE.DirectionalLight(
+    0xffead0,
+    5
+  );
+
+key.position.set(
+  4,
+  8,
+  5
+);
+
+scene.add(key);
+
+const fill =
+  new THREE.DirectionalLight(
+    0x5c79a8,
+    2
+  );
+
+fill.position.set(
+  -5,
+  2,
+  3
+);
+
+scene.add(fill);
+
+const rim =
+  new THREE.DirectionalLight(
+    0xc9a55a,
+    2.4
+  );
+
+rim.position.set(
+  -2,
+  5,
+  -5
+);
+
+scene.add(rim);
+
+
+// ============================================================
+// FLOOR
+// ============================================================
+
+const floor =
+  new THREE.Mesh(
+    new THREE.CircleGeometry(
+      9,
+      96
+    ),
+    new THREE.MeshStandardMaterial({
+      color:0x080a0e,
+      roughness:.38,
+      metalness:.7
+    })
+  );
+
+floor.rotation.x = -Math.PI/2;
+floor.position.y = -1.25;
+
+scene.add(floor);
+
+
+// ============================================================
+// WATCH ROOT
+// ============================================================
+
+const watch =
+  new THREE.Group();
+
+scene.add(watch);
+
+watch.position.y =
+  0.05;
+
+
+// ============================================================
+// MATERIALS
+// ============================================================
+
+const metalMaterials = {
+
+  steel:
+    new THREE.MeshPhysicalMaterial({
+      color:0xb9c0c7,
+      metalness:1,
+      roughness:.21,
+      clearcoat:.7,
+      clearcoatRoughness:.16
+    }),
+
+  black:
+    new THREE.MeshPhysicalMaterial({
+      color:0x16191e,
+      metalness:.95,
+      roughness:.24,
+      clearcoat:.8,
+      clearcoatRoughness:.18
+    }),
+
+  gold:
+    new THREE.MeshPhysicalMaterial({
+      color:0xb68a39,
+      metalness:1,
+      roughness:.18,
+      clearcoat:.75,
+      clearcoatRoughness:.13
+    }),
+
+  blue:
+    new THREE.MeshPhysicalMaterial({
+      color:0x3f5d7d,
+      metalness:1,
+      roughness:.2,
+      clearcoat:.75,
+      clearcoatRoughness:.15
+    })
+
+};
+
+
+const dialMaterials = {
+
+  black:
+    new THREE.MeshPhysicalMaterial({
+      color:0x050609,
+      metalness:.25,
+      roughness:.22,
+      clearcoat:.7
+    }),
+
+  blue:
+    new THREE.MeshPhysicalMaterial({
+      color:0x081b32,
+      metalness:.3,
+      roughness:.2,
+      clearcoat:.8
+    }),
+
+  silver:
+    new THREE.MeshPhysicalMaterial({
+      color:0xbfc5cb,
+      metalness:.65,
+      roughness:.25,
+      clearcoat:.5
+    }),
+
+  green:
+    new THREE.MeshPhysicalMaterial({
+      color:0x08281e,
+      metalness:.25,
+      roughness:.2,
+      clearcoat:.8
+    })
+
+};
+
+
+// ============================================================
+// CASE
+// ============================================================
+
+const caseGeo =
+  new THREE.CylinderGeometry(
+    1.85,
+    1.85,
+    .56,
+    96
+  );
+
+const caseMesh =
+  new THREE.Mesh(
+    caseGeo,
+    metalMaterials.steel
+  );
+
+caseMesh.rotation.x =
+  Math.PI / 2;
+
+watch.add(caseMesh);
+
+
+// bezel
+const bezel =
+  new THREE.Mesh(
+    new THREE.TorusGeometry(
+      1.72,
+      .19,
+      32,
+      96
+    ),
+    metalMaterials.steel
+  );
+
+bezel.position.z =
+  .32;
+
+watch.add(bezel);
+
+
+// crystal
+const crystal =
+  new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      1.59,
+      1.59,
+      .08,
+      96
+    ),
+    new THREE.MeshPhysicalMaterial({
+      transmission:1,
+      transparent:true,
+      opacity:.26,
+      roughness:.04,
+      thickness:.03,
+      ior:1.45
+    })
+  );
+
+crystal.rotation.x =
+  Math.PI/2;
+
+crystal.position.z =
+  .39;
+
+watch.add(crystal);
+
+
+// ============================================================
+// DIAL
+// ============================================================
+
+const dial =
+  new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      1.52,
+      1.52,
+      .075,
+      96
+    ),
+    dialMaterials.black
+  );
+
+dial.rotation.x =
+  Math.PI/2;
+
+dial.position.z =
+  .34;
+
+watch.add(dial);
+
+
+// ============================================================
+// INDEXES
+// ============================================================
+
+const indexes =
+  new THREE.Group();
+
+watch.add(indexes);
+
+const indexMat =
+  new THREE.MeshStandardMaterial({
+    color:0xe5d1a1,
+    metalness:.85,
+    roughness:.2
+  });
+
+for(let i=0;i<12;i++){
+
+  const angle =
+    (i/12) *
+    Math.PI * 2;
+
+  const major =
+    i % 3 === 0;
+
+  const geo =
+    new THREE.BoxGeometry(
+      major ? .10 : .06,
+      major ? .30 : .20,
+      .035
+    );
+
+  const marker =
+    new THREE.Mesh(
+      geo,
+      indexMat
+    );
+
+  marker.position.set(
+    Math.sin(angle) *
+      1.23,
+
+    Math.cos(angle) *
+      1.23,
+
+    .40
+  );
+
+  marker.rotation.z =
+    -angle;
+
+  indexes.add(marker);
+}
+
+
+// ============================================================
+// HANDS
+// ============================================================
+
+const handGroup =
+  new THREE.Group();
+
+watch.add(handGroup);
+
+function createHand(
+  length,
+  width,
+  color
+){
+
+  const mesh =
+    new THREE.Mesh(
+      new THREE.BoxGeometry(
+        width,
+        length,
+        .035
+      ),
+      new THREE.MeshStandardMaterial({
+        color,
+        metalness:.85,
+        roughness:.18
+      })
+    );
+
+  mesh.position.y =
+    length/2;
+
+  return mesh;
+}
+
+
+const hourHand =
+  createHand(
+    .72,
+    .11,
+    0xe5d5ac
+  );
+
+const minuteHand =
+  createHand(
+    1.05,
+    .075,
+    0xf4efe6
+  );
+
+const secondHand =
+  createHand(
+    1.17,
+    .022,
+    0xca625d
+  );
+
+hourHand.position.z =
+  .49;
+
+minuteHand.position.z =
+  .505;
+
+secondHand.position.z =
+  .52;
+
+handGroup.add(
+  hourHand,
+  minuteHand,
+  secondHand
+);
+
+
+// central pin
+const pin =
+  new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      .085,
+      .085,
+      .07,
+      24
+    ),
+    new THREE.MeshStandardMaterial({
+      color:0xd8b56e,
+      metalness:1,
+      roughness:.16
+    })
+  );
+
+pin.rotation.x =
+  Math.PI/2;
+
+pin.position.z =
+  .55;
+
+watch.add(pin);
+
+
+// ============================================================
+// COMPLICATIONS
+// ============================================================
+
+const complicationGroup =
+  new THREE.Group();
+
+watch.add(complicationGroup);
+
+
+const complicationMeshes = [];
+
+
+function makeComplication(
+  x,
+  y,
+  radius,
+  color
+){
+
+  const ring =
+    new THREE.Mesh(
+      new THREE.TorusGeometry(
+        radius,
+        .025,
+        14,
+        48
+      ),
+      new THREE.MeshStandardMaterial({
+        color,
+        metalness:.85,
+        roughness:.17,
+        emissive:0x000000
+      })
+    );
+
+  ring.position.set(
+    x,
+    y,
+    .47
+  );
+
+  complicationGroup.add(ring);
+
+  complicationMeshes.push(ring);
+
+  return ring;
+}
+
+
+const comp1 =
+  makeComplication(
+    -.55,
+    .48,
+    .28,
+    0xbca26d
+  );
+
+const comp2 =
+  makeComplication(
+    .55,
+    .42,
+    .28,
+    0xbca26d
+  );
+
+
+// date window
+const dateGeo =
+  new THREE.BoxGeometry(
+    .27,
+    .18,
+    .03
+  );
+
+const date =
+  new THREE.Mesh(
+    dateGeo,
+    new THREE.MeshStandardMaterial({
+      color:0xe9e8e1,
+      metalness:.15,
+      roughness:.4
+    })
+  );
+
+date.position.set(
+  .83,
+  -.05,
+  .48
+);
+
+watch.add(date);
+
+
+// ============================================================
+// STRAPS
+// ============================================================
+
+const strapRoot =
+  new THREE.Group();
+
+watch.add(strapRoot);
+
+
+let currentStrap =
+  buildStrap(
+    CONFIG.strap
+  );
+
+strapRoot.add(
+  currentStrap
+);
+
+
+function buildStrap(type){
+
+  const group =
+    new THREE.Group();
+
+  let material;
+
+  switch(type){
+
+    case "leather":
+
+      material =
+        new THREE.MeshPhysicalMaterial({
+          color:0x3b2419,
+          roughness:.72,
+          metalness:0,
+          clearcoat:.15
+        });
+
+      break;
+
+    case "rubber":
+
+      material =
+        new THREE.MeshPhysicalMaterial({
+          color:0x0a0c10,
+          roughness:.55,
+          metalness:.08
+        });
+
+      break;
+
+    case "fabric":
+
+      material =
+        new THREE.MeshPhysicalMaterial({
+          color:0x34433e,
+          roughness:.92,
+          metalness:.02
+        });
+
+      break;
+
+    default:
+
+      material =
+        metalMaterials.steel;
+
+  }
+
+
+  // upper strap
+  const upper =
+    new THREE.Mesh(
+      new THREE.BoxGeometry(
+        1.02,
+        2.8,
+        .22
+      ),
+      material
+    );
+
+  upper.position.set(
+    0,
+    2.05,
+    0
+  );
+
+  group.add(upper);
+
+
+  // lower strap
+  const lower =
+    new THREE.Mesh(
+      new THREE.BoxGeometry(
+        1.02,
+        2.8,
+        .22
+      ),
+      material
+    );
+
+  lower.position.set(
+    0,
+    -2.05,
+    0
+  );
+
+  group.add(lower);
+
+
+  return group;
+
+}
+
+
+// ============================================================
+// STRAP SWAP ANIMATION
+// ============================================================
+
+let strapAnimation = null;
+
+function swapStrap(
+  type
+){
+
+  if(
+    CONFIG.strap === type &&
+    currentStrap
+  ){
+    return;
+  }
+
+  const oldStrap =
+    currentStrap;
+
+  const newStrap =
+    buildStrap(type);
+
+  newStrap.scale.setScalar(.65);
+
+  newStrap.rotation.z =
+    -.45;
+
+  strapRoot.add(newStrap);
+
+  currentStrap =
+    newStrap;
+
+  CONFIG.strap =
+    type;
+
+  strapAnimation = {
+    oldStrap,
+    newStrap,
+    start:performance.now()
+  };
+
+  updateReadout();
+
+}
+
+
+function animateStrap(){
+
+  if(!strapAnimation){
+    return;
+  }
+
+  const elapsed =
+    (performance.now() -
+      strapAnimation.start) /
+    550;
+
+  const p =
+    Math.min(elapsed,1);
+
+  const ease =
+    1 -
+    Math.pow(
+      1-p,
+      3
+    );
+
+  const oldS =
+    1 -
+    ease;
+
+  strapAnimation.oldStrap.scale.setScalar(
+    Math.max(.001,oldS)
+  );
+
+  strapAnimation.oldStrap.rotation.z =
+    ease * .5;
+
+  strapAnimation.newStrap.scale.setScalar(
+    .65 + .35 * ease
+  );
+
+  strapAnimation.newStrap.rotation.z =
+    -.45 * (1-ease);
+
+  if(p >= 1){
+
+    strapRoot.remove(
+      strapAnimation.oldStrap
+    );
+
+    strapAnimation =
+      null;
+  }
+
+}
+
+
+// ============================================================
+// MATERIAL SWITCHES
+// ============================================================
+
+function changeMetal(type){
+
+  CONFIG.case =
+    type;
+
+  caseMesh.material =
+    metalMaterials[type];
+
+  bezel.material =
+    metalMaterials[type];
+
+  updateReadout();
+
+}
+
+
+function changeDial(type){
+
+  CONFIG.dial =
+    type;
+
+  dial.material =
+    dialMaterials[type];
+
+  updateReadout();
+
+}
+
+
+// ============================================================
+// HOVER GLOW
+// ============================================================
+
+const raycaster =
+  new THREE.Raycaster();
+
+const pointer =
+  new THREE.Vector2(
+    -10,
+    -10
+  );
+
+let hoveredComp =
+  null;
+
+renderer.domElement
+.addEventListener(
+  "pointermove",
+  event => {
+
+    pointer.x =
+      (event.clientX /
+        innerWidth) * 2 - 1;
+
+    pointer.y =
+      -(event.clientY /
+        innerHeight) * 2 + 1;
+
+  }
+);
+
+
+function updateHover(){
+
+  raycaster.setFromCamera(
+    pointer,
+    camera
+  );
+
+  const hits =
+    raycaster.intersectObjects(
+      complicationMeshes,
+      true
+    );
+
+  const next =
+    hits.length
+      ? hits[0].object
+      : null;
+
+  if(next !== hoveredComp){
+
+    if(hoveredComp){
+
+      hoveredComp.material.emissive.setHex(
+        0x000000
+      );
+    }
+
+    hoveredComp =
+      next;
+
+    if(hoveredComp){
+
+      hoveredComp.material.emissive.setHex(
+        0x6a4715
+      );
+    }
+
+  }
+
+}
+
+
+// ============================================================
+// REAL TIME WATCH HANDS
+// ============================================================
+
+function updateHands(){
+
+  const now =
+    new Date();
+
+  const ms =
+    now.getMilliseconds();
+
+  const sec =
+    now.getSeconds() +
+    ms / 1000;
+
+  const minute =
+    now.getMinutes() +
+    sec / 60;
+
+  const hour =
+    (now.getHours() % 12) +
+    minute / 60;
+
+
+  secondHand.rotation.z =
+    -sec / 60 *
+    Math.PI * 2;
+
+  minuteHand.rotation.z =
+    -minute / 60 *
+    Math.PI * 2;
+
+  hourHand.rotation.z =
+    -hour / 12 *
+    Math.PI * 2;
+
+
+  document.getElementById(
+    "digitalTime"
+  ).textContent =
+    now.toLocaleTimeString();
+
+
+  document.getElementById(
+    "timezone"
+  ).textContent =
+    Intl.DateTimeFormat()
+      .resolvedOptions()
+      .timeZone;
+
+}
+
+
+// ============================================================
+// LABELS
+// ============================================================
+
+const caseNames = {
+  steel:"STEEL",
+  black:"BLACK",
+  gold:"GOLD",
+  blue:"BLUE STEEL"
+};
+
+const dialNames = {
+  black:"OBSIDIAN",
+  blue:"MIDNIGHT",
+  silver:"SILVER",
+  green:"FOREST"
+};
+
+const strapNames = {
+  steel:"STEEL BRACELET",
+  leather:"LEATHER",
+  rubber:"RUBBER",
+  fabric:"FABRIC"
+};
+
+
+function updateReadout(){
+
+  document.getElementById(
+    "caseLabel"
+  ).textContent =
+    caseNames[CONFIG.case];
+
+  document.getElementById(
+    "dialLabel"
+  ).textContent =
+    dialNames[CONFIG.dial];
+
+  document.getElementById(
+    "strapLabel"
+  ).textContent =
+    strapNames[CONFIG.strap];
+
+  document.getElementById(
+    "configReadout"
+  ).textContent =
+    `${caseNames[CONFIG.case]} / ` +
+    `${dialNames[CONFIG.dial]} / ` +
+    `${strapNames[CONFIG.strap]}`;
+
+}
+
+
+// ============================================================
+// UI
+// ============================================================
+
+document
+.querySelectorAll("[data-metal]")
+.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      document
+      .querySelectorAll("[data-metal]")
+      .forEach(x =>
+        x.classList.remove("active")
+      );
+
+      button.classList.add("active");
+
+      changeMetal(
+        button.dataset.metal
+      );
+
+    }
+  );
+
+});
+
+
+document
+.querySelectorAll("[data-dial]")
+.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      document
+      .querySelectorAll("[data-dial]")
+      .forEach(x =>
+        x.classList.remove("active")
+      );
+
+      button.classList.add("active");
+
+      changeDial(
+        button.dataset.dial
+      );
+
+    }
+  );
+
+});
+
+
+document
+.querySelectorAll("[data-strap]")
+.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      document
+      .querySelectorAll("[data-strap]")
+      .forEach(x =>
+        x.classList.remove("active")
+      );
+
+      button.classList.add("active");
+
+      swapStrap(
+        button.dataset.strap
+      );
+
+    }
+  );
+
+});
+
+
+document
+.querySelectorAll("[data-comp]")
+.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      document
+      .querySelectorAll("[data-comp]")
+      .forEach(x =>
+        x.classList.remove("active")
+      );
+
+      button.classList.add("active");
+
+      CONFIG.complication =
+        button.dataset.comp;
+
+    }
+  );
+
+});
+
+
+document
+.getElementById("resetBtn")
+.addEventListener(
+  "click",
+  () => {
+
+    camera.position.set(
+      5.8,
+      3.7,
+      6.2
+    );
+
+    controls.target.set(
+      0,
+      .3,
+      0
+    );
+
+    controls.update();
+
+  }
+);
+
+
+// ============================================================
+// AR
+// ============================================================
+
+const arMode =
+  document.getElementById(
+    "arMode"
+  );
+
+const video =
+  document.getElementById(
+    "webcam"
+  );
+
+const arCanvas =
+  document.getElementById(
+    "arCanvas"
+  );
+
+const arCtx =
+  arCanvas.getContext(
+    "2d"
+  );
+
+let arStream = null;
+
+let handLandmarker = null;
+
+let arEnabled = false;
+
+let lastVideoTime = -1;
+
+
+// MediaPipe CDN bundle provides these globals.
+async function createHandLandmarker(){
+
+  if(handLandmarker){
+    return handLandmarker;
+  }
+
+  const vision =
+    await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
+    );
+
+  handLandmarker =
+    await HandLandmarker.createFromOptions(
+      vision,
+      {
+        baseOptions:{
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+        },
+
+        runningMode:"VIDEO",
+
+        numHands:1,
+
+        minHandDetectionConfidence:.45,
+
+        minHandPresenceConfidence:.45,
+
+        minTrackingConfidence:.45
+
+      }
+    );
+
+  return handLandmarker;
+
+}
+
+
+async function startAR(){
+
+  try{
+
+    arMode.classList.add(
+      "active"
+    );
+
+    arCanvas.width =
+      innerWidth;
+
+    arCanvas.height =
+      innerHeight;
+
+    arStream =
+      await navigator.mediaDevices
+        .getUserMedia({
+          video:{
+            facingMode:"user",
+            width:{
+              ideal:1280
+            },
+            height:{
+              ideal:720
+            }
+          },
+          audio:false
+        });
+
+    video.srcObject =
+      arStream;
+
+    await video.play();
+
+    await createHandLandmarker();
+
+    arEnabled = true;
+
+    document.getElementById(
+      "statusText"
+    ).textContent =
+      "AR HAND TRACKING ACTIVE";
+
+    requestAnimationFrame(
+      processAR
+    );
+
+  }catch(error){
+
+    console.error(error);
+
+    document.getElementById(
+      "arMessage"
+    ).textContent =
+      "Camera unavailable — use HTTPS or localhost";
+
+  }
+
+}
+
+
+function stopAR(){
+
+  arEnabled = false;
+
+  if(arStream){
+
+    arStream
+      .getTracks()
+      .forEach(
+        track =>
+          track.stop()
+      );
+
+    arStream =
+      null;
+  }
+
+  video.srcObject =
+    null;
+
+  arMode.classList.remove(
+    "active"
+  );
+
+  arCtx.clearRect(
+    0,
+    0,
+    arCanvas.width,
+    arCanvas.height
+  );
+
+  document.getElementById(
+    "statusText"
+  ).textContent =
+    "LIVE MATERIAL PREVIEW";
+
+}
+
+
+function processAR(){
+
+  if(
+    !arEnabled ||
+    !handLandmarker ||
+    video.readyState <
+      2
+  ){
+
+    if(arEnabled){
+      requestAnimationFrame(
+        processAR
+      );
+    }
+
+    return;
+  }
+
+
+  if(
+    video.currentTime !==
+    lastVideoTime
+  ){
+
+    lastVideoTime =
+      video.currentTime;
+
+    const result =
+      handLandmarker.detectForVideo(
+        video,
+        performance.now()
+      );
+
+    renderARWatch(
+      result
+    );
+
+  }
+
+  requestAnimationFrame(
+    processAR
+  );
+
+}
+
+
+function renderARWatch(
+  result
+){
+
+  arCtx.clearRect(
+    0,
+    0,
+    arCanvas.width,
+    arCanvas.height
+  );
+
+
+  if(
+    !result.landmarks ||
+    !result.landmarks.length
+  ){
+
+    document.getElementById(
+      "arMessage"
+    ).textContent =
+      "Show your wrist to the camera";
+
+    return;
+  }
+
+
+  const hand =
+    result.landmarks[0];
+
+
+  /*
+    Approximate wrist anchor:
+    landmark 0 = wrist
+    landmark 5 = index MCP
+    landmark 17 = pinky MCP
+
+    This is a visual AR approximation,
+    not a full 6DoF body-tracking solve.
+  */
+
+  const wrist =
+    hand[0];
+
+  const index =
+    hand[5];
+
+  const pinky =
+    hand[17];
+
+
+  const centerX =
+    1 - wrist.x;
+
+  const centerY =
+    wrist.y;
+
+
+  const span =
+    Math.hypot(
+      index.x - pinky.x,
+      index.y - pinky.y
+    );
+
+
+  const width =
+    Math.max(
+      130,
+      span *
+      innerWidth *
+      3.8
+    );
+
+
+  const height =
+    width *
+    .64;
+
+
+  const px =
+    centerX *
+    innerWidth;
+
+  const py =
+    centerY *
+    innerHeight;
+
+
+  const angle =
+    Math.atan2(
+      pinky.y-index.y,
+      pinky.x-index.x
+    );
+
+
+  arCtx.save();
+
+  arCtx.translate(
+    px,
+    py
+  );
+
+  arCtx.rotate(
+    angle
+  );
+
+  arCtx.translate(
+    0,
+    -height*.04
+  );
+
+
+  // strap
+  arCtx.fillStyle =
+    strapColor(CONFIG.strap);
+
+  roundRect(
+    arCtx,
+    -width*.19,
+    -height*.85,
+    width*.38,
+    height*1.7,
+    width*.05
+  );
+
+  arCtx.fill();
+
+
+  // case
+  const gradient =
+    arCtx.createLinearGradient(
+      -width*.5,
+      0,
+      width*.5,
+      0
+    );
+
+  gradient.addColorStop(
+    0,
+    "#50555a"
+  );
+
+  gradient.addColorStop(
+    .45,
+    "#eef2f4"
+  );
+
+  gradient.addColorStop(
+    .7,
+    "#676d73"
+  );
+
+  gradient.addColorStop(
+    1,
+    "#24282c"
+  );
+
+  arCtx.fillStyle =
+    gradient;
+
+  arCtx.beginPath();
+
+  arCtx.ellipse(
+    0,
+    0,
+    width*.43,
+    width*.43,
+    0,
+    0,
+    Math.PI*2
+  );
+
+  arCtx.fill();
+
+
+  // dial
+  arCtx.fillStyle =
+    dialColor(CONFIG.dial);
+
+  arCtx.beginPath();
+
+  arCtx.arc(
+    0,
+    0,
+    width*.34,
+    0,
+    Math.PI*2
+  );
+
+  arCtx.fill();
+
+
+  // hands
+  const now =
+    new Date();
+
+  const sec =
+    now.getSeconds() +
+    now.getMilliseconds()/1000;
+
+  const min =
+    now.getMinutes() +
+    sec/60;
+
+  const hour =
+    (now.getHours()%12) +
+    min/60;
+
+
+  drawARHand(
+    arCtx,
+    hour/12*Math.PI*2,
+    width*.18,
+    4,
+    "#eee6d4"
+  );
+
+  drawARHand(
+    arCtx,
+    min/60*Math.PI*2,
+    width*.27,
+    3,
+    "#ffffff"
+  );
+
+  drawARHand(
+    arCtx,
+    sec/60*Math.PI*2,
+    width*.29,
+    1.5,
+    "#e16e69"
+  );
+
+
+  arCtx.restore();
+
+
+  document.getElementById(
+    "arMessage"
+  ).textContent =
+    "WRIST DETECTED · MOVE YOUR HAND";
+
+}
+
+
+function drawARHand(
+  ctx,
+  rotation,
+  length,
+  thickness,
+  color
+){
+
+  ctx.save();
+
+  ctx.rotate(
+    rotation
+  );
+
+  ctx.fillStyle =
+    color;
+
+  ctx.fillRect(
+    -thickness/2,
+    -length,
+    thickness,
+    length
+  );
+
+  ctx.restore();
+
+}
+
+
+function strapColor(
+  type
+){
+
+  return {
+
+    steel:"#aeb4b9",
+    leather:"#492d20",
+    rubber:"#101215",
+    fabric:"#39473f"
+
+  }[type];
+
+}
+
+
+function dialColor(
+  type
+){
+
+  return {
+
+    black:"#080a0d",
+    blue:"#07192c",
+    silver:"#c1c5c8",
+    green:"#0b2b20"
+
+  }[type];
+
+}
+
+
+function roundRect(
+  ctx,
+  x,
+  y,
+  w,
+  h,
+  r
+){
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    x+r,
+    y
+  );
+
+  ctx.lineTo(
+    x+w-r,
+    y
+  );
+
+  ctx.quadraticCurveTo(
+    x+w,
+    y,
+    x+w,
+    y+r
+  );
+
+  ctx.lineTo(
+    x+w,
+    y+h-r
+  );
+
+  ctx.quadraticCurveTo(
+    x+w,
+    y+h,
+    x+w-r,
+    y+h
+  );
+
+  ctx.lineTo(
+    x+r,
+    y+h
+  );
+
+  ctx.quadraticCurveTo(
+    x,
+    y+h,
+    x,
+    y+h-r
+  );
+
+  ctx.lineTo(
+    x,
+    y+r
+  );
+
+  ctx.quadraticCurveTo(
+    x,
+    y,
+    x+r,
+    y
+  );
+
+  ctx.closePath();
+
+}
+
+
+// AR buttons
+document
+.getElementById("arBtn")
+.addEventListener(
+  "click",
+  startAR
+);
+
+document
+.getElementById("closeAR")
+.addEventListener(
+  "click",
+  stopAR
+);
+
+
+// ============================================================
+// RESET
+// ============================================================
+
+updateReadout();
+
+
+// ============================================================
+// ANIMATION
+// ============================================================
+
+const clock =
+  new THREE.Clock();
+
+
+function animate(){
+
+  requestAnimationFrame(
+    animate
+  );
+
+  const t =
+    clock.getElapsedTime();
+
+
+  // subtle floating movement
+  watch.position.y =
+    .05 +
+    Math.sin(t*.9)*.035;
+
+  watch.rotation.y =
+    Math.sin(t*.2)*.035;
+
+
+  updateHands();
+
+  updateHover();
+
+  animateStrap();
+
+  controls.update();
+
+  renderer.render(
+    scene,
+    camera
+  );
+
+}
+
+
+animate();
+
+
+// ============================================================
+// RESIZE
+// ============================================================
+
+window.addEventListener(
+  "resize",
+  () => {
+
+    camera.aspect =
+      innerWidth/
+      innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+      innerWidth,
+      innerHeight
+    );
+
+    if(arMode.classList.contains("active")){
+
+      arCanvas.width =
+        innerWidth;
+
+      arCanvas.height =
+        innerHeight;
+
+    }
+
+  }
+);
+
+</script>
+
+</body>
+</html>
