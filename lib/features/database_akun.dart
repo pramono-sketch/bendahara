@@ -441,9 +441,9 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                 return;
               }
 
-              // 1. Proses kenaikan kelas untuk data siswa (dummyStudents)
-              archiveGraduatedStudents(folderName); // arsip siswa XII
-              processClassPromotion(); // naikkan X→XI, XI→XII
+              // 1. Proses kenaikan kelas untuk data siswa (sampleStudents)
+              archiveGraduatedStudents(folderName, sampleStudents); // arsip siswa XII
+              processClassPromotion(sampleStudents); // naikkan X→XI, XI→XII
 
               // 2. Proses kenaikan kelas untuk akun digital siswa
               //    Arsipkan akun XII ke arsipAkunSiswa
@@ -455,7 +455,7 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
               _saveAccounts();
 
               // 4. Catat log
-              dummyLogs.insert(
+              localLogs.insert(
                 0,
                 ActivityLog(
                   user: 'Admin',

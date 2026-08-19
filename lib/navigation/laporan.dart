@@ -14,7 +14,7 @@ class ReportsPage extends StatelessWidget {
     for (var list in arsipTransaksi.values) {
       allTransactions.addAll(list);
     }
-    allTransactions.addAll(dummyTransactions);
+    allTransactions.addAll(localTransactions);
 
     Map<String, List<Transaction>> grouped = {};
     for (var t in allTransactions) {

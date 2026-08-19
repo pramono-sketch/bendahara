@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-import '../constants/appearance.dart'; // 🔥 import warna
+import '../constants/appearance.dart'; 
 import '../data.dart';
 import '../firebase/firestore_service.dart';
 import '../addon/aksi.dart';

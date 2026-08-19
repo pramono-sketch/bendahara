@@ -118,13 +118,13 @@ Future<List<DigitalAccount>> fetchDigitalAccounts() async {
 
 // ================== SEED DATA ==================
 
-/// Isi data dummy ke Firestore jika koleksi kosong
+/// Isi data sample ke Firestore jika koleksi kosong
 Future<void> seedFirestoreIfEmpty() async {
   // Seed students
   final studentSnapshot = await studentsCollection.limit(1).get();
   if (studentSnapshot.docs.isEmpty) {
-    final dummyList = generateDummyStudents();
-    for (var s in dummyList) {
+    final sampleList = generateSampleStudents();
+    for (var s in sampleList) {
       await studentsCollection.doc(s.id).set(s.toMap());
     }
   }
@@ -132,21 +132,21 @@ Future<void> seedFirestoreIfEmpty() async {
   // Seed transactions
   final transSnapshot = await transactionsCollection.limit(1).get();
   if (transSnapshot.docs.isEmpty) {
-    initDummyTransactions();
+    generateSampleTransactions();
     final allTransactions = <Transaction>[];
     arsipTransaksi.forEach((key, list) => allTransactions.addAll(list));
-    allTransactions.addAll(dummyTransactions);
+    allTransactions.addAll(localTransactions);
     for (var t in allTransactions) {
       await transactionsCollection.doc(t.id).set(t.toMap());
     }
-    dummyTransactions.clear();
+    localTransactions.clear();
     arsipTransaksi.clear();
   }
 
   // Seed digital accounts
   final accSnapshot = await accountsCollection.limit(1).get();
   if (accSnapshot.docs.isEmpty) {
-    for (var acc in dummyAccounts) {
+    for (var acc in defaultAccounts) {
       await accountsCollection.add(acc.toMap());
     }
   }

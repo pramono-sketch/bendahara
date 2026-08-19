@@ -10,7 +10,9 @@ class TagihanPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final outstanding = dummyStudents.where((s) => s.hasOutstanding && s.isActive).toList();
+    // Memanggil fungsi generator sample untuk ditampilkan jika belum ada data real
+    final outstanding = generateSampleStudents().where((s) => s.hasOutstanding && s.isActive).toList();
+    
     return Scaffold(
       appBar: AppBar(title: const Text('Tunggakan Tagihan')),
       body: outstanding.isEmpty

@@ -319,7 +319,7 @@ void setExtraInfo(String id, String key, String value) {
 }
 
 // ================== SISTEM TRANSAKSI (Lokal) ==================
-List<Transaction> dummyTransactions = [];
+List<Transaction> localTransactions = [];
 Map<String, List<Transaction>> arsipTransaksi = {};
 
 void addIncomeTransaction(String description, double amount, {String category = 'Pemasukan'}) {
@@ -331,8 +331,8 @@ void addExpenseTransaction(String description, double amount, {String category =
 }
 
 void _addTransaction(TransType type, String description, double amount, String category) {
-  int nextId = dummyTransactions.length + 1;
-  dummyTransactions.add(Transaction(
+  int nextId = localTransactions.length + 1;
+  localTransactions.add(Transaction(
     id: 'TRX${nextId.toString().padLeft(3, '0')}',
     type: type,
     amount: amount,
@@ -345,14 +345,14 @@ void _addTransaction(TransType type, String description, double amount, String c
 void resetMonthlyTransactions() {
   final now = DateTime.now();
   final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-  if (dummyTransactions.isNotEmpty) {
+  if (localTransactions.isNotEmpty) {
     arsipTransaksi.putIfAbsent(monthKey, () => []);
-    arsipTransaksi[monthKey]!.addAll(dummyTransactions);
-    dummyTransactions.clear();
+    arsipTransaksi[monthKey]!.addAll(localTransactions);
+    localTransactions.clear();
   }
 }
 
-void initDummyTransactions() {
+void generateSampleTransactions() {
   final now = DateTime.now();
   for (int i = 1; i <= 6; i++) {
     final month = now.month - i;
@@ -374,7 +374,7 @@ void initDummyTransactions() {
         id: 'TRX${j + 1}',
         type: isIncome ? TransType.pemasukan : TransType.pengeluaran,
         amount: amount,
-        description: '$desc (dummy)',
+        description: '$desc (sample)',
         date: DateTime(y, m, random.nextInt(28) + 1),
         category: isIncome ? 'Pemasukan' : 'Pengeluaran',
       ));
@@ -442,7 +442,7 @@ Student createStudentWithPayments({
   return Student(id: id, name: name, nis: nis, kelas: kelas, alamat: alamat, phone: phone, payments: payments, isActive: true);
 }
 
-List<Student> generateDummyStudents() {
+List<Student> generateSampleStudents() {
   List<Student> students = [];
   int idCounter = 1;
   int nisCounter = 1;
@@ -478,13 +478,11 @@ List<Student> generateDummyStudents() {
   return students;
 }
 
-List<Student> dummyStudents = generateDummyStudents();
-
 // ================== SISTEM ARSIP SISWA ==================
 Map<String, Map<String, List<Student>>> arsipSiswa = {};
 
-void archiveGraduatedStudents(String tahunAjaran) {
-  List<Student> graduated = dummyStudents.where((s) => s.kelas.startsWith('XII') && s.isActive).toList();
+void archiveGraduatedStudents(String tahunAjaran, List<Student> activeStudents) {
+  List<Student> graduated = activeStudents.where((s) => s.kelas.startsWith('XII') && s.isActive).toList();
   if (graduated.isEmpty) return;
   Map<String, List<Student>> grouped = {};
   for (var s in graduated) { grouped.putIfAbsent(s.kelas, () => []).add(s); }
@@ -496,8 +494,8 @@ void archiveGraduatedStudents(String tahunAjaran) {
   for (var s in graduated) { s.isActive = false; }
 }
 
-void processClassPromotion() {
-  for (var s in dummyStudents) {
+void processClassPromotion(List<Student> students) {
+  for (var s in students) {
     if (s.isActive) {
       if (s.kelas.startsWith('XI')) s.kelas = s.kelas.replaceFirst('XI', 'XII');
       else if (s.kelas.startsWith('X')) s.kelas = s.kelas.replaceFirst('X', 'XI');
@@ -507,6 +505,9 @@ void processClassPromotion() {
 
 // ================== ARSIP AKUN DIGITAL SISWA ==================
 Map<String, Map<String, List<AkunDigital>>> arsipAkunSiswa = {};
+
+// ================== 🔥 TAMBAHAN: GLOBAL SAMPLE STUDENTS ==================
+List<Student> sampleStudents = []; // <-- DEKLARASI GLOBAL
 
 void archiveGraduatedAccounts(String tahunAjaran, List<AkunDigital> accounts) {
   List<AkunDigital> graduated = accounts.where((a) => a.category == 'siswa' && a.kelas != null && a.kelas!.startsWith('XII')).toList();
@@ -545,7 +546,7 @@ class DigitalAccount {
 }
 
 // ================== AKUN DIGITAL & LOG ==================
-List<DigitalAccount> dummyAccounts = [
+List<DigitalAccount> defaultAccounts = [
   DigitalAccount(name: 'Google Workspace', email: 'admin@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Email dan Drive'),
   DigitalAccount(name: 'SiPendik', email: 'sipendik@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Sistem Informasi Pendidikan'),
   DigitalAccount(name: 'Zoom Meeting', email: 'zoom@eduvest.sch.id', penanggungJawab: 'Waka Kurikulum', keterangan: 'Akun Zoom premium'),
@@ -563,10 +564,12 @@ List<DigitalAccount> dummyAccounts = [
   DigitalAccount(name: 'E-Learning', email: 'elearning@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Moodle'),
 ];
 
-List<ActivityLog> dummyLogs = [];
+List<ActivityLog> localLogs = [];
 
 // ================== INISIALISASI DATA (Lokal) ==================
 void initData() {
-  initDummyTransactions();
-  dummyTransactions.clear();
+  generateSampleTransactions();
+  localTransactions.clear();
+  // 🔥 TAMBAHAN: inisialisasi sampleStudents dengan data dummy
+  sampleStudents = generateSampleStudents();
 }

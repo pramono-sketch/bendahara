@@ -64,10 +64,8 @@ class AksiHelper {
                   onTap: () {
                     SoundHelper().playClick();
 
-                    // Tutup bottom sheet menggunakan context sheet
                     Navigator.of(sheetContext).pop();
 
-                    // Buka dialog menggunakan context halaman utama
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!parentContext.mounted) return;
 
@@ -278,10 +276,10 @@ class AksiHelper {
 
                     final now = DateTime.now();
 
-                    dummyTransactions.insert(
+                    localTransactions.insert(
                       0,
                       Transaction(
-                        id: 'TRX${dummyTransactions.length + 1}',
+                        id: 'TRX${localTransactions.length + 1}',
                         type: selectedType,
                         amount: amount,
                         description: description,
@@ -289,7 +287,7 @@ class AksiHelper {
                       ),
                     );
 
-                    dummyLogs.insert(
+                    localLogs.insert(
                       0,
                       ActivityLog(
                         user: 'Admin',
@@ -343,8 +341,7 @@ class CalculatorDialog extends StatefulWidget {
   });
 
   @override
-  State<CalculatorDialog> createState() =>
-      _CalculatorDialogState();
+  State<CalculatorDialog> createState() => _CalculatorDialogState();
 }
 
 class _CalculatorDialogState extends State<CalculatorDialog> {

@@ -261,6 +261,7 @@ class ExcelImportManager {
       int errorCount = 0;
       List<String> errorDetails = [];
 
+      // 🔥 PERBAIKAN: Gunakan sampleStudents (dari data.dart)
       for (int rowIndex = 1; rowIndex < sheet.rows.length; rowIndex++) {
         var row = sheet.rows[rowIndex];
         if (row.isEmpty) continue;
@@ -277,14 +278,15 @@ class ExcelImportManager {
           continue;
         }
 
-        bool exists = dummyStudents.any((s) => s.nis == nis);
+        // 🔥 PERBAIKAN: Gunakan sampleStudents
+        bool exists = sampleStudents.any((s) => s.nis == nis);
         if (exists) {
           errorCount++;
           errorDetails.add('Baris ${rowIndex + 1}: NIS $nis sudah ada');
           continue;
         }
 
-        String id = 'STD${(dummyStudents.length + 1).toString().padLeft(3, '0')}';
+        String id = 'STD${(sampleStudents.length + 1).toString().padLeft(3, '0')}';
         Student newStudent = createStudentWithPayments(
           id: id,
           name: name,
@@ -293,12 +295,14 @@ class ExcelImportManager {
           alamat: alamat ?? '-',
           phone: phone ?? '-',
         );
-        dummyStudents.add(newStudent);
+        // 🔥 PERBAIKAN: Tambahkan ke sampleStudents
+        sampleStudents.add(newStudent);
         addedCount++;
       }
 
       if (addedCount > 0) {
-        dummyLogs.insert(
+        // 🔥 PERBAIKAN: Gunakan localLogs (dari data.dart)
+        localLogs.insert(
           0,
           ActivityLog(
             user: 'Admin',

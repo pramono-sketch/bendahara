@@ -33,18 +33,18 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
   @override
   void initState() {
     super.initState();
-    _ensureDummyLogs();
+    _ensureLocalLogs();
     _applyFilterAndSearch();
   }
 
-  /// Jika dummyLogs kosong, generate data dummy untuk demo.
-  void _ensureDummyLogs() {
-    if (dummyLogs.isEmpty) {
+  /// Jika localLogs kosong, generate data sample untuk demo.
+  void _ensureLocalLogs() {
+    if (localLogs.isEmpty) {
       // Menambahkan log untuk berbagai aktivitas
       final now = DateTime.now();
 
       // Log siswa
-      dummyLogs.addAll([
+      localLogs.addAll([
         ActivityLog(
           user: 'Admin',
           action: ActivityAction.tambah,
@@ -66,7 +66,7 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
       ]);
 
       // Log transaksi
-      dummyLogs.addAll([
+      localLogs.addAll([
         ActivityLog(
           user: 'Bendahara',
           action: ActivityAction.tambah,
@@ -88,7 +88,7 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
       ]);
 
       // Log akun digital
-      dummyLogs.addAll([
+      localLogs.addAll([
         ActivityLog(
           user: 'IT Support',
           action: ActivityAction.tambah,
@@ -110,7 +110,7 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
       ]);
 
       // Log pembayaran siswa
-      dummyLogs.addAll([
+      localLogs.addAll([
         ActivityLog(
           user: 'Admin',
           action: ActivityAction.bayar,
@@ -132,7 +132,7 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
       ]);
 
       // Log login/logout
-      dummyLogs.addAll([
+      localLogs.addAll([
         ActivityLog(
           user: 'Admin',
           action: ActivityAction.login,
@@ -158,7 +158,7 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
   /// Menerapkan filter kategori dan pencarian ke daftar log.
   void _applyFilterAndSearch() {
     setState(() {
-      List<ActivityLog> logs = List.from(dummyLogs);
+      List<ActivityLog> logs = List.from(localLogs);
 
       // Filter berdasarkan kategori
       if (_selectedFilter != 'Semua') {

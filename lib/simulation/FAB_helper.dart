@@ -402,7 +402,6 @@ class SimulasiHelper {
 
   static Future<void> _addMultipleStudents(int count) async {
     for (int i = 0; i < count; i++) {
-      // Beri delay kecil agar timestamp berbeda dan ID tidak sama detik
       await Future.delayed(const Duration(milliseconds: 10));
       final student = _createRandomStudent();
       await saveStudent(student);
@@ -460,7 +459,6 @@ class SimulasiHelper {
     final grade = gradeLevels[random.nextInt(gradeLevels.length)];
     final major = majors[random.nextInt(majors.length)];
     
-    // PERBAIKAN BUG: Gunakan timestamp agar ID selalu unik dan tidak menimpa
     final uniqueId = DateTime.now().millisecondsSinceEpoch.toString().substring(5);
     final randomSuffix = random.nextInt(99);
     
@@ -763,10 +761,11 @@ class AksiHelper {
                     final description = descCtrl.text.trim();
                     final now = DateTime.now();
 
-                    dummyTransactions.insert(
+                    // 🔥 PERBAIKAN: ganti dummyTransactions → localTransactions
+                    localTransactions.insert(
                       0,
                       Transaction(
-                        id: 'TRX${dummyTransactions.length + 1}',
+                        id: 'TRX${localTransactions.length + 1}',
                         type: selectedType,
                         amount: amount,
                         description: description,
@@ -774,7 +773,8 @@ class AksiHelper {
                       ),
                     );
 
-                    dummyLogs.insert(
+                    // 🔥 PERBAIKAN: ganti dummyLogs → localLogs
+                    localLogs.insert(
                       0,
                       ActivityLog(
                         user: 'Admin',

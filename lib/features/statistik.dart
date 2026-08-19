@@ -28,7 +28,7 @@ class StatistikPage extends StatelessWidget {
     }
 
     // Dari transaksi aktif
-    for (var t in dummyTransactions) {
+    for (var t in localTransactions) {
       if (t.type == TransType.pemasukan) {
         final month = t.date.month;
         monthly[month] = (monthly[month] ?? 0) + t.amount;
@@ -59,7 +59,7 @@ class StatistikPage extends StatelessWidget {
       }
     }
 
-    for (var t in dummyTransactions) {
+    for (var t in localTransactions) {
       if (t.type == TransType.pengeluaran) {
         final month = t.date.month;
         monthly[month] = (monthly[month] ?? 0) + t.amount;
@@ -82,7 +82,7 @@ class StatistikPage extends StatelessWidget {
         if (t.type == TransType.pemasukan) total += t.amount;
       }
     }
-    for (var t in dummyTransactions) {
+    for (var t in localTransactions) {
       if (t.type == TransType.pemasukan) total += t.amount;
     }
     return total;
@@ -95,7 +95,7 @@ class StatistikPage extends StatelessWidget {
         if (t.type == TransType.pengeluaran) total += t.amount;
       }
     }
-    for (var t in dummyTransactions) {
+    for (var t in localTransactions) {
       if (t.type == TransType.pengeluaran) total += t.amount;
     }
     return total;
@@ -107,7 +107,7 @@ class StatistikPage extends StatelessWidget {
   Map<String, Map<String, dynamic>> _getPaymentStatsByClass() {
     Map<String, Map<String, dynamic>> result = {};
 
-    for (var s in dummyStudents.where((s) => s.isActive)) {
+    for (var s in sampleStudents.where((s) => s.isActive)) {
       final kelas = s.kelas;
       if (!result.containsKey(kelas)) {
         result[kelas] = {
@@ -147,7 +147,7 @@ class StatistikPage extends StatelessWidget {
     // Bulan ini
     double incomeThisMonth = 0;
     double expenseThisMonth = 0;
-    for (var t in dummyTransactions) {
+    for (var t in localTransactions) {
       if (t.date.month == currentMonth && t.date.year == currentYear) {
         if (t.type == TransType.pemasukan) incomeThisMonth += t.amount;
         else expenseThisMonth += t.amount;
@@ -188,7 +188,7 @@ class StatistikPage extends StatelessWidget {
   List<Map<String, dynamic>> _getTopOutstandingStudents() {
     List<Map<String, dynamic>> result = [];
 
-    for (var s in dummyStudents.where((s) => s.isActive && s.hasOutstanding)) {
+    for (var s in sampleStudents.where((s) => s.isActive && s.hasOutstanding)) {
       final outstanding = s.remaining;
       result.add({
         'name': s.name,
@@ -230,7 +230,7 @@ class StatistikPage extends StatelessWidget {
       }
       // Tambahkan transaksi aktif jika bulan ini
       if (month == now.month && year == now.year) {
-        for (var t in dummyTransactions) {
+        for (var t in localTransactions) {
           if (t.type == TransType.pemasukan) income += t.amount;
           else expense += t.amount;
         }
@@ -247,7 +247,7 @@ class StatistikPage extends StatelessWidget {
   Map<String, double> _getPaymentTypeDistribution() {
     Map<String, double> distribution = {};
 
-    for (var s in dummyStudents.where((s) => s.isActive)) {
+    for (var s in sampleStudents.where((s) => s.isActive)) {
       for (var p in s.payments) {
         if (p.status == PaymentStatus.lunas) {
           distribution[p.type] = (distribution[p.type] ?? 0) + p.amount;
@@ -299,10 +299,6 @@ class StatistikPage extends StatelessWidget {
       // Ambil income dan expense
       double inc = monthlyIncome[month] ?? 0;
       double exp = monthlyExpense[month] ?? 0;
-      // Jika bulan ini, ambil dari dummyTransactions juga
-      if (month == now.month && year == now.year) {
-        // sudah tercakup di monthlyIncome
-      }
       last6Income.add(inc);
       last6Expense.add(exp);
     }
