@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:permission_handler/permission_handler.dart';
 
-import '../constants/appearance.dart';
 import '../data.dart';
 
 // ============================================================
@@ -86,6 +85,9 @@ class ExcelImportManager {
 
   /// Menampilkan dialog popup berisi daftar file Excel dari folder import
   Future<void> showImportFileDialog(BuildContext context) async {
+    // ── FIX: Simpan NavigatorState sebelum async gap ──
+    final navigator = Navigator.of(context);
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -102,49 +104,50 @@ class ExcelImportManager {
 
     bool hasPermission = await _requestStoragePermission();
 
-    if (!context.mounted) return;
-    Navigator.pop(context); // Tutup loading
+    // ── FIX: Gunakan navigator/messenger yang disimpan, bukan context ──
+    if (!navigator.mounted) return;
+    navigator.pop(); // Tutup loading
 
     if (!hasPermission) {
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                SizedBox(width: 8),
-                Text('Izin Diperlukan'),
-              ],
-            ),
-            content: const Text(
-              'Aplikasi memerlukan izin akses penyimpanan untuk '
-              'membaca file Excel dari folder import.\n\n'
-              'Silakan berikan izin "Kelola semua file" di pengaturan.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Batal'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  openAppSettings();
-                },
-                child: const Text('Buka Pengaturan'),
-              ),
+      if (!navigator.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Izin Diperlukan'),
             ],
           ),
-        );
-      }
+          content: const Text(
+            'Aplikasi memerlukan izin akses penyimpanan untuk '
+            'membaca file Excel dari folder import.\n\n'
+            'Silakan berikan izin "Kelola semua file" di pengaturan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                openAppSettings();
+              },
+              child: const Text('Buka Pengaturan'),
+            ),
+          ],
+        ),
+      );
       return;
     }
 
     List<File> excelFiles = await getExcelFilesFromFolder();
 
-    if (!context.mounted) return;
+    if (!navigator.mounted) return;
 
+    // ── FIX: onShowGuide menggunakan page context (aman) ──
     showDialog(
       context: context,
       builder: (ctx) => ImportFileDialog(
@@ -158,6 +161,16 @@ class ExcelImportManager {
           Navigator.pop(ctx);
           importFromExcelPicker(context);
         },
+        onShowGuide: () {
+          Navigator.pop(ctx); // Tutup ImportFileDialog
+          // Gunakan page context (bukan dialog context) → aman!
+          showDialog(
+            context: context,
+            builder: (_) => GuideDialog(
+              onExport: () => exportGuideFile(context),
+            ),
+          );
+        },
       ),
     );
   }
@@ -165,6 +178,9 @@ class ExcelImportManager {
   /// Import data siswa dari file Excel yang dipilih
   Future<void> importFromFile(BuildContext context, File file) async {
     String fileName = file.path.split('/').last;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
@@ -183,15 +199,15 @@ class ExcelImportManager {
     try {
       final bytes = await file.readAsBytes();
 
-      if (!context.mounted) return;
-      Navigator.pop(context); // Tutup loading
+      if (!navigator.mounted) return;
+      navigator.pop(); // Tutup loading
 
       await processExcelBytes(context, bytes, fileName);
     } catch (e) {
-      if (!context.mounted) return;
-      Navigator.pop(context);
+      if (!navigator.mounted) return;
+      navigator.pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Terjadi kesalahan saat membaca file: $e'),
           backgroundColor: Colors.red,
@@ -202,6 +218,7 @@ class ExcelImportManager {
 
   /// Fallback: Pilih file menggunakan FilePicker (sistem)
   Future<void> importFromExcelPicker(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -211,7 +228,7 @@ class ExcelImportManager {
 
       final bytes = result.files.first.bytes;
       if (bytes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Gagal membaca file.')),
         );
         return;
@@ -219,7 +236,7 @@ class ExcelImportManager {
 
       await processExcelBytes(context, bytes, result.files.first.name);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('Terjadi kesalahan: $e')),
       );
     }
@@ -228,11 +245,13 @@ class ExcelImportManager {
   /// Proses bytes Excel dan tambahkan siswa
   Future<void> processExcelBytes(
       BuildContext context, Uint8List bytes, String fileName) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       var excel = Excel.decodeBytes(bytes);
       var sheet = excel.tables[excel.tables.keys.first];
       if (sheet == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Tidak ada sheet yang ditemukan.')),
         );
         return;
@@ -290,7 +309,7 @@ class ExcelImportManager {
         );
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
             addedCount > 0
@@ -338,18 +357,22 @@ class ExcelImportManager {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('Terjadi kesalahan: $e')),
       );
     }
   }
 
-  /// Export Template Petunjuk ke Folder Export
+  /// ── FIX: Export Template Petunjuk ke Folder Export ──
   Future<void> exportGuideFile(BuildContext context) async {
+    // Simpan referensi sebelum async gap
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       bool hasPermission = await _requestStoragePermission();
       if (!hasPermission) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!context.mounted) return;
+        messenger.showSnackBar(
           const SnackBar(content: Text('Izin penyimpanan ditolak!'), backgroundColor: Colors.red),
         );
         return;
@@ -362,7 +385,7 @@ class ExcelImportManager {
 
       String filePath = '${exportDir.path}/format_import_siswa.csv';
       File file = File(filePath);
-      
+
       // Membuat isi file CSV
       String csvContent = "Nama,NIS,Kelas,Alamat,Telepon\n";
       csvContent += "Budi Santoso,12345,X TKJ,Jl. Mawar No.1,081234567890\n";
@@ -370,7 +393,8 @@ class ExcelImportManager {
 
       await file.writeAsString(csvContent);
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!context.mounted) return;
+      messenger.showSnackBar(
         SnackBar(
           content: Text('✅ Petunjuk berhasil diexport ke:\n$filePath'),
           backgroundColor: Colors.green,
@@ -378,7 +402,8 @@ class ExcelImportManager {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!context.mounted) return;
+      messenger.showSnackBar(
         SnackBar(content: Text('Gagal export petunjuk: $e'), backgroundColor: Colors.red),
       );
     }
@@ -395,12 +420,17 @@ class ImportFileDialog extends StatelessWidget {
   final Function(File) onFileSelected;
   final VoidCallback onPickOtherFile;
 
+  /// ── FIX: Callback terpisah untuk show guide ──
+  /// Menggunakan page context, bukan dialog context
+  final VoidCallback onShowGuide;
+
   const ImportFileDialog({
     super.key,
     required this.excelFiles,
     required this.folderPath,
     required this.onFileSelected,
     required this.onPickOtherFile,
+    required this.onShowGuide,
   });
 
   String _formatFileSize(int bytes) {
@@ -421,15 +451,8 @@ class ImportFileDialog extends StatelessWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.help_outline, color: Colors.blue),
-            onPressed: () {
-              Navigator.pop(context);
-              showDialog(
-                context: context,
-                builder: (ctx) => GuideDialog(
-                  onExport: () => ExcelImportManager().exportGuideFile(context),
-                ),
-              );
-            },
+            // ── FIX: Gunakan callback, bukan inline Navigator.pop ──
+            onPressed: onShowGuide,
             tooltip: 'Petunjuk Format',
           ),
           const SizedBox(width: 8),
@@ -586,6 +609,8 @@ class GuideDialog extends StatelessWidget {
         ),
         ElevatedButton.icon(
           onPressed: () {
+            // ── FIX: Pop dialog dulu, lalu panggil onExport ──
+            // onExport menggunakan page context (bukan dialog context)
             Navigator.pop(context);
             onExport();
           },

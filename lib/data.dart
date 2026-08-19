@@ -1,7 +1,7 @@
 // lib/data.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';  // ← DULU ADA
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ================== MODEL AKUN DIGITAL (GURU & SISWA) ==================
 class AkunDigital {
@@ -163,8 +163,7 @@ class Student {
         return sum;
       });
   double get remaining => totalDue - totalPaid;
-  bool get hasOutstanding =>
-      payments.any((p) => p.status != PaymentStatus.lunas);
+  bool get hasOutstanding => payments.any((p) => p.status != PaymentStatus.lunas);
 
   // ===== FIRESTORE HELPERS =====
   Map<String, dynamic> toMap() => {
@@ -253,35 +252,23 @@ class ActivityLog {
 
   String get actionText {
     switch (action) {
-      case ActivityAction.tambah:
-        return 'Menambah';
-      case ActivityAction.edit:
-        return 'Mengedit';
-      case ActivityAction.hapus:
-        return 'Menghapus';
-      case ActivityAction.login:
-        return 'Login';
-      case ActivityAction.logout:
-        return 'Logout';
-      case ActivityAction.bayar:
-        return 'Pembayaran';
+      case ActivityAction.tambah: return 'Menambah';
+      case ActivityAction.edit: return 'Mengedit';
+      case ActivityAction.hapus: return 'Menghapus';
+      case ActivityAction.login: return 'Login';
+      case ActivityAction.logout: return 'Logout';
+      case ActivityAction.bayar: return 'Pembayaran';
     }
   }
 
   IconData get actionIcon {
     switch (action) {
-      case ActivityAction.tambah:
-        return Icons.add_circle_outline;
-      case ActivityAction.edit:
-        return Icons.edit_outlined;
-      case ActivityAction.hapus:
-        return Icons.delete_outline;
-      case ActivityAction.login:
-        return Icons.login;
-      case ActivityAction.logout:
-        return Icons.logout;
-      case ActivityAction.bayar:
-        return Icons.payment;
+      case ActivityAction.tambah: return Icons.add_circle_outline;
+      case ActivityAction.edit: return Icons.edit_outlined;
+      case ActivityAction.hapus: return Icons.delete_outline;
+      case ActivityAction.login: return Icons.login;
+      case ActivityAction.logout: return Icons.logout;
+      case ActivityAction.bayar: return Icons.payment;
     }
   }
 
@@ -310,32 +297,14 @@ String getExtraInfo(String id, String key) {
   if (!extraInfo.containsKey(id)) {
     final seed = int.tryParse(id.replaceAll('STD', '')) ?? 0;
     final random = Random(seed);
-    final tempatLahir = [
-      'Jakarta',
-      'Bandung',
-      'Surabaya',
-      'Yogyakarta',
-      'Semarang',
-      'Medan',
-    ][random.nextInt(6)];
-    final tanggalLahir = DateTime(
-      2008 + random.nextInt(4),
-      random.nextInt(12) + 1,
-      random.nextInt(28) + 1,
-    );
+    final tempatLahir = ['Jakarta', 'Bandung', 'Surabaya', 'Yogyakarta', 'Semarang', 'Medan'][random.nextInt(6)];
+    final tanggalLahir = DateTime(2008 + random.nextInt(4), random.nextInt(12) + 1, random.nextInt(28) + 1);
     final jenisKelamin = random.nextBool() ? 'Laki-laki' : 'Perempuan';
     final orangTua = 'Orang Tua ${seed + 1}';
-    final agama = [
-      'Islam',
-      'Kristen',
-      'Katolik',
-      'Hindu',
-      'Buddha',
-    ][random.nextInt(5)];
+    final agama = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha'][random.nextInt(5)];
     extraInfo[id] = {
       'tempatLahir': tempatLahir,
-      'tanggalLahir':
-          '${tanggalLahir.day}/${tanggalLahir.month}/${tanggalLahir.year}',
+      'tanggalLahir': '${tanggalLahir.day}/${tanggalLahir.month}/${tanggalLahir.year}',
       'jenisKelamin': jenisKelamin,
       'orangTua': orangTua,
       'agama': agama,
@@ -345,51 +314,32 @@ String getExtraInfo(String id, String key) {
 }
 
 void setExtraInfo(String id, String key, String value) {
-  if (!extraInfo.containsKey(id)) {
-    getExtraInfo(id, key);
-  }
-  if (extraInfo.containsKey(id)) {
-    extraInfo[id]?[key] = value;
-  }
+  if (!extraInfo.containsKey(id)) getExtraInfo(id, key);
+  if (extraInfo.containsKey(id)) extraInfo[id]?[key] = value;
 }
 
 // ================== SISTEM TRANSAKSI (Lokal) ==================
 List<Transaction> dummyTransactions = [];
 Map<String, List<Transaction>> arsipTransaksi = {};
 
-void addIncomeTransaction(
-  String description,
-  double amount, {
-  String category = 'Pemasukan',
-}) {
+void addIncomeTransaction(String description, double amount, {String category = 'Pemasukan'}) {
   _addTransaction(TransType.pemasukan, description, amount, category);
 }
 
-void addExpenseTransaction(
-  String description,
-  double amount, {
-  String category = 'Pengeluaran',
-}) {
+void addExpenseTransaction(String description, double amount, {String category = 'Pengeluaran'}) {
   _addTransaction(TransType.pengeluaran, description, amount, category);
 }
 
-void _addTransaction(
-  TransType type,
-  String description,
-  double amount,
-  String category,
-) {
+void _addTransaction(TransType type, String description, double amount, String category) {
   int nextId = dummyTransactions.length + 1;
-  dummyTransactions.add(
-    Transaction(
-      id: 'TRX${nextId.toString().padLeft(3, '0')}',
-      type: type,
-      amount: amount,
-      description: description,
-      date: DateTime.now(),
-      category: category,
-    ),
-  );
+  dummyTransactions.add(Transaction(
+    id: 'TRX${nextId.toString().padLeft(3, '0')}',
+    type: type,
+    amount: amount,
+    description: description,
+    date: DateTime.now(),
+    category: category,
+  ));
 }
 
 void resetMonthlyTransactions() {
@@ -409,10 +359,7 @@ void initDummyTransactions() {
     final year = now.year;
     int m = month;
     int y = year;
-    if (m <= 0) {
-      m += 12;
-      y -= 1;
-    }
+    if (m <= 0) { m += 12; y -= 1; }
     final key = '$y-${m.toString().padLeft(2, '0')}';
     arsipTransaksi.putIfAbsent(key, () => []);
     final random = Random();
@@ -421,19 +368,16 @@ void initDummyTransactions() {
       final isIncome = random.nextBool();
       final amount = (random.nextDouble() * 3000000 + 500000).roundToDouble();
       final desc = isIncome
-          ? ['Pembayaran SPP', 'Bantuan', 'Sumbangan', 'Pendaftaran'][random
-              .nextInt(4)]
+          ? ['Pembayaran SPP', 'Bantuan', 'Sumbangan', 'Pendaftaran'][random.nextInt(4)]
           : ['ATK', 'Listrik', 'Perbaikan', 'Honor'][random.nextInt(4)];
-      arsipTransaksi[key]!.add(
-        Transaction(
-          id: 'TRX${j + 1}',
-          type: isIncome ? TransType.pemasukan : TransType.pengeluaran,
-          amount: amount,
-          description: '$desc (dummy)',
-          date: DateTime(y, m, random.nextInt(28) + 1),
-          category: isIncome ? 'Pemasukan' : 'Pengeluaran',
-        ),
-      );
+      arsipTransaksi[key]!.add(Transaction(
+        id: 'TRX${j + 1}',
+        type: isIncome ? TransType.pemasukan : TransType.pengeluaran,
+        amount: amount,
+        description: '$desc (dummy)',
+        date: DateTime(y, m, random.nextInt(28) + 1),
+        category: isIncome ? 'Pemasukan' : 'Pengeluaran',
+      ));
     }
   }
 }
@@ -472,16 +416,12 @@ Map<String, List<PaymentItem>> defaultPaymentsByClass = {
 List<PaymentItem> getDefaultPaymentsForClass(String kelas) {
   String grade = kelas.split(' ').first;
   if (defaultPaymentsByClass.containsKey(grade)) {
-    return defaultPaymentsByClass[grade]!
-        .map(
-          (p) => PaymentItem(
-            type: p.type,
-            amount: p.amount,
-            status: PaymentStatus.belumBayar,
-            paidAmount: 0,
-          ),
-        )
-        .toList();
+    return defaultPaymentsByClass[grade]!.map((p) => PaymentItem(
+      type: p.type,
+      amount: p.amount,
+      status: PaymentStatus.belumBayar,
+      paidAmount: 0,
+    )).toList();
   } else {
     return [
       PaymentItem(type: 'SPP', amount: 200000),
@@ -499,16 +439,7 @@ Student createStudentWithPayments({
   required String phone,
 }) {
   List<PaymentItem> payments = getDefaultPaymentsForClass(kelas);
-  return Student(
-    id: id,
-    name: name,
-    nis: nis,
-    kelas: kelas,
-    alamat: alamat,
-    phone: phone,
-    payments: payments,
-    isActive: true,
-  );
+  return Student(id: id, name: name, nis: nis, kelas: kelas, alamat: alamat, phone: phone, payments: payments, isActive: true);
 }
 
 List<Student> generateDummyStudents() {
@@ -524,12 +455,9 @@ List<Student> generateDummyStudents() {
         final String id = 'STD${(idCounter++).toString().padLeft(3, '0')}';
         List<PaymentItem> payments = getDefaultPaymentsForClass(kelas);
         for (int j = 0; j < payments.length; j++) {
-          if (j == 1 && idCounter % 3 == 0)
-            payments[j].status = PaymentStatus.belumBayar;
-          else if (j == 2 && idCounter % 4 == 0)
-            payments[j].status = PaymentStatus.sebagian;
-          else
-            payments[j].status = PaymentStatus.lunas;
+          if (j == 1 && idCounter % 3 == 0) payments[j].status = PaymentStatus.belumBayar;
+          else if (j == 2 && idCounter % 4 == 0) payments[j].status = PaymentStatus.sebagian;
+          else payments[j].status = PaymentStatus.lunas;
           if (payments[j].status == PaymentStatus.lunas) {
             payments[j].paidAmount = payments[j].amount;
             payments[j].lastPaymentDate = DateTime(2026, 6, 10);
@@ -538,18 +466,12 @@ List<Student> generateDummyStudents() {
             payments[j].lastPaymentDate = DateTime(2026, 3, 20);
           }
         }
-        students.add(
-          Student(
-            id: id,
-            name: name,
-            nis: nis,
-            kelas: kelas,
-            alamat: 'Jl. Merdeka No. $idCounter',
-            phone: '08123456${(700 + idCounter).toString()}',
-            payments: payments,
-            isActive: true,
-          ),
-        );
+        students.add(Student(
+          id: id, name: name, nis: nis, kelas: kelas,
+          alamat: 'Jl. Merdeka No. $idCounter',
+          phone: '08123456${(700 + idCounter).toString()}',
+          payments: payments, isActive: true,
+        ));
       }
     }
   }
@@ -558,36 +480,27 @@ List<Student> generateDummyStudents() {
 
 List<Student> dummyStudents = generateDummyStudents();
 
-// ================== SISTEM ARSIP SISWA (untuk data siswa) ==================
+// ================== SISTEM ARSIP SISWA ==================
 Map<String, Map<String, List<Student>>> arsipSiswa = {};
 
 void archiveGraduatedStudents(String tahunAjaran) {
-  List<Student> graduated = dummyStudents
-      .where((s) => s.kelas.startsWith('XII') && s.isActive)
-      .toList();
+  List<Student> graduated = dummyStudents.where((s) => s.kelas.startsWith('XII') && s.isActive).toList();
   if (graduated.isEmpty) return;
   Map<String, List<Student>> grouped = {};
-  for (var s in graduated) {
-    grouped.putIfAbsent(s.kelas, () => []).add(s);
-  }
+  for (var s in graduated) { grouped.putIfAbsent(s.kelas, () => []).add(s); }
   arsipSiswa.putIfAbsent(tahunAjaran, () => {});
   for (var entry in grouped.entries) {
     arsipSiswa[tahunAjaran]!.putIfAbsent(entry.key, () => []);
     arsipSiswa[tahunAjaran]![entry.key]!.addAll(entry.value);
   }
-  for (var s in graduated) {
-    s.isActive = false;
-  }
+  for (var s in graduated) { s.isActive = false; }
 }
 
 void processClassPromotion() {
   for (var s in dummyStudents) {
     if (s.isActive) {
-      if (s.kelas.startsWith('XI')) {
-        s.kelas = s.kelas.replaceFirst('XI', 'XII');
-      } else if (s.kelas.startsWith('X')) {
-        s.kelas = s.kelas.replaceFirst('X', 'XI');
-      }
+      if (s.kelas.startsWith('XI')) s.kelas = s.kelas.replaceFirst('XI', 'XII');
+      else if (s.kelas.startsWith('X')) s.kelas = s.kelas.replaceFirst('X', 'XI');
     }
   }
 }
@@ -596,184 +509,58 @@ void processClassPromotion() {
 Map<String, Map<String, List<AkunDigital>>> arsipAkunSiswa = {};
 
 void archiveGraduatedAccounts(String tahunAjaran, List<AkunDigital> accounts) {
-  List<AkunDigital> graduated = accounts
-      .where(
-        (a) =>
-            a.category == 'siswa' &&
-            a.kelas != null &&
-            a.kelas!.startsWith('XII'),
-      )
-      .toList();
-
+  List<AkunDigital> graduated = accounts.where((a) => a.category == 'siswa' && a.kelas != null && a.kelas!.startsWith('XII')).toList();
   if (graduated.isEmpty) return;
-
   Map<String, List<AkunDigital>> grouped = {};
-  for (var acc in graduated) {
-    String kelasAsal = acc.kelas!;
-    grouped.putIfAbsent(kelasAsal, () => []).add(acc);
-  }
-
+  for (var acc in graduated) { String kelasAsal = acc.kelas!; grouped.putIfAbsent(kelasAsal, () => []).add(acc); }
   arsipAkunSiswa.putIfAbsent(tahunAjaran, () => {});
   for (var entry in grouped.entries) {
     arsipAkunSiswa[tahunAjaran]!.putIfAbsent(entry.key, () => []);
     arsipAkunSiswa[tahunAjaran]![entry.key]!.addAll(entry.value);
   }
-
-  for (var acc in graduated) {
-    acc.kelas = 'Lulus';
-  }
+  for (var acc in graduated) { acc.kelas = 'Lulus'; }
 }
 
 void promoteAccounts(List<AkunDigital> accounts) {
   for (var acc in accounts) {
     if (acc.category != 'siswa' || acc.kelas == null) continue;
-
     String kelas = acc.kelas!;
     String? jurusan;
-    if (kelas.contains('RPL'))
-      jurusan = 'RPL';
-    else if (kelas.contains('TKJ'))
-      jurusan = 'TKJ';
-    else if (kelas.contains('TKR'))
-      jurusan = 'TKR';
-    else
-      continue;
-
-    if (kelas.startsWith('X ')) {
-      acc.kelas = 'XI $jurusan';
-    } else if (kelas.startsWith('XI ')) {
-      acc.kelas = 'XII $jurusan';
-    }
+    if (kelas.contains('RPL')) jurusan = 'RPL';
+    else if (kelas.contains('TKJ')) jurusan = 'TKJ';
+    else if (kelas.contains('TKR')) jurusan = 'TKR';
+    else continue;
+    if (kelas.startsWith('X ')) acc.kelas = 'XI $jurusan';
+    else if (kelas.startsWith('XI ')) acc.kelas = 'XII $jurusan';
   }
 }
 
 class DigitalAccount {
-  String name;
-  String email;
-  String penanggungJawab;
-  String keterangan;
-  String passwordMasked;
-
-  DigitalAccount({
-    required this.name,
-    required this.email,
-    required this.penanggungJawab,
-    required this.keterangan,
-    this.passwordMasked = '••••••••',
-  });
-
-  // ===== FIRESTORE HELPERS =====
-  Map<String, dynamic> toMap() => {
-        'name': name,
-        'email': email,
-        'penanggungJawab': penanggungJawab,
-        'keterangan': keterangan,
-        'passwordMasked': passwordMasked,
-      };
-
+  String name; String email; String penanggungJawab; String keterangan; String passwordMasked;
+  DigitalAccount({required this.name, required this.email, required this.penanggungJawab, required this.keterangan, this.passwordMasked = '••••••••'});
+  Map<String, dynamic> toMap() => {'name': name, 'email': email, 'penanggungJawab': penanggungJawab, 'keterangan': keterangan, 'passwordMasked': passwordMasked};
   static DigitalAccount fromMap(Map<String, dynamic> map) {
-    return DigitalAccount(
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      penanggungJawab: map['penanggungJawab'] ?? '',
-      keterangan: map['keterangan'] ?? '',
-      passwordMasked: map['passwordMasked'] ?? '••••••••',
-    );
+    return DigitalAccount(name: map['name'] ?? '', email: map['email'] ?? '', penanggungJawab: map['penanggungJawab'] ?? '', keterangan: map['keterangan'] ?? '', passwordMasked: map['passwordMasked'] ?? '••••••••');
   }
 }
 
 // ================== AKUN DIGITAL & LOG ==================
 List<DigitalAccount> dummyAccounts = [
-  DigitalAccount(
-    name: 'Google Workspace',
-    email: 'admin@eduvest.sch.id',
-    penanggungJawab: 'Kepala Sekolah',
-    keterangan: 'Email dan Drive',
-  ),
-  DigitalAccount(
-    name: 'SiPendik',
-    email: 'sipendik@eduvest.sch.id',
-    penanggungJawab: 'Bendahara',
-    keterangan: 'Sistem Informasi Pendidikan',
-  ),
-  DigitalAccount(
-    name: 'Zoom Meeting',
-    email: 'zoom@eduvest.sch.id',
-    penanggungJawab: 'Waka Kurikulum',
-    keterangan: 'Akun Zoom premium',
-  ),
-  DigitalAccount(
-    name: 'Canva for Edu',
-    email: 'canva@eduvest.sch.id',
-    penanggungJawab: 'Guru',
-    keterangan: 'Desain grafis',
-  ),
-  DigitalAccount(
-    name: 'Bank Sekolah',
-    email: 'bank@eduvest.sch.id',
-    penanggungJawab: 'Bendahara',
-    keterangan: 'Rekening operasional',
-  ),
-  DigitalAccount(
-    name: 'Sistem Absensi',
-    email: 'absensi@eduvest.sch.id',
-    penanggungJawab: 'TU',
-    keterangan: 'Absensi digital',
-  ),
-  DigitalAccount(
-    name: 'Perpustakaan Digital',
-    email: 'pustaka@eduvest.sch.id',
-    penanggungJawab: 'Kepala Perpus',
-    keterangan: 'E-book dan katalog',
-  ),
-  DigitalAccount(
-    name: 'Website Sekolah',
-    email: 'webmaster@eduvest.sch.id',
-    penanggungJawab: 'IT Support',
-    keterangan: 'Hosting dan domain',
-  ),
-  DigitalAccount(
-    name: 'Youtube Edu',
-    email: 'youtube@eduvest.sch.id',
-    penanggungJawab: 'Humas',
-    keterangan: 'Channel resmi',
-  ),
-  DigitalAccount(
-    name: 'SMS Gateway',
-    email: 'sms@eduvest.sch.id',
-    penanggungJawab: 'Administrasi',
-    keterangan: 'Notifikasi ke orang tua',
-  ),
-  DigitalAccount(
-    name: 'Aplikasi Rapor',
-    email: 'rapor@eduvest.sch.id',
-    penanggungJawab: 'Waka Kurikulum',
-    keterangan: 'E-rapor',
-  ),
-  DigitalAccount(
-    name: 'Cloud Storage',
-    email: 'cloud@eduvest.sch.id',
-    penanggungJawab: 'IT Support',
-    keterangan: 'Backup data',
-  ),
-  DigitalAccount(
-    name: 'WhatsApp Business',
-    email: 'wa@eduvest.sch.id',
-    penanggungJawab: 'Humas',
-    keterangan: 'Layanan chat',
-  ),
-  DigitalAccount(
-    name: 'Microsoft 365',
-    email: 'office@eduvest.sch.id',
-    penanggungJawab: 'Kepala Sekolah',
-    keterangan: 'Office dan Teams',
-  ),
-  DigitalAccount(
-    name: 'E-Learning',
-    email: 'elearning@eduvest.sch.id',
-    penanggungJawab: 'Guru',
-    keterangan: 'Moodle',
-  ),
+  DigitalAccount(name: 'Google Workspace', email: 'admin@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Email dan Drive'),
+  DigitalAccount(name: 'SiPendik', email: 'sipendik@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Sistem Informasi Pendidikan'),
+  DigitalAccount(name: 'Zoom Meeting', email: 'zoom@eduvest.sch.id', penanggungJawab: 'Waka Kurikulum', keterangan: 'Akun Zoom premium'),
+  DigitalAccount(name: 'Canva for Edu', email: 'canva@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Desain grafis'),
+  DigitalAccount(name: 'Bank Sekolah', email: 'bank@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Rekening operasional'),
+  DigitalAccount(name: 'Sistem Absensi', email: 'absensi@eduvest.sch.id', penanggungJawab: 'TU', keterangan: 'Absensi digital'),
+  DigitalAccount(name: 'Perpustakaan Digital', email: 'pustaka@eduvest.sch.id', penanggungJawab: 'Kepala Perpus', keterangan: 'E-book dan katalog'),
+  DigitalAccount(name: 'Website Sekolah', email: 'webmaster@eduvest.sch.id', penanggungJawab: 'IT Support', keterangan: 'Hosting dan domain'),
+  DigitalAccount(name: 'Youtube Edu', email: 'youtube@eduvest.sch.id', penanggungJawab: 'Humas', keterangan: 'Channel resmi'),
+  DigitalAccount(name: 'SMS Gateway', email: 'sms@eduvest.sch.id', penanggungJawab: 'Administrasi', keterangan: 'Notifikasi ke orang tua'),
+  DigitalAccount(name: 'Aplikasi Rapor', email: 'rapor@eduvest.sch.id', penanggungJawab: 'Waka Kurikulum', keterangan: 'E-rapor'),
+  DigitalAccount(name: 'Cloud Storage', email: 'cloud@eduvest.sch.id', penanggungJawab: 'IT Support', keterangan: 'Backup data'),
+  DigitalAccount(name: 'WhatsApp Business', email: 'wa@eduvest.sch.id', penanggungJawab: 'Humas', keterangan: 'Layanan chat'),
+  DigitalAccount(name: 'Microsoft 365', email: 'office@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Office dan Teams'),
+  DigitalAccount(name: 'E-Learning', email: 'elearning@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Moodle'),
 ];
 
 List<ActivityLog> dummyLogs = [];
