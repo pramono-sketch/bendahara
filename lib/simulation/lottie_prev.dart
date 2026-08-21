@@ -1,3 +1,4 @@
+// lib/simulation/lottie_prev.dart
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
@@ -51,6 +52,13 @@ class LottieAnimationGallery extends StatefulWidget {
       assetPath: 'assets/animations/ai animation Flow 1.json',
       category: 'AI',
       primaryColor: Color(0xFF3949AB),
+    ),
+    LottieAnimationItem(
+      name: 'Benefits',
+      description: 'Animasi keuntungan / benefit',
+      assetPath: 'assets/animations/Benefits.json',
+      category: 'Umum',
+      primaryColor: Color(0xFF43A047),
     ),
   ];
 
@@ -140,15 +148,13 @@ class _LottieAnimationGalleryState extends State<LottieAnimationGallery> {
           child: Column(
             children: [
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
                   decoration: InputDecoration(
                     hintText: 'Cari animasi...',
                     hintStyle: TextStyle(color: Colors.grey.shade500),
-                    prefixIcon:
-                        const Icon(Icons.search, color: Color(0xFF1976D2)),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF1976D2)),
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -158,13 +164,11 @@ class _LottieAnimationGalleryState extends State<LottieAnimationGallery> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide:
-                          BorderSide(color: Colors.grey.shade200, width: 1),
+                      borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
-                          color: Color(0xFF1976D2), width: 1.5),
+                      borderSide: const BorderSide(color: Color(0xFF1976D2), width: 1.5),
                     ),
                   ),
                 ),
@@ -183,27 +187,20 @@ class _LottieAnimationGalleryState extends State<LottieAnimationGallery> {
                       child: FilterChip(
                         label: Text(cat),
                         selected: isSelected,
-                        onSelected: (_) =>
-                            setState(() => _selectedCategory = cat),
+                        onSelected: (_) => setState(() => _selectedCategory = cat),
                         selectedColor: const Color(0xFF1976D2),
                         labelStyle: TextStyle(
                           color: isSelected ? Colors.white : Colors.grey.shade700,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                           fontSize: 13,
                         ),
                         backgroundColor: Colors.white,
                         side: BorderSide(
-                          color: isSelected
-                              ? const Color(0xFF1976D2)
-                              : Colors.grey.shade300,
+                          color: isSelected ? const Color(0xFF1976D2) : Colors.grey.shade300,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         showCheckmark: false,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                       ),
                     );
                   },
@@ -215,8 +212,7 @@ class _LottieAnimationGalleryState extends State<LottieAnimationGallery> {
                     ? _buildEmptyState()
                     : GridView.builder(
                         padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           mainAxisSpacing: 14,
                           crossAxisSpacing: 14,
@@ -233,14 +229,12 @@ class _LottieAnimationGalleryState extends State<LottieAnimationGallery> {
                       ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 color: Colors.white.withValues(alpha: 0.6),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.movie_filter_rounded,
-                        size: 16, color: Colors.grey.shade600),
+                    Icon(Icons.movie_filter_rounded, size: 16, color: Colors.grey.shade600),
                     const SizedBox(width: 6),
                     Text(
                       'Total: ${LottieAnimationGallery.animations.length} animasi • Lottie',
@@ -265,27 +259,16 @@ class _LottieAnimationGalleryState extends State<LottieAnimationGallery> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.search_off_rounded,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
+          Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade400),
           const SizedBox(height: 12),
           Text(
             'Animasi tidak ditemukan',
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 15, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
             'Coba kata kunci atau kategori lain',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade500,
-            ),
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           ),
         ],
       ),
@@ -320,8 +303,7 @@ class _AnimationCardState extends State<_AnimationCard>
 
   Future<void> _loadComposition() async {
     try {
-      final composition =
-          await AssetLottie(widget.item.assetPath).load();
+      final composition = await AssetLottie(widget.item.assetPath).load();
       if (!mounted) return;
       setState(() {
         _composition = composition;
@@ -374,11 +356,7 @@ class _AnimationCardState extends State<_AnimationCard>
                       children: [
                         Center(
                           child: _hasError
-                              ? Icon(
-                                  Icons.broken_image_rounded,
-                                  size: 40,
-                                  color: Colors.grey.shade400,
-                                )
+                              ? Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey.shade400)
                               : !_loaded
                                   ? SizedBox(
                                       width: 32,
@@ -392,16 +370,14 @@ class _AnimationCardState extends State<_AnimationCard>
                                       composition: _composition,
                                       repeat: true,
                                       fit: BoxFit.contain,
-                                      renderCache:
-                                          RenderCache.drawingCommands,
+                                      renderCache: RenderCache.drawingCommands,
                                     ),
                         ),
                         Positioned(
                           top: 8,
                           left: 8,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: widget.item.primaryColor,
                               borderRadius: BorderRadius.circular(8),
@@ -438,8 +414,7 @@ class _AnimationCardState extends State<_AnimationCard>
                   ),
                 ),
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -459,10 +434,7 @@ class _AnimationCardState extends State<_AnimationCard>
                         widget.item.description,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                       ),
                     ],
                   ),
@@ -482,8 +454,7 @@ class _LottieFullScreenViewer extends StatefulWidget {
   const _LottieFullScreenViewer({required this.item});
 
   @override
-  State<_LottieFullScreenViewer> createState() =>
-      _LottieFullScreenViewerState();
+  State<_LottieFullScreenViewer> createState() => _LottieFullScreenViewerState();
 }
 
 class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
@@ -506,8 +477,7 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
 
   Future<void> _loadComposition() async {
     try {
-      final composition =
-          await AssetLottie(widget.item.assetPath).load();
+      final composition = await AssetLottie(widget.item.assetPath).load();
       if (!mounted) return;
       setState(() {
         _composition = composition;
@@ -609,14 +579,12 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
           child: Column(
             children: [
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Row(
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_rounded,
-                          color: Colors.white),
+                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                     ),
                     Expanded(
                       child: Column(
@@ -647,8 +615,7 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                     ),
                     IconButton(
                       onPressed: _restart,
-                      icon: const Icon(Icons.refresh_rounded,
-                          color: Colors.white),
+                      icon: const Icon(Icons.refresh_rounded, color: Colors.white),
                       tooltip: 'Restart',
                     ),
                   ],
@@ -659,10 +626,7 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                   child: _hasError
                       ? _buildErrorView()
                       : !_loaded
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 3,
-                            )
+                          ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
                           : Padding(
                               padding: const EdgeInsets.all(24),
                               child: Lottie(
@@ -696,15 +660,10 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                               return SliderTheme(
                                 data: SliderTheme.of(context).copyWith(
                                   trackHeight: 4,
-                                  thumbShape:
-                                      const RoundSliderThumbShape(
-                                          enabledThumbRadius: 6),
-                                  overlayShape:
-                                      const RoundSliderOverlayShape(
-                                          overlayRadius: 12),
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                                   activeTrackColor: Colors.white,
-                                  inactiveTrackColor:
-                                      Colors.white.withValues(alpha: 0.3),
+                                  inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
                                   thumbColor: Colors.white,
                                 ),
                                 child: Slider(
@@ -745,9 +704,7 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _ControlButton(
-                        icon: _repeat
-                            ? Icons.repeat_rounded
-                            : Icons.repeat_one_rounded,
+                        icon: _repeat ? Icons.repeat_rounded : Icons.repeat_one_rounded,
                         label: _repeat ? 'Loop' : 'Once',
                         isActive: _repeat,
                         onPressed: _toggleRepeat,
@@ -769,9 +726,7 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                             ],
                           ),
                           child: Icon(
-                            _isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
+                            _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                             color: widget.item.primaryColor,
                             size: 36,
                           ),
@@ -787,8 +742,7 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                           _speedMenuItem(2.0),
                         ],
                         color: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: _ControlButton(
                           icon: Icons.speed_rounded,
                           label: '${_speed}x',
@@ -806,9 +760,7 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.2),
-                    ),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: Column(
                     children: [
@@ -816,15 +768,9 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
                       const SizedBox(height: 8),
                       _infoRow('Deskripsi', widget.item.description),
                       const SizedBox(height: 8),
-                      _infoRow(
-                        'Durasi',
-                        _formatDuration(_composition!.duration),
-                      ),
+                      _infoRow('Durasi', _formatDuration(_composition!.duration)),
                       const SizedBox(height: 8),
-                      _infoRow(
-                        'Status',
-                        _isPlaying ? 'Memutar' : 'Dijeda',
-                      ),
+                      _infoRow('Status', _isPlaying ? 'Memutar' : 'Dijeda'),
                     ],
                   ),
                 ),
@@ -843,23 +789,16 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
       child: Row(
         children: [
           Icon(
-            _speed == speed
-                ? Icons.radio_button_checked
-                : Icons.radio_button_unchecked,
+            _speed == speed ? Icons.radio_button_checked : Icons.radio_button_unchecked,
             size: 18,
-            color: _speed == speed
-                ? widget.item.primaryColor
-                : Colors.grey,
+            color: _speed == speed ? widget.item.primaryColor : Colors.grey,
           ),
           const SizedBox(width: 8),
           Text(
             '${speed}x',
             style: TextStyle(
-              fontWeight:
-                  _speed == speed ? FontWeight.w700 : FontWeight.w500,
-              color: _speed == speed
-                  ? widget.item.primaryColor
-                  : Colors.black87,
+              fontWeight: _speed == speed ? FontWeight.w700 : FontWeight.w500,
+              color: _speed == speed ? widget.item.primaryColor : Colors.black87,
             ),
           ),
         ],
@@ -867,27 +806,19 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
     );
   }
 
-  // PERBAIKAN ERROR DI SINI (Menutup kurung Text dengan benar)
   Widget _infoRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 12,
-          ),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
         ),
         Flexible(
           flex: 2,
           child: Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
             textAlign: TextAlign.end,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -903,19 +834,11 @@ class _LottieFullScreenViewerState extends State<_LottieFullScreenViewer>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.white,
-            size: 64,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.white, size: 64),
           const SizedBox(height: 16),
           const Text(
             'Gagal memuat animasi',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           if (_errorMessage != null)
@@ -965,19 +888,11 @@ class _ControlButton extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: isActive
-                  ? Colors.white.withValues(alpha: 0.25)
-                  : Colors.white.withValues(alpha: 0.12),
+              color: isActive ? Colors.white.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.12),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
             ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 22,
-            ),
+            child: Icon(icon, color: Colors.white, size: 22),
           ),
           const SizedBox(height: 6),
           Text(

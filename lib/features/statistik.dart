@@ -290,10 +290,8 @@ class StatistikPage extends StatelessWidget {
 
     for (int i = 5; i >= 0; i--) {
       int month = now.month - i;
-      int year = now.year;
       if (month <= 0) {
         month += 12;
-        year -= 1;
       }
       last6MonthLabels.add(monthLabels[month - 1]);
       // Ambil income dan expense

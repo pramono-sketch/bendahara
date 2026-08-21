@@ -1,6 +1,7 @@
 cd C:\project_flutter\bendahara\
 cd C:\project_flutter\bendahara\lib\
 tree /F /A > "C:\Users\Hype AMD\Archives\Structure three\struktur_bendahara.txt"
+notepad "C:\Users\Hype AMD\Archives\Structure three\struktur_bendahara.txt"
 
 <!-- gaji guru dan karyawan=berbeda tergantung jam mengajar -->
 1. Card konsisten
@@ -41,3 +42,7 @@ gaji guru:
 7. Membuat template
 
 1.aku berikan contoh setting.dart sebagai pages yang sudah aku include ui dan kuperbarui tampilanya untuk referensi anda.
+
+                            PR
+1. memperbaiki apperaence ai pages
+2. tema di bottom navigation

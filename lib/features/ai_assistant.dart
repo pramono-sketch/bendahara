@@ -16,11 +16,11 @@ final chatHistoryCollection = FirebaseFirestore.instance.collection('ai_chat_his
 
 // ===================== GEMINI SERVICE =====================
 final geminiServiceProvider = Provider<GeminiService>((ref) {
-  return GeminiService(apiKey: geminiApiKey, modelName: 'gemini-1.5-flash');
+  return GeminiService(apiKey: geminiApiKey, modelName: 'gemini-3.6-flash');
 });
 
 class GeminiService {
-  GeminiService({required this.apiKey, this.modelName = 'gemini-1.5-flash'})
+  GeminiService({required this.apiKey, this.modelName = 'gemini-3.6-flash'})
       : _model = GenerativeModel(model: modelName, apiKey: apiKey);
 
   final String apiKey;
@@ -96,63 +96,75 @@ class ChatSession {
   }
 }
 
-// ===================== MAIN PAGE =====================
-class AIAssistantPage extends ConsumerStatefulWidget {
-  const AIAssistantPage({super.key});
-  @override
-  ConsumerState<AIAssistantPage> createState() => _AIAssistantPageState();
-}
+// ===================== RIVERPOD STATE MANAGEMENT =====================
+// Memisahkan logic agar proses AI terus berjalan meski widget di dispose (pindah page)
+class AIChatState {
+  final List<ChatSession> sessions;
+  final String? currentSessionId;
+  final bool isLoading;
+  final bool isFetching;
 
-class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
-  final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  AIChatState({
+    this.sessions = const [],
+    this.currentSessionId,
+    this.isLoading = false,
+    this.isFetching = true,
+  });
 
-  List<ChatSession> _sessions = [];
-  String? _currentSessionId;
-  bool _isLoading = false;
-  bool _isFetching = true;
-
-  List<ChatMessage> get _messages {
-    if (_currentSessionId == null) return [];
-    final session = _sessions.firstWhere(
-      (s) => s.id == _currentSessionId,
+  // ─── TAMBAHKAN GETTER INI ───
+  List<ChatMessage> get currentMessages {
+    if (currentSessionId == null) return [];
+    final session = sessions.firstWhere(
+      (s) => s.id == currentSessionId,
       orElse: () => ChatSession(id: '', title: '', messages: const [], createdTime: DateTime.now()),
     );
     return session.messages;
   }
 
-  static const List<String> _suggestions = [
-    'Prediksi pemasukan bulan depan',
-    'Siswa paling berisiko menunggak',
-    'Rekomendasi efisiensi anggaran',
-    'Analisis tren pembayaran',
-  ];
+  AIChatState copyWith({
+    List<ChatSession>? sessions,
+    String? currentSessionId,
+    bool? isLoading,
+    bool? isFetching,
+    bool clearSessionId = false,
+  }) {
+    return AIChatState(
+      sessions: sessions ?? this.sessions,
+      currentSessionId: clearSessionId ? null : (currentSessionId ?? this.currentSessionId),
+      isLoading: isLoading ?? this.isLoading,
+      isFetching: isFetching ?? this.isFetching,
+    );
+  }
+}
 
-  @override
-  void initState() {
-    super.initState();
+class AIChatNotifier extends StateNotifier<AIChatState> {
+  final Ref ref;
+  AIChatNotifier(this.ref) : super(AIChatState()) {
     _loadSessionsFromFirestore();
   }
 
-  // ==================== FIRESTORE INTEGRATION ====================
+  List<ChatMessage> get currentMessages {
+    if (state.currentSessionId == null) return [];
+    final session = state.sessions.firstWhere(
+      (s) => s.id == state.currentSessionId,
+      orElse: () => ChatSession(id: '', title: '', messages: const [], createdTime: DateTime.now()),
+    );
+    return session.messages;
+  }
+
   Future<void> _loadSessionsFromFirestore() async {
     try {
       final snapshot = await chatHistoryCollection.get();
-      if (snapshot.docs.isEmpty) {
-        setState(() => _currentSessionId = null); // Tidak buat sesi kosong
-      } else {
-        _sessions = snapshot.docs.map((doc) => ChatSession.fromMap(doc.data())).toList();
-        _sessions.sort((a, b) => b.createdTime.compareTo(a.createdTime));
-        setState(() => _currentSessionId = _sessions.first.id);
-      }
+      final sessions = snapshot.docs.map((doc) => ChatSession.fromMap(doc.data())).toList();
+      sessions.sort((a, b) => b.createdTime.compareTo(a.createdTime));
+      
+      state = state.copyWith(
+        sessions: sessions,
+        isFetching: false,
+        clearSessionId: true, // Mulai dengan chat baru kosong
+      );
     } catch (e) {
-      setState(() => _currentSessionId = null);
-    } finally {
-      if (mounted) {
-        setState(() => _isFetching = false);
-        _scrollToBottom();
-      }
+      state = state.copyWith(isFetching: false, clearSessionId: true);
     }
   }
 
@@ -172,15 +184,15 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
     }
   }
 
-  // ==================== MANAJEMEN SESI ====================
-  void _startNewChat() {
-    setState(() {
-      _currentSessionId = null; // Set null agar history menyembunyikan chat kosong
-    });
-    Navigator.pop(context); // Tutup drawer
+  void startNewChat() {
+    state = state.copyWith(clearSessionId: true);
   }
 
-  ChatSession _createNewSessionForMessage() {
+  void switchSession(String sessionId) {
+    state = state.copyWith(currentSessionId: sessionId);
+  }
+
+  void _createNewSessionForMessage() {
     final now = DateTime.now();
     final id = 'session_${now.millisecondsSinceEpoch}';
     final newSession = ChatSession(
@@ -189,139 +201,129 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
       messages: [],
       createdTime: now,
     );
-    _sessions.insert(0, newSession);
-    _currentSessionId = id;
-    return newSession;
-  }
-
-  String _formatTime(DateTime dt) {
-    return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
-  void _switchSession(String sessionId) async {
-    if (_currentSessionId == sessionId) return;
-    await SoundHelper().playClick();
-    setState(() => _currentSessionId = sessionId);
-    Navigator.pop(context);
-    _scrollToBottom();
+    
+    // Masukkan ke depan, dan set sebagai sesi aktif
+    state = state.copyWith(
+      sessions: [newSession, ...state.sessions],
+      currentSessionId: id,
+    );
   }
 
   void _updateSessionTitle(String sessionId) {
-    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    final sessions = state.sessions;
+    final index = sessions.indexWhere((s) => s.id == sessionId);
     if (index == -1) return;
-    final session = _sessions[index];
+    
+    final session = sessions[index];
     if (session.messages.isNotEmpty && session.title == 'Chat baru') {
       final firstUserMsg = session.messages.firstWhere((m) => m.isUser, orElse: () => ChatMessage(text: 'Percakapan', isUser: false));
       if (firstUserMsg.isUser) {
         String newTitle = firstUserMsg.text;
         if (newTitle.length > 30) newTitle = newTitle.substring(0, 30) + '...';
-        _sessions[index] = session.copyWith(title: newTitle);
+        sessions[index] = session.copyWith(title: newTitle);
       }
     }
   }
 
-  void _deleteSession(String sessionId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus sesi'),
-        content: const Text('Yakin ingin menghapus percakapan ini?'),
-        actions: [
-          TextButton(
-            onPressed: () async { await SoundHelper().playClick(); if (mounted) Navigator.pop(ctx, false); },
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () async { await SoundHelper().playClick(); if (mounted) Navigator.pop(ctx, true); },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-
+  Future<void> deleteSession(String sessionId) async {
     await _deleteSessionFromFirestore(sessionId);
-
-    setState(() {
-      _sessions.removeWhere((s) => s.id == sessionId);
-      if (_sessions.isEmpty) {
-        _currentSessionId = null;
-      } else if (_currentSessionId == sessionId) {
-        _currentSessionId = _sessions.first.id;
-      }
-    });
-    _scrollToBottom();
+    
+    final sessions = state.sessions.where((s) => s.id != sessionId).toList();
+    state = state.copyWith(
+      sessions: sessions,
+      clearSessionId: state.currentSessionId == sessionId,
+    );
   }
 
-  // ==================== KIRIM PESAN ====================
-  Future<void> _sendMessage([String? quickPrompt]) async {
-    if (_isLoading) return;
-
-    final prompt = (quickPrompt ?? _controller.text).trim();
-    if (prompt.isEmpty) return;
-
-    FocusScope.of(context).unfocus();
+  Future<void> sendMessage(String prompt) async {
+    if (state.isLoading) return;
+    if (prompt.trim().isEmpty) return;
 
     // Buat sesi baru HANYA saat pesan pertama dikirim
-    bool isNewSession = false;
-    if (_currentSessionId == null || !_sessions.any((s) => s.id == _currentSessionId)) {
+    if (state.currentSessionId == null || !state.sessions.any((s) => s.id == state.currentSessionId)) {
       _createNewSessionForMessage();
-      isNewSession = true;
     }
 
+    final currentId = state.currentSessionId!;
     final userMsg = ChatMessage(text: prompt, isUser: true);
-    int sessionIndex = _sessions.indexWhere((s) => s.id == _currentSessionId);
+    
+    List<ChatSession> updatedSessions = List.from(state.sessions);
+    int sessionIndex = updatedSessions.indexWhere((s) => s.id == currentId);
     
     if (sessionIndex != -1) {
-      setState(() {
-        _sessions[sessionIndex] = _sessions[sessionIndex].copyWith(
-          messages: [..._sessions[sessionIndex].messages, userMsg],
-        );
-        _isLoading = true;
-        _controller.clear();
-      });
-      _updateSessionTitle(_currentSessionId!);
-      _saveSessionToFirestore(_sessions[sessionIndex]);
+      final targetSession = updatedSessions[sessionIndex];
+      final newMessages = [...targetSession.messages, userMsg];
+      
+      updatedSessions[sessionIndex] = targetSession.copyWith(messages: newMessages);
+      _updateSessionTitle(currentId);
+      
+      // Pindahkan sesi yang baru dikirim ke urutan paling atas (index 0)
+      final activeSession = updatedSessions.removeAt(sessionIndex);
+      updatedSessions.insert(0, activeSession);
+
+      state = state.copyWith(sessions: updatedSessions, isLoading: true);
+      _saveSessionToFirestore(updatedSessions.first);
     }
-    _scrollToBottom();
 
     try {
       final gemini = ref.read(geminiServiceProvider);
       final answer = await gemini.ask(prompt);
 
-      if (!mounted) return;
-
       final aiMsg = ChatMessage(text: answer, isUser: false);
-      sessionIndex = _sessions.indexWhere((s) => s.id == _currentSessionId);
+      updatedSessions = List.from(state.sessions);
+      sessionIndex = updatedSessions.indexWhere((s) => s.id == currentId);
+      
       if (sessionIndex != -1) {
-        setState(() {
-          _sessions[sessionIndex] = _sessions[sessionIndex].copyWith(
-            messages: [..._sessions[sessionIndex].messages, aiMsg],
-          );
-        });
-        _saveSessionToFirestore(_sessions[sessionIndex]);
+        updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(
+          messages: [...updatedSessions[sessionIndex].messages, aiMsg],
+        );
+        state = state.copyWith(sessions: updatedSessions);
+        _saveSessionToFirestore(updatedSessions[sessionIndex]);
       }
     } catch (e) {
-      if (!mounted) return;
-      sessionIndex = _sessions.indexWhere((s) => s.id == _currentSessionId);
+      updatedSessions = List.from(state.sessions);
+      sessionIndex = updatedSessions.indexWhere((s) => s.id == currentId);
       if (sessionIndex != -1) {
-        setState(() {
-          _sessions[sessionIndex] = _sessions[sessionIndex].copyWith(
-            messages: [
-              ..._sessions[sessionIndex].messages,
-              ChatMessage(text: '❌ Gagal menghubungi AI.\n$e', isUser: false),
-            ],
-          );
-        });
-        _saveSessionToFirestore(_sessions[sessionIndex]);
+        updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(
+          messages: [...updatedSessions[sessionIndex].messages, ChatMessage(text: '❌ Gagal menghubungi AI.\n$e', isUser: false)],
+        );
+        state = state.copyWith(sessions: updatedSessions);
+        _saveSessionToFirestore(updatedSessions[sessionIndex]);
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _scrollToBottom();
-      }
+      state = state.copyWith(isLoading: false);
     }
+  }
+}
+
+final aiChatProvider = StateNotifierProvider<AIChatNotifier, AIChatState>((ref) {
+  return AIChatNotifier(ref);
+});
+
+// ===================== MAIN PAGE =====================
+class AIAssistantPage extends ConsumerStatefulWidget {
+  const AIAssistantPage({super.key});
+  @override
+  ConsumerState<AIAssistantPage> createState() => _AIAssistantPageState();
+}
+
+class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  static const List<String> _suggestions = [
+    'Prediksi pemasukan bulan depan',
+    'Siswa paling berisiko menunggak',
+    'Rekomendasi efisiensi anggaran',
+    'Analisis tren pembayaran',
+  ];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _scrollToBottom() {
@@ -333,6 +335,17 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  Future<void> _sendMessage([String? quickPrompt]) async {
+    final prompt = (quickPrompt ?? _controller.text).trim();
+    if (prompt.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+    _controller.clear();
+
+    await ref.read(aiChatProvider.notifier).sendMessage(prompt);
+    _scrollToBottom();
   }
 
   // ==================== THEME HELPERS ====================
@@ -396,6 +409,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
 
   BoxDecoration _getThemedBubbleDecoration(AppThemeMode themeMode, ColorScheme colors, bool isUser) {
     if (isUser) {
+      // Bubble User selalu memakai warna primary dari tema aktif
       return BoxDecoration(
         color: colors.primary,
         borderRadius: BorderRadius.only(
@@ -407,7 +421,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
       );
     }
 
-    // AI Bubble mengikuti tema
+    // Bubble AI mengikuti dekorasi tema
     if (_isNeo(themeMode)) {
       return neumorphismDecoration(borderRadius: 20, isPressed: true);
     }
@@ -436,11 +450,32 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
     );
   }
 
+  Color _getThemedTextColor(AppThemeMode themeMode, ColorScheme colors, bool isUser) {
+    if (isUser) return colors.onPrimary;
+
+    // Jika tema memiliki warna khusus untuk teks gelap/terang
+    if (_isNeo(themeMode)) return AppColors.neoTextPrimary;
+    if (_isGlass(themeMode)) return AppColors.glassTextPrimary;
+    if (_isModern(themeMode)) return AppColors.modernTextPrimary;
+    if (_isAurora(themeMode)) return AppColors.auroraTextPrimary;
+    if (_isCyber(themeMode)) return AppColors.cyberTextPrimary;
+
+    return colors.onSurfaceVariant;
+  }
+
   // ==================== BUILD UI ====================
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final colors = Theme.of(context).colorScheme;
+    final chatState = ref.watch(aiChatProvider);
+
+    // Scroll ke bawah saat pesan berubah
+    ref.listen(aiChatProvider, (prev, next) {
+      if (prev?.currentMessages.length != next.currentMessages.length) {
+        _scrollToBottom();
+      }
+    });
 
     return _buildThemedBackground(
       themeMode,
@@ -466,22 +501,22 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
             tooltip: 'Riwayat Chat',
           ),
         ),
-        drawer: _buildDrawer(themeMode),
+        drawer: _buildDrawer(themeMode, chatState),
         body: SafeArea(
-          child: _isFetching
+          child: chatState.isFetching
               ? const Center(child: CircularProgressIndicator())
               : Column(
                   children: [
                     Expanded(
-                      child: _messages.isEmpty
+                      child: chatState.currentMessages.isEmpty
                           ? _buildEmptyState(themeMode)
                           : ListView.builder(
                               controller: _scrollController,
                               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                              itemCount: _messages.length + (_isLoading ? 1 : 0),
+                              itemCount: chatState.currentMessages.length + (chatState.isLoading ? 1 : 0),
                               itemBuilder: (context, index) {
-                                if (index < _messages.length) {
-                                  return _buildMessageBubble(_messages[index], themeMode);
+                                if (index < chatState.currentMessages.length) {
+                                  return _buildMessageBubble(chatState.currentMessages[index], themeMode);
                                 }
                                 return _buildTypingIndicator(themeMode);
                               },
@@ -496,7 +531,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
   }
 
   // ==================== DRAWER RIWAYAT CHAT ====================
-  Widget _buildDrawer(AppThemeMode themeMode) {
+  Widget _buildDrawer(AppThemeMode themeMode, AIChatState chatState) {
     final colors = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
 
@@ -515,18 +550,18 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
                 children: [
                   const Text('Riwayat Chat', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  Text('${_sessions.length} sesi tersimpan', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                  Text('${chatState.sessions.length} sesi tersimpan', style: const TextStyle(color: Colors.white70, fontSize: 14)),
                 ],
               ),
             ),
             Expanded(
-              child: _sessions.isEmpty
+              child: chatState.sessions.isEmpty
                   ? Center(child: Text('Belum ada history chat', style: theme.textTheme.bodyMedium))
                   : ListView.builder(
-                      itemCount: _sessions.length,
+                      itemCount: chatState.sessions.length,
                       itemBuilder: (context, index) {
-                        final session = _sessions[index];
-                        final isActive = session.id == _currentSessionId;
+                        final session = chatState.sessions[index];
+                        final isActive = session.id == chatState.currentSessionId;
                         return ListTile(
                           leading: Icon(Icons.chat_bubble_outline, color: isActive ? colors.primary : colors.outline),
                           title: Text(
@@ -540,11 +575,15 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
                             icon: const Icon(Icons.delete_outline, size: 20),
                             onPressed: () async {
                               await SoundHelper().playClick();
-                              _deleteSession(session.id);
+                              ref.read(aiChatProvider.notifier).deleteSession(session.id);
                             },
                             color: colors.outline,
                           ),
-                          onTap: () => _switchSession(session.id),
+                          onTap: () async {
+                            await SoundHelper().playClick();
+                            ref.read(aiChatProvider.notifier).switchSession(session.id);
+                            if (mounted) Navigator.pop(context);
+                          },
                         );
                       },
                     ),
@@ -555,7 +594,8 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   await SoundHelper().playClick();
-                  _startNewChat();
+                  ref.read(aiChatProvider.notifier).startNewChat();
+                  if (mounted) Navigator.pop(context);
                 },
                 icon: const Icon(Icons.add),
                 label: const Text('Chat Baru'),
@@ -634,8 +674,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final bgColor = isUser ? colors.primary : colors.surfaceContainerHighest;
-    final textColor = isUser ? colors.onPrimary : colors.onSurfaceVariant;
+    final textColor = _getThemedTextColor(themeMode, colors, isUser);
     final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
 
     return Align(
@@ -675,7 +714,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
           children: [
             SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: colors.primary)),
             const SizedBox(width: 12),
-            Text('AI sedang berpikir...', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
+            Text('AI sedang berpikir...', style: TextStyle(color: _getThemedTextColor(themeMode, colors, false), fontSize: 13)),
           ],
         ),
       ),
@@ -688,7 +727,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12), // Hapus perhitungan keyboard manual
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor.withOpacity(0.95),
         border: Border(top: BorderSide(color: _dividerColor(themeMode))),
@@ -717,7 +756,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
             height: 52,
             width: 52,
             child: ElevatedButton(
-              onPressed: _isLoading
+              onPressed: ref.read(aiChatProvider).isLoading
                   ? null
                   : () async {
                       await SoundHelper().playClick();
@@ -729,7 +768,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
                 backgroundColor: colors.primary,
                 foregroundColor: colors.onPrimary,
               ),
-              child: _isLoading
+              child: ref.watch(aiChatProvider).isLoading
                   ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: colors.onPrimary))
                   : const Icon(Icons.send_rounded),
             ),
@@ -739,10 +778,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  String _formatTime(DateTime dt) {
+    return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }

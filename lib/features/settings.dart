@@ -712,7 +712,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     contentPadding: EdgeInsets.zero,
                     onChanged: (value) {
                       if (value == null) return;
-                      ref.read(themeModeProvider.notifier).state = value;
+                      ref.read(themeModeProvider.notifier).setTheme(value);
                       Navigator.pop(ctx);
                     },
                   );

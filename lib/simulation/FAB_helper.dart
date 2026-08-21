@@ -9,6 +9,27 @@ import '../firebase/firestore_service.dart';
 import '../templates/sound_helper.dart';
 import '../features/ai_assistant.dart';
 
+// ================== AKUN DIGITAL & LOG (Dipindah ke sini) ==================
+List<DigitalAccount> defaultAccounts = [
+  DigitalAccount(name: 'Google Workspace', email: 'admin@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Email dan Drive'),
+  DigitalAccount(name: 'SiPendik', email: 'sipendik@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Sistem Informasi Pendidikan'),
+  DigitalAccount(name: 'Zoom Meeting', email: 'zoom@eduvest.sch.id', penanggungJawab: 'Waka Kurikulum', keterangan: 'Akun Zoom premium'),
+  DigitalAccount(name: 'Canva for Edu', email: 'canva@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Desain grafis'),
+  DigitalAccount(name: 'Bank Sekolah', email: 'bank@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Rekening operasional'),
+  DigitalAccount(name: 'Sistem Absensi', email: 'absensi@eduvest.sch.id', penanggungJawab: 'TU', keterangan: 'Absensi digital'),
+  DigitalAccount(name: 'Perpustakaan Digital', email: 'pustaka@eduvest.sch.id', penanggungJawab: 'Kepala Perpus', keterangan: 'E-book dan katalog'),
+  DigitalAccount(name: 'Website Sekolah', email: 'webmaster@eduvest.sch.id', penanggungJawab: 'IT Support', keterangan: 'Hosting dan domain'),
+  DigitalAccount(name: 'Youtube Edu', email: 'youtube@eduvest.sch.id', penanggungJawab: 'Humas', keterangan: 'Channel resmi'),
+  DigitalAccount(name: 'SMS Gateway', email: 'sms@eduvest.sch.id', penanggungJawab: 'Administrasi', keterangan: 'Notifikasi ke orang tua'),
+  DigitalAccount(name: 'Aplikasi Rapor', email: 'rapor@eduvest.sch.id', penanggungJawab: 'Waka Kurikulum', keterangan: 'E-rapor'),
+  DigitalAccount(name: 'Cloud Storage', email: 'cloud@eduvest.sch.id', penanggungJawab: 'IT Support', keterangan: 'Backup data'),
+  DigitalAccount(name: 'WhatsApp Business', email: 'wa@eduvest.sch.id', penanggungJawab: 'Humas', keterangan: 'Layanan chat'),
+  DigitalAccount(name: 'Microsoft 365', email: 'office@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Office dan Teams'),
+  DigitalAccount(name: 'E-Learning', email: 'elearning@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Moodle'),
+];
+
+List<ActivityLog> localLogs = [];
+
 class SimulasiHelper {
   // ============================================================
   // ================== SHOW SIMULATION DIALOG ==================
@@ -27,7 +48,8 @@ class SimulasiHelper {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
-          height: MediaQuery.of(parentContext).size.height * 0.75,
+          // Tinggi dikecilkan jadi 0.65 dari layar
+          height: MediaQuery.of(parentContext).size.height * 0.65,
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -53,7 +75,7 @@ class SimulasiHelper {
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -62,7 +84,7 @@ class SimulasiHelper {
                           Text(
                             'Mode Simulasi Data',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -78,7 +100,7 @@ class SimulasiHelper {
                   labelColor: AppColors.primary,
                   unselectedLabelColor: Colors.grey,
                   indicatorColor: AppColors.primary,
-                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   tabs: [
                     Tab(text: 'Siswa'),
                     Tab(text: 'Akademik'),
@@ -178,32 +200,6 @@ class SimulasiHelper {
   ) {
     final items = [
       {
-        'title': 'Naik Kelas',
-        'subtitle': 'X → XI, XI → XII',
-        'icon': Icons.upload_file,
-        'color': Colors.indigo,
-        'onTap': () => _executeAction(
-          parentContext, sheetContext, onUpdate, refreshCallback,
-          () async => await promoteStudentsFirestore(),
-          'Semua siswa telah naik kelas!', Colors.indigo, true,
-          confirmTitle: 'Naik Kelas',
-          confirmMsg: 'Semua siswa aktif akan naik kelas. Lanjutkan?',
-        ),
-      },
-      {
-        'title': 'Arsip Lulusan',
-        'subtitle': 'XII diarsipkan & nonaktif',
-        'icon': Icons.archive,
-        'color': Colors.brown,
-        'onTap': () => _executeAction(
-          parentContext, sheetContext, onUpdate, refreshCallback,
-          () async => await archiveGraduatedStudentsFirestore('Simulasi 2024'),
-          'Lulusan berhasil diarsipkan!', Colors.brown, true,
-          confirmTitle: 'Arsip Lulusan',
-          confirmMsg: 'Siswa kelas XII akan dinonaktifkan. Lanjutkan?',
-        ),
-      },
-      {
         'title': 'Bulan Baru',
         'subtitle': 'Hapus semua transaksi',
         'icon': Icons.calendar_month,
@@ -254,6 +250,19 @@ class SimulasiHelper {
         ),
       },
       {
+        'title': 'Hapus Akun Digital',
+        'subtitle': 'Kosongkan koleksi akun digital',
+        'icon': Icons.delete_forever,
+        'color': Colors.deepOrange,
+        'onTap': () => _executeAction(
+          parentContext, sheetContext, onUpdate, refreshCallback,
+          () async => await _clearAllAccounts(),
+          'Akun digital telah dihapus!', Colors.deepOrange, true,
+          confirmTitle: 'Hapus Akun Digital',
+          confirmMsg: 'Yakin ingin menghapus semua data akun digital?',
+        ),
+      },
+      {
         'title': 'Hapus Log Aktivitas',
         'subtitle': 'Bersihkan riwayat aktivitas',
         'icon': Icons.cleaning_services,
@@ -267,20 +276,34 @@ class SimulasiHelper {
         ),
       },
       {
-        'title': 'Reset Total DB',
-        'subtitle': 'Hapus siswa, transaksi & log',
+        'title': 'Hapus Total DB',
+        'subtitle': 'Hapus semua data (Kosong)',
         'icon': Icons.dangerous,
-        'color': Colors.black87,
+        'color': Colors.redAccent,
         'onTap': () => _executeAction(
           parentContext, sheetContext, onUpdate, refreshCallback,
           () async {
             await _clearAllStudents();
             await _clearAllTransactions();
+            await _clearAllAccounts();
             await _clearAllLogs();
           },
-          'Database telah direset total!', Colors.black87, true,
-          confirmTitle: 'RESET TOTAL DATABASE',
-          confirmMsg: 'PERINGATAN: Semua data siswa, transaksi, dan log akan hilang. Lanjutkan?',
+          'Semua database telah dikosongkan total!', Colors.redAccent, true,
+          confirmTitle: 'HAPUS TOTAL DATABASE',
+          confirmMsg: 'PERINGATAN: Semua data (siswa, transaksi, akun, log) akan dihapus permanen tanpa generate ulang. Lanjutkan?',
+        ),
+      },
+      {
+        'title': 'Reset & Generate DB',
+        'subtitle': 'Hapus semua & isi data sample',
+        'icon': Icons.restore,
+        'color': Colors.black87,
+        'onTap': () => _executeAction(
+          parentContext, sheetContext, onUpdate, refreshCallback,
+          () async => await _resetAndSeedAllDatabase(),
+          'Database telah direset & diisi ulang!', Colors.black87, true,
+          confirmTitle: 'RESET & GENERATE SEMUA DATABASE',
+          confirmMsg: 'PERINGATAN: Semua data akan dihapus dan ditimpa dengan data sample. Lanjutkan?',
         ),
       },
     ];
@@ -293,46 +316,48 @@ class SimulasiHelper {
 
   static Widget _buildGrid(List<Map<String, dynamic>> items) {
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.0,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        crossAxisCount: 3, // Diubah jadi 3 kolom agar tombol lebih kecil
+        childAspectRatio: 0.85,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
       ),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
         return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 1.5,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: InkWell(
             onTap: item['onTap'] as VoidCallback,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.all(12.0),
+              padding: const EdgeInsets.all(8.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: (item['color'] as Color).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      shape: BoxShape.circle,
                     ),
-                    child: Icon(item['icon'] as IconData, color: item['color'] as Color),
+                    child: Icon(item['icon'] as IconData, color: item['color'] as Color, size: 22),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 8),
                   Text(
                     item['title'] as String,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    maxLines: 1,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     item['subtitle'] as String,
-                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+                    textAlign: TextAlign.center,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -452,6 +477,46 @@ class SimulasiHelper {
       batch.delete(doc.reference);
     }
     await batch.commit();
+    localLogs.clear();
+  }
+
+  static Future<void> _clearAllAccounts() async {
+    final snapshot = await accountsCollection.get();
+    final batch = firestore.FirebaseFirestore.instance.batch();
+    for (var doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
+  static Future<void> _resetAndSeedAllDatabase() async {
+    // 1. Clear All Collections
+    await _clearAllStudents();
+    await _clearAllTransactions();
+    await _clearAllAccounts();
+    await _clearAllLogs();
+
+    // 2. Seed Students
+    final students = generateSampleStudents();
+    for (var s in students) {
+      await saveStudent(s);
+    }
+
+    // 3. Seed Transactions
+    generateSampleTransactions();
+    final allTransactions = <Transaction>[];
+    arsipTransaksi.forEach((key, list) => allTransactions.addAll(list));
+    allTransactions.addAll(localTransactions);
+    for (var t in allTransactions) {
+      await transactionsCollection.doc(t.id).set(t.toMap());
+    }
+    localTransactions.clear();
+    arsipTransaksi.clear();
+
+    // 4. Seed Digital Accounts
+    for (var acc in defaultAccounts) {
+      await accountsCollection.add(acc.toMap());
+    }
   }
 
   static Student _createRandomStudent() {
@@ -592,12 +657,12 @@ class AksiHelper {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             const Text(
               'Menu Cepat',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -665,6 +730,7 @@ class AksiHelper {
     );
   }
 
+  // Ukuran Tombol FAB Menu dikecilkan
   static Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -675,15 +741,15 @@ class AksiHelper {
       child: Column(
         children: [
           CircleAvatar(
-            radius: 28,
+            radius: 24,
             backgroundColor: AppColors.primary.withOpacity(0.1),
-            child: Icon(icon, color: AppColors.primary, size: 30),
+            child: Icon(icon, color: AppColors.primary, size: 26),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12),
+            style: const TextStyle(fontSize: 11),
           ),
         ],
       ),
@@ -761,7 +827,6 @@ class AksiHelper {
                     final description = descCtrl.text.trim();
                     final now = DateTime.now();
 
-                    // 🔥 PERBAIKAN: ganti dummyTransactions → localTransactions
                     localTransactions.insert(
                       0,
                       Transaction(
@@ -773,7 +838,6 @@ class AksiHelper {
                       ),
                     );
 
-                    // 🔥 PERBAIKAN: ganti dummyLogs → localLogs
                     localLogs.insert(
                       0,
                       ActivityLog(

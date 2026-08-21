@@ -545,27 +545,6 @@ class DigitalAccount {
   }
 }
 
-// ================== AKUN DIGITAL & LOG ==================
-List<DigitalAccount> defaultAccounts = [
-  DigitalAccount(name: 'Google Workspace', email: 'admin@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Email dan Drive'),
-  DigitalAccount(name: 'SiPendik', email: 'sipendik@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Sistem Informasi Pendidikan'),
-  DigitalAccount(name: 'Zoom Meeting', email: 'zoom@eduvest.sch.id', penanggungJawab: 'Waka Kurikulum', keterangan: 'Akun Zoom premium'),
-  DigitalAccount(name: 'Canva for Edu', email: 'canva@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Desain grafis'),
-  DigitalAccount(name: 'Bank Sekolah', email: 'bank@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Rekening operasional'),
-  DigitalAccount(name: 'Sistem Absensi', email: 'absensi@eduvest.sch.id', penanggungJawab: 'TU', keterangan: 'Absensi digital'),
-  DigitalAccount(name: 'Perpustakaan Digital', email: 'pustaka@eduvest.sch.id', penanggungJawab: 'Kepala Perpus', keterangan: 'E-book dan katalog'),
-  DigitalAccount(name: 'Website Sekolah', email: 'webmaster@eduvest.sch.id', penanggungJawab: 'IT Support', keterangan: 'Hosting dan domain'),
-  DigitalAccount(name: 'Youtube Edu', email: 'youtube@eduvest.sch.id', penanggungJawab: 'Humas', keterangan: 'Channel resmi'),
-  DigitalAccount(name: 'SMS Gateway', email: 'sms@eduvest.sch.id', penanggungJawab: 'Administrasi', keterangan: 'Notifikasi ke orang tua'),
-  DigitalAccount(name: 'Aplikasi Rapor', email: 'rapor@eduvest.sch.id', penanggungJawab: 'Waka Kurikulum', keterangan: 'E-rapor'),
-  DigitalAccount(name: 'Cloud Storage', email: 'cloud@eduvest.sch.id', penanggungJawab: 'IT Support', keterangan: 'Backup data'),
-  DigitalAccount(name: 'WhatsApp Business', email: 'wa@eduvest.sch.id', penanggungJawab: 'Humas', keterangan: 'Layanan chat'),
-  DigitalAccount(name: 'Microsoft 365', email: 'office@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Office dan Teams'),
-  DigitalAccount(name: 'E-Learning', email: 'elearning@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Moodle'),
-];
-
-List<ActivityLog> localLogs = [];
-
 // ================== INISIALISASI DATA (Lokal) ==================
 void initData() {
   generateSampleTransactions();

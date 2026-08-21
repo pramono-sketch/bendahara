@@ -3,6 +3,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ============================================================
 // ====================== APP COLORS ===========================
@@ -167,11 +168,35 @@ final systemBrightnessProvider =
     StateProvider<Brightness>((ref) => Brightness.light);
 
 // ============================================================
-// ====================== PROVIDERS ============================
+// ================== THEME NOTIFIER (PERSISTENT) ============
 // ============================================================
 
+class ThemeModeNotifier extends StateNotifier<AppThemeMode> {
+  ThemeModeNotifier() : super(AppThemeMode.system) {
+    _loadFromPrefs();
+  }
+
+  Future<void> _loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final index = prefs.getInt('appThemeMode') ?? AppThemeMode.system.index;
+    state = AppThemeMode.values[index];
+  }
+
+  Future<void> setTheme(AppThemeMode mode) async {
+    state = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('appThemeMode', mode.index);
+  }
+}
+
 final themeModeProvider =
-    StateProvider<AppThemeMode>((ref) => AppThemeMode.system);
+    StateNotifierProvider<ThemeModeNotifier, AppThemeMode>((ref) {
+  return ThemeModeNotifier();
+});
+
+// ============================================================
+// ====================== PROVIDERS ============================
+// ============================================================
 
 final themeDataProvider = Provider<ThemeData>((ref) {
   final mode = ref.watch(themeModeProvider);
