@@ -18,14 +18,43 @@ class ManageStudentsPage extends ConsumerStatefulWidget {
   const ManageStudentsPage({super.key});
 
   @override
-  ConsumerState<ManageStudentsPage> createState() =>
-      _ManageStudentsPageState();
+  ConsumerState<ManageStudentsPage> createState() => _ManageStudentsPageState();
 }
 
 class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   final ExcelImportManager _excelImporter = ExcelImportManager();
   
   String _filterKelas = 'Semua';
+  
+  // FIX: State lokal untuk menyimpan data siswa & loading
+  List<Student> _students = [];
+  bool _isLoading = true;
+
+  // FIX: Daftar filter kelas statis
+  final List<String> _kelasOptions = [
+    'Semua',
+    'X TKJ', 'X RPL', 'X TKR',
+    'XI TKJ', 'XI RPL', 'XI TKR',
+    'XII TKJ', 'XII RPL', 'XII TKR',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
+
+  // FIX: Fungsi untuk fetch data dari Firestore
+  Future<void> _loadStudents() async {
+    setState(() => _isLoading = true);
+    try {
+      _students = await fetchActiveStudents();
+    } catch (e) {
+      debugPrint("Error loading students: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   // ═════════════════════════════════════════════════════════════
   // ================== THEME HELPERS ==================
@@ -37,52 +66,36 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   bool _isAurora(AppThemeMode mode) => mode == AppThemeMode.aurora;
   bool _isCyber(AppThemeMode mode) => mode == AppThemeMode.cyberpunk;
 
-  Widget _buildThemedBackground({
-    required AppThemeMode themeMode,
-    required Widget child,
-  }) {
+  Widget _buildThemedBackground({required AppThemeMode themeMode, required Widget child}) {
     if (_isGlass(themeMode)) {
       return Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.glassBg1,
-              AppColors.glassBg2,
-              AppColors.glassBg3,
-            ],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: [AppColors.glassBg1, AppColors.glassBg2, AppColors.glassBg3],
             stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: child,
       );
     }
-
     if (_isAurora(themeMode)) {
       return Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.auroraBg,
-              AppColors.auroraBg2,
-              AppColors.auroraBg3,
-            ],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [AppColors.auroraBg, AppColors.auroraBg2, AppColors.auroraBg3],
             stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: child,
       );
     }
-
     if (_isCyber(themeMode)) {
       return Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 0.8,
+            center: Alignment.topCenter, radius: 0.8,
             colors: [
               AppColors.cyberBg,
               AppColors.cyberSurface.withValues(alpha: 0.5),
@@ -94,7 +107,6 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
         child: child,
       );
     }
-
     return child;
   }
 
@@ -107,58 +119,35 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     return Colors.transparent;
   }
 
-  Widget _buildSectionHeader({
-    required String title,
-    required AppThemeMode themeMode,
-  }) {
+  Widget _buildSectionHeader({required String title, required AppThemeMode themeMode}) {
     final colors = Theme.of(context).colorScheme;
-
     Color labelColor;
-    if (_isNeo(themeMode)) {
-      labelColor = AppColors.neoTextSecondary;
-    } else if (_isGlass(themeMode)) {
-      labelColor = Colors.white.withValues(alpha: 0.8);
-    } else if (_isModern(themeMode)) {
-      labelColor = AppColors.modernPrimary;
-    } else if (_isAurora(themeMode)) {
-      labelColor = AppColors.auroraAccent1;
-    } else if (_isCyber(themeMode)) {
-      labelColor = AppColors.cyberAccent1;
-    } else {
-      labelColor = colors.primary;
-    }
+    if (_isNeo(themeMode)) labelColor = AppColors.neoTextSecondary;
+    else if (_isGlass(themeMode)) labelColor = Colors.white.withValues(alpha: 0.8);
+    else if (_isModern(themeMode)) labelColor = AppColors.modernPrimary;
+    else if (_isAurora(themeMode)) labelColor = AppColors.auroraAccent1;
+    else if (_isCyber(themeMode)) labelColor = AppColors.cyberAccent1;
+    else labelColor = colors.primary;
 
     return Padding(
       padding: const EdgeInsets.only(left: 4, right: 4, top: 2, bottom: 2),
       child: Text(
         title.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.0,
-          color: labelColor,
-        ),
+        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 1.0, color: labelColor),
       ),
     );
   }
 
-  Widget _buildSectionGroup({
-    required AppThemeMode themeMode,
-    required List<Widget> children,
-  }) {
+  Widget _buildSectionGroup({required AppThemeMode themeMode, required List<Widget> children}) {
     if (_isNeo(themeMode)) {
       return Container(
         decoration: neumorphismDecoration(borderRadius: 22),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
         ),
       );
     }
-
     if (_isGlass(themeMode)) {
       return Container(
         decoration: glassmorphismDecoration(borderRadius: 20),
@@ -166,62 +155,43 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
           borderRadius: BorderRadius.circular(20),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
-            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
           ),
         ),
       );
     }
-
     if (_isModern(themeMode)) {
       return Container(
         decoration: modernDecoration(borderRadius: 24),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
         ),
       );
     }
-
     if (_isAurora(themeMode)) {
       return Container(
         decoration: auroraDecoration(borderRadius: 22),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
         ),
       );
     }
-
     if (_isCyber(themeMode)) {
       return Container(
         decoration: cyberpunkDecoration(borderRadius: 12),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
         ),
       );
     }
-
     return Card(
       elevation: 1,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
     );
   }
 
@@ -229,10 +199,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     if (_isNeo(themeMode)) {
       return Container(
         decoration: neumorphismDecoration(borderRadius: 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: child,
-        ),
+        child: ClipRRect(borderRadius: BorderRadius.circular(16), child: child),
       );
     }
     if (_isGlass(themeMode)) {
@@ -240,38 +207,26 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
         decoration: glassmorphismDecoration(borderRadius: 16),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: child,
-          ),
+          child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), child: child),
         ),
       );
     }
     if (_isModern(themeMode)) {
       return Container(
         decoration: modernDecoration(borderRadius: 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: child,
-        ),
+        child: ClipRRect(borderRadius: BorderRadius.circular(16), child: child),
       );
     }
     if (_isAurora(themeMode)) {
       return Container(
         decoration: auroraDecoration(borderRadius: 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: child,
-        ),
+        child: ClipRRect(borderRadius: BorderRadius.circular(16), child: child),
       );
     }
     if (_isCyber(themeMode)) {
       return Container(
         decoration: cyberpunkDecoration(borderRadius: 10),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: child,
-        ),
+        child: ClipRRect(borderRadius: BorderRadius.circular(10), child: child),
       );
     }
     return Card(
@@ -303,29 +258,25 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
             themeMode: themeMode,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    DefaultTextStyle(
-                      style: Theme.of(ctx).textTheme.titleLarge ?? const TextStyle(),
-                      child: title,
-                    ),
-                    const SizedBox(height: 20),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: content,
+                padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DefaultTextStyle(
+                        style: Theme.of(ctx).textTheme.titleLarge ?? const TextStyle(),
+                        child: title,
                       ),
-                    ),
-                    if (actions.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: actions,
-                      ),
+                      const SizedBox(height: 20),
+                      Flexible(child: SingleChildScrollView(child: content)),
+                      if (actions.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        Row(mainAxisAlignment: MainAxisAlignment.end, children: actions),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -342,10 +293,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   Future<void> _addLog(ActivityAction action, String detail) async {
     try {
       await addActivityLog(ActivityLog(
-        user: 'Admin',
-        action: action,
-        detail: detail,
-        timestamp: DateTime.now(),
+        user: 'Admin', action: action, detail: detail, timestamp: DateTime.now(),
       ));
     } catch (e) {
       debugPrint("Error adding log: $e");
@@ -356,11 +304,10 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   // ================== FUNGSI NAIK KELAS ==================
   // ═════════════════════════════════════════════════════════════
 
-  void _promoteClasses() {
+  Future<void> _promoteClasses() async {
     final TextEditingController folderController = TextEditingController();
 
-    showAppDialog(
-      
+    await showAppDialog(
       title: const Row(
         children: [
           Icon(Icons.arrow_upward, color: Colors.purple),
@@ -426,16 +373,16 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Kenaikan kelas berhasil! Arsip: "$folderName"')),
               );
+              
+              // FIX: Refresh data setelah berhasil naik kelas
+              _loadStudents();
             } catch (e) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Gagal: $e')),
               );
             }
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.purple,
-            foregroundColor: Colors.white,
-          ),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white),
           child: const Text('Ya, Naikkan Kelas'),
         ),
       ],
@@ -446,9 +393,8 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   // ================== KELOLA PEMBAYARAN ==================
   // ═════════════════════════════════════════════════════════════
 
-  void _managePayments() {
-    showAppDialog(
-      
+  Future<void> _managePayments() async {
+    await showAppDialog(
       title: const Text('Pilih Kelas'),
       content: SizedBox(
         width: double.maxFinite,
@@ -485,12 +431,11 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     );
   }
 
-  void _showPaymentEditor(String grade) {
+  Future<void> _showPaymentEditor(String grade) async {
     List<PaymentItem> currentList = defaultPaymentsByClass[grade] ?? [];
     List<PaymentItem> tempList = currentList.map((p) => p.copyWith()).toList();
 
-    showAppDialog(
-      
+    await showAppDialog(
       title: Text('Kelola Pembayaran Kelas $grade'),
       content: StatefulBuilder(
         builder: (ctx, setStateDialog) {
@@ -576,12 +521,11 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     );
   }
 
-  void _editPaymentItem(BuildContext context, PaymentItem item, Function(PaymentItem) onSaved) {
+  Future<void> _editPaymentItem(BuildContext context, PaymentItem item, Function(PaymentItem) onSaved) async {
     final TextEditingController nameController = TextEditingController(text: item.type);
     final TextEditingController amountController = TextEditingController(text: item.amount.toString());
 
-    showAppDialog(
-      
+    await showAppDialog(
       title: const Text('Edit Item Pembayaran'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -632,12 +576,11 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     );
   }
 
-  void _addNewPaymentItem(BuildContext context, Function(PaymentItem) onAdd) {
+  Future<void> _addNewPaymentItem(BuildContext context, Function(PaymentItem) onAdd) async {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController amountController = TextEditingController();
 
-    showAppDialog(
-      
+    await showAppDialog(
       title: const Text('Tambah Item Pembayaran'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -687,13 +630,12 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   // ================== FUNGSI CRUD SISWA (FIRESTORE) ==================
   // ═════════════════════════════════════════════════════════════
 
-  void _showAddStudentDialog() {
+  Future<void> _showAddStudentDialog() async {
     final formKey = GlobalKey<FormState>();
     String name = '', nis = '', alamat = '', phone = '';
     String? selectedKelas;
 
-    showAppDialog(
-      
+    await showAppDialog(
       title: const Row(
         children: [
           Icon(Icons.person_add, color: Colors.blue),
@@ -766,6 +708,9 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
                 await saveStudent(newStudent);
                 await _addLog(ActivityAction.tambah, 'Menambah siswa $name');
                 if (mounted) Navigator.pop(context);
+                
+                // FIX: Refresh data setelah dialog ditutup
+                _loadStudents();
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -781,7 +726,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     );
   }
 
-  void _showEditStudentDialog(Student student) {
+  Future<void> _showEditStudentDialog(Student student) async {
     final formKey = GlobalKey<FormState>();
     String name = student.name;
     String nis = student.nis;
@@ -790,8 +735,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     String? selectedKelas = student.kelas;
     String selectedGender = getExtraInfo(student.id, 'jenisKelamin');
 
-    showAppDialog(
-      
+    await showAppDialog(
       title: const Row(
         children: [
           Icon(Icons.edit, color: Colors.orange),
@@ -877,6 +821,9 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
                 await saveStudent(student);
                 await _addLog(ActivityAction.edit, 'Mengedit siswa $name');
                 if (mounted) Navigator.pop(context);
+                
+                // FIX: Refresh data setelah dialog ditutup
+                _loadStudents();
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -892,9 +839,8 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     );
   }
 
-  void _deleteStudent(Student student) {
-    showAppDialog(
-      
+  Future<void> _deleteStudent(Student student) async {
+    await showAppDialog(
       title: const Row(
         children: [
           Icon(Icons.warning, color: Colors.red),
@@ -918,6 +864,9 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
               await deleteStudent(student.id);
               await _addLog(ActivityAction.hapus, 'Menghapus siswa ${student.name}');
               if (mounted) Navigator.pop(context);
+              
+              // FIX: Refresh data setelah dialog ditutup
+              _loadStudents();
             } catch (e) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -926,22 +875,18 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
               }
             }
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-          ),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
           child: const Text('Hapus'),
         ),
       ],
     );
   }
 
-  void _showAddClassXDialog() {
+  Future<void> _showAddClassXDialog() async {
     int tkjCount = 5, rplCount = 5, tkrCount = 5;
     final formKey = GlobalKey<FormState>();
 
-    showAppDialog(
-      
+    await showAppDialog(
       title: const Row(
         children: [
           Icon(Icons.group_add, color: Colors.teal),
@@ -1021,6 +966,9 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
                 await _addLog(ActivityAction.tambah, 'Menambah kelas X (TKJ:$tkjCount, RPL:$rplCount, TKR:$tkrCount)');
                 
                 if (mounted) Navigator.pop(context);
+                
+                // FIX: Refresh data setelah dialog ditutup
+                _loadStudents();
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1080,12 +1028,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     );
   }
 
-  Widget _buildStatItem({
-    required String label,
-    required String value,
-    required Color color,
-    required IconData icon,
-  }) {
+  Widget _buildStatItem({required String label, required String value, required Color color, required IconData icon}) {
     return Expanded(
       child: Column(
         children: [
@@ -1098,10 +1041,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
             child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
-          ),
+          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 2),
           Text(label, style: Theme.of(context).textTheme.labelMedium),
         ],
@@ -1110,12 +1050,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   }
 
   Widget _buildStatDivider(AppThemeMode mode) {
-    return Container(
-      width: 1,
-      height: 50,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: _dividerColor(mode),
-    );
+    return Container(width: 1, height: 50, margin: const EdgeInsets.symmetric(horizontal: 4), color: _dividerColor(mode));
   }
 
   Widget _buildQuickActionsSection(AppThemeMode themeMode) {
@@ -1123,7 +1058,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
 
     final actions = <_ActionItem>[
       _ActionItem(icon: Icons.person_add, label: 'Tambah', color: colors.primary, onTap: _showAddStudentDialog),
-      _ActionItem(icon: Icons.upload_file, label: 'Import', color: Colors.teal, onTap: () => _excelImporter.showImportFileDialog(context)),
+      _ActionItem(icon: Icons.upload_file, label: 'Import', color: Colors.teal, onTap: () => _excelImporter.showImportFileDialog(context).then((_) => _loadStudents())), // Refresh setelah import
       _ActionItem(icon: Icons.menu_book, label: 'Petunjuk', color: Colors.indigo, onTap: _showGuideDialog),
       _ActionItem(icon: Icons.group_add_outlined, label: 'Kelas X', color: Colors.orange, onTap: _showAddClassXDialog),
       _ActionItem(icon: Icons.payment, label: 'Bayaran', color: Colors.deepPurple, onTap: _managePayments),
@@ -1185,7 +1120,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
     );
   }
 
-  Widget _buildFilterSection(AppThemeMode themeMode, List<String> kelasOptions) {
+  Widget _buildFilterSection(AppThemeMode themeMode) {
     return _buildSectionGroup(
       themeMode: themeMode,
       children: [
@@ -1194,10 +1129,10 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            itemCount: kelasOptions.length,
+            itemCount: _kelasOptions.length,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
-              final kelas = kelasOptions[index];
+              final kelas = _kelasOptions[index];
               final isSelected = _filterKelas == kelas;
               final colors = Theme.of(context).colorScheme;
 
@@ -1214,10 +1149,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
                     decoration: BoxDecoration(
                       color: isSelected ? colors.primary : colors.primary.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? colors.primary : Colors.transparent,
-                        width: 1,
-                      ),
+                      border: Border.all(color: isSelected ? colors.primary : Colors.transparent, width: 1),
                     ),
                     child: Center(
                       child: Text(
@@ -1367,6 +1299,10 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
 
+    final filteredStudents = _filterKelas == 'Semua'
+        ? _students
+        : _students.where((s) => s.kelas == _filterKelas).toList();
+
     return _buildThemedBackground(
       themeMode: themeMode,
       child: Scaffold(
@@ -1392,7 +1328,7 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
               icon: const Icon(Icons.upload_file_outlined),
               onPressed: () async {
                 await SoundHelper().playClick();
-                _excelImporter.showImportFileDialog(context);
+                _excelImporter.showImportFileDialog(context).then((_) => _loadStudents());
               },
               tooltip: 'Import Excel',
             ),
@@ -1424,36 +1360,17 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
             ),
           ],
         ),
-        body: FutureBuilder<List<Student>>(
-          future: fetchActiveStudents(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text('Error memuat data: ${snapshot.error}'));
-            }
-
-            final allStudents = snapshot.data ?? [];
-            final kelasOptions = ['Semua', ...{for (var s in allStudents) s.kelas}];
-
-            final filteredStudents = _filterKelas == 'Semua'
-                ? allStudents
-                : allStudents.where((s) => s.kelas == _filterKelas).toList();
-
-            return RefreshIndicator(
-              onRefresh: () async {
-                setState(() {}); // Trigger rebuild to refetch
-              },
+        // FIX: Hapus FutureBuilder, gunakan state lokal _isLoading
+        body: _isLoading 
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadStudents,
               child: CustomScrollView(
                 slivers: [
-                  // ─── STATISTIK ───
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                    sliver: SliverToBoxAdapter(child: _buildStatsSection(themeMode, allStudents)),
+                    sliver: SliverToBoxAdapter(child: _buildStatsSection(themeMode, _students)),
                   ),
-
-                  // ─── AKSI CEPAT ───
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     sliver: SliverToBoxAdapter(child: _buildSectionHeader(title: 'Aksi Cepat', themeMode: themeMode)),
@@ -1462,18 +1379,14 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     sliver: SliverToBoxAdapter(child: _buildQuickActionsSection(themeMode)),
                   ),
-
-                  // ─── FILTER ───
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     sliver: SliverToBoxAdapter(child: _buildSectionHeader(title: 'Filter Kelas', themeMode: themeMode)),
                   ),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    sliver: SliverToBoxAdapter(child: _buildFilterSection(themeMode, kelasOptions)),
+                    sliver: SliverToBoxAdapter(child: _buildFilterSection(themeMode)),
                   ),
-
-                  // ─── DAFTAR SISWA ───
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     sliver: SliverToBoxAdapter(
@@ -1500,17 +1413,11 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
                   ),
                 ],
               ),
-            );
-          },
-        ),
+            ),
       ),
     );
   }
 }
-
-// ============================================================
-// ================== HELPER CLASS ==================
-// ============================================================
 
 class _ActionItem {
   final IconData icon;

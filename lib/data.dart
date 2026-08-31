@@ -545,6 +545,9 @@ class DigitalAccount {
   }
 }
 
+// ================== AKUN DIGITAL & LOG ==================
+List<ActivityLog> localLogs = []; // Dipindah kembali ke sini agar tidak crash
+
 // ================== INISIALISASI DATA (Lokal) ==================
 void initData() {
   generateSampleTransactions();

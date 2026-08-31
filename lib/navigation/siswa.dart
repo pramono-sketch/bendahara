@@ -1,7 +1,7 @@
 // navigation/siswa.dart
 import 'package:flutter/material.dart';
 
-import '../constants/appearance.dart'; // 🔥 import warna
+import '../constants/appearance.dart';
 import '../data.dart';
 import '../firebase/firestore_service.dart';
 import '../templates/sound_helper.dart';
@@ -32,23 +32,20 @@ class _StudentsPageState extends State<StudentsPage> {
   String _searchQuery = '';
   String _filterKelas = 'Semua';
 
-  // Stream untuk data siswa aktif
   Stream<List<Student>> get _studentsStream {
     return studentsCollection
         .where('isActive', isEqualTo: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-    .map((doc) => Student.fromMap(doc.data()))
-    .toList();
-        });
+      return snapshot.docs
+          .map((doc) => Student.fromMap(doc.data()))
+          .toList();
+    });
   }
 
-  // Ambil daftar kelas unik untuk filter
   Future<List<String>> _getKelasOptions() async {
-    final snapshot = await studentsCollection
-        .where('isActive', isEqualTo: true)
-        .get();
+    final snapshot =
+        await studentsCollection.where('isActive', isEqualTo: true).get();
     final set = <String>{};
     for (var doc in snapshot.docs) {
       final data = doc.data();
@@ -137,7 +134,6 @@ class _StudentsPageState extends State<StudentsPage> {
                 }
 
                 final allStudents = snapshot.data!;
-                // Filter berdasarkan query dan kelas
                 final filtered = allStudents.where((s) {
                   final query = _searchQuery.toLowerCase();
                   bool matchName = s.name.toLowerCase().contains(query);
@@ -223,118 +219,468 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 }
 
-// ================== HALAMAN ARSIP ROOT ==================
-class ArchiveRootPage extends StatelessWidget {
+// ============================================================
+// ================== HALAMAN ARSIP ROOT ======================
+// Menampilkan daftar folder arsip (tahun ajaran) dari Firebase
+// ============================================================
+class ArchiveRootPage extends StatefulWidget {
   const ArchiveRootPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Kita ambil semua siswa dengan isActive = false, lalu kelompokkan berdasarkan tahun arsip (field tahunArsip)
-    // Untuk sederhana, kita asumsikan field 'tahunArsip' ada, atau kita bisa kelompokkan berdasarkan kelas XII dan set isActive false.
-    // Di sini kita gunakan Stream untuk siswa tidak aktif.
-    return Scaffold(
-      appBar: AppBar(title: const Text('Arsip Siswa')),
-      body: StreamBuilder<List<Student>>(
-        stream: studentsCollection
-            .where('isActive', isEqualTo: false)
-            .snapshots()
-            .map(
-              (snapshot) => snapshot.docs
-                  .map((doc) => Student.fromMap(doc.data()))
-                  .toList(),
-            ),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData)
-            return const Center(child: CircularProgressIndicator());
-          final arsip = snapshot.data!;
-          if (arsip.isEmpty)
-            return const Center(child: Text('Belum ada arsip'));
-
-          // Kelompokkan berdasarkan tahunArsip (jika ada) atau berdasarkan kelas
-          Map<String, List<Student>> grouped = {};
-          for (var s in arsip) {
-            // Kita asumsikan ada field tahunArsip, atau kita buat dari kelas?
-            // Untuk demo, kita pakai 'XII' sebagai kelompok.
-            String key = s.kelas; // atau ambil dari field tahunArsip jika ada
-            grouped.putIfAbsent(key, () => []).add(s);
-          }
-          final tahunKeys = grouped.keys.toList()..sort();
-
-          return ListView.builder(
-            itemCount: tahunKeys.length,
-            itemBuilder: (context, index) {
-              final key = tahunKeys[index];
-              final list = grouped[key]!;
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.folder, color: Colors.amber),
-                  title: Text(key),
-                  subtitle: Text('${list.length} siswa'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    SoundHelper().playClick();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ArchiveStudentListPage(siswaList: list),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
+  State<ArchiveRootPage> createState() => _ArchiveRootPageState();
 }
 
-// ================== HALAMAN ARSIP PER KELAS ==================
-class ArchiveStudentListPage extends StatelessWidget {
-  final List<Student> siswaList;
-  const ArchiveStudentListPage({super.key, required this.siswaList});
+class _ArchiveRootPageState extends State<ArchiveRootPage> {
+  List<Map<String, dynamic>> _folders = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFolders();
+  }
+
+  Future<void> _loadFolders() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      _folders = await fetchArchiveFolders();
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Arsip Siswa')),
-      body: ListView.builder(
-        itemCount: siswaList.length,
-        itemBuilder: (context, index) {
-          final s = siswaList[index];
-          return Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.grey.withOpacity(0.3),
-                child: Text(
-                  s.name[0],
-                  style: const TextStyle(color: Colors.grey),
-                ),
-              ),
-              title: Text(s.name),
-              subtitle: Text('NIS: ${s.nis} • ${s.kelas}'),
-              trailing: IconButton(
-                icon: const Icon(Icons.remove_red_eye, color: Colors.grey),
-                onPressed: () {
-                  SoundHelper().playClick();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Siswa sudah lulus (arsip)')),
-                  );
-                },
-              ),
-            ),
-          );
-        },
+      appBar: AppBar(
+        title: const Text('Arsip Siswa'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              SoundHelper().playClick();
+              _loadFolders();
+            },
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('Error: $_errorMessage'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadFolders,
+                        child: const Text('Coba Lagi'),
+                      ),
+                    ],
+                  ),
+                )
+              : _folders.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.archive_outlined,
+                              size: 64, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Belum ada arsip',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Arsip akan muncul setelah melakukan\nkenaikan kelas di menu Manajemen Data Siswa',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadFolders,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _folders.length,
+                        itemBuilder: (context, index) {
+                          final folder = _folders[index];
+                          final name = folder['name'] as String;
+                          final count = folder['count'] as int;
+
+                          return Card(
+                            elevation: 2,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.folder,
+                                    color: Colors.amber, size: 32),
+                              ),
+                              title: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              subtitle: Text('$count siswa diarsipkan'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () {
+                                SoundHelper().playClick();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ArchiveMajorsPage(
+                                        tahunArsip: name),
+                                  ),
+                                ).then((_) => _loadFolders());
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
     );
   }
 }
 
-// ================== HALAMAN DETAIL SISWA ==================
+// ============================================================
+// ================== HALAMAN ARSIP PER JURUSAN ===============
+// Menampilkan daftar jurusan dalam tahun arsip tertentu
+// ============================================================
+class ArchiveMajorsPage extends StatefulWidget {
+  final String tahunArsip;
+  const ArchiveMajorsPage({super.key, required this.tahunArsip});
+
+  @override
+  State<ArchiveMajorsPage> createState() => _ArchiveMajorsPageState();
+}
+
+class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
+  List<Map<String, dynamic>> _majors = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMajors();
+  }
+
+  Future<void> _loadMajors() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      _majors = await fetchMajorsInArchive(widget.tahunArsip);
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Warna berdasarkan jurusan
+  Color _getMajorColor(String major) {
+    switch (major) {
+      case 'TKJ':
+        return Colors.red;
+      case 'RPL':
+        return Colors.green;
+      case 'TKR':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getMajorIcon(String major) {
+    switch (major) {
+      case 'TKJ':
+        return Icons.computer;
+      case 'RPL':
+        return Icons.code;
+      case 'TKR':
+        return Icons.build;
+      default:
+        return Icons.school;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Arsip ${widget.tahunArsip}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              SoundHelper().playClick();
+              _loadMajors();
+            },
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('Error: $_errorMessage'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadMajors,
+                        child: const Text('Coba Lagi'),
+                      ),
+                    ],
+                  ),
+                )
+              : _majors.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.folder_off,
+                              size: 64, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          const Text('Tidak ada jurusan ditemukan'),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadMajors,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _majors.length,
+                        itemBuilder: (context, index) {
+                          final major = _majors[index];
+                          final name = major['name'] as String;
+                          final count = major['count'] as int;
+                          final color = _getMajorColor(name);
+
+                          return Card(
+                            elevation: 2,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: color.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(_getMajorIcon(name),
+                                    color: color, size: 28),
+                              ),
+                              title: Text(
+                                'Jurusan $name',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              subtitle: Text('$count siswa'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () {
+                                SoundHelper().playClick();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ArchiveStudentListPage(
+                                      tahunArsip: widget.tahunArsip,
+                                      jurusan: name,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+    );
+  }
+}
+
+// ============================================================
+// ================== HALAMAN DAFTAR SISWA ARSIP ==============
+// Menampilkan daftar siswa dalam tahun arsip & jurusan tertentu
+// ============================================================
+class ArchiveStudentListPage extends StatefulWidget {
+  final String tahunArsip;
+  final String jurusan;
+
+  const ArchiveStudentListPage({
+    super.key,
+    required this.tahunArsip,
+    required this.jurusan,
+  });
+
+  @override
+  State<ArchiveStudentListPage> createState() =>
+      _ArchiveStudentListPageState();
+}
+
+class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
+  List<Student> _students = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      _students =
+          await fetchArchivedStudents(widget.tahunArsip, widget.jurusan);
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${widget.jurusan} - ${widget.tahunArsip}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              SoundHelper().playClick();
+              _loadStudents();
+            },
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('Error: $_errorMessage'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadStudents,
+                        child: const Text('Coba Lagi'),
+                      ),
+                    ],
+                  ),
+                )
+              : _students.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.people_outline,
+                              size: 64, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          const Text('Tidak ada siswa arsip'),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadStudents,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _students.length,
+                        itemBuilder: (context, index) {
+                          final s = _students[index];
+                          final majorColor = getMajorColor(s.kelas);
+
+                          return Card(
+                            elevation: 1,
+                            margin: const EdgeInsets.only(bottom: 6),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.grey.withOpacity(0.3),
+                                child: Text(
+                                  s.name.isNotEmpty
+                                      ? s.name[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                              title: Text(s.name),
+                              subtitle:
+                                  Text('NIS: ${s.nis} • ${s.kelas}'),
+                              trailing: const Icon(Icons.chevron_right,
+                                  color: Colors.grey),
+                              onTap: () {
+                                SoundHelper().playClick();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => StudentDetailPage(
+                                      student: s,
+                                      isArchived: true,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+    );
+  }
+}
+
+// ============================================================
+// ================== HALAMAN DETAIL SISWA ====================
+// Support isArchived: true untuk siswa arsip (read-only)
+// ============================================================
 class StudentDetailPage extends StatefulWidget {
   final Student student;
-  const StudentDetailPage({super.key, required this.student});
+  final bool isArchived;
+
+  const StudentDetailPage({
+    super.key,
+    required this.student,
+    this.isArchived = false,
+  });
 
   @override
   State<StudentDetailPage> createState() => _StudentDetailPageState();
@@ -352,6 +698,9 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 
   // ========== FUNGSI PEMBAYARAN CEPAT ==========
   void _quickPayment() async {
+    // Jangan lakukan apapun jika siswa sudah diarsipkan
+    if (widget.isArchived) return;
+
     final input = _quickPayController.text.trim();
     if (input.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -367,7 +716,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
       return;
     }
 
-    // Proses pembayaran (sama seperti sebelumnya)
     setState(() {
       List<PaymentItem> unpaid = student.payments
           .where((p) => p.status != PaymentStatus.lunas && p.type != 'Saldo')
@@ -398,7 +746,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             ),
           );
         }
-        // Tambah transaksi
         _addTransaction(
           TransType.pemasukan,
           'Saldo tabungan - ${student.name}',
@@ -527,7 +874,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 
   void _addTransaction(TransType type, String desc, double amount) {
     final t = Transaction(
-      id: 'TRX${DateTime.now().millisecondsSinceEpoch}', // ID unik
+      id: 'TRX${DateTime.now().millisecondsSinceEpoch}',
       type: type,
       amount: amount,
       description: desc,
@@ -538,11 +885,16 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   }
 
   Future<void> _saveStudentToFirestore() async {
+    // Jangan simpan jika siswa sudah diarsipkan
+    if (widget.isArchived) return;
     await saveStudent(student);
   }
 
   // ========== TOGGLE PEMBAYARAN ==========
   void _togglePayment(int index) async {
+    // Jangan lakukan apapun jika siswa sudah diarsipkan
+    if (widget.isArchived) return;
+
     setState(() {
       final item = student.payments[index];
       if (item.type == 'Saldo') {
@@ -592,13 +944,43 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(student.name),
-        backgroundColor: getMajorColor(student.kelas),
+        backgroundColor: widget.isArchived
+            ? Colors.grey
+            : getMajorColor(student.kelas),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Banner jika siswa sudah diarsipkan
+            if (widget.isArchived)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade400),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.archive, color: Colors.grey.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Siswa ini sudah lulus dan diarsipkan. '
+                        'Data hanya bisa dilihat (read-only).',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -623,58 +1005,60 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pembayaran Cepat',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _quickPayController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: 'Masukkan nominal',
-                              border: OutlineInputBorder(),
-                              prefixText: 'Rp ',
+            // Card Pembayaran Cepat — hanya tampil jika BUKAN arsip
+            if (!widget.isArchived)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pembayaran Cepat',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _quickPayController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                hintText: 'Masukkan nominal',
+                                border: OutlineInputBorder(),
+                                prefixText: 'Rp ',
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            SoundHelper().playClick();
-                            _quickPayment();
-                          },
-                          icon: const Icon(Icons.payment),
-                          label: const Text('Bayar'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              SoundHelper().playClick();
+                              _quickPayment();
+                            },
+                            icon: const Icon(Icons.payment),
+                            label: const Text('Bayar'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Nominal akan dialokasikan ke semua tagihan yang belum lunas. Kelebihan akan menjadi saldo tabungan.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Nominal akan dialokasikan ke semua tagihan yang belum lunas. Kelebihan akan menjadi saldo tabungan.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+            if (!widget.isArchived) const SizedBox(height: 16),
             Text(
               'Riwayat Pembayaran',
               style: Theme.of(context).textTheme.titleMedium,
@@ -692,18 +1076,14 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                       payment.status == PaymentStatus.lunas
                           ? Icons.check_circle
                           : payment.status == PaymentStatus.sebagian
-                          ? Icons.remove_circle_outline
-                          : Icons.cancel_outlined,
+                              ? Icons.remove_circle_outline
+                              : Icons.cancel_outlined,
                       color: _statusColor(payment.status),
                     ),
                   ),
                   title: Text(payment.type),
                   subtitle: Text(
-                    'Rp ${formatCurrency(payment.amount)} • ${payment.status == PaymentStatus.lunas
-                        ? 'Lunas'
-                        : payment.status == PaymentStatus.sebagian
-                        ? 'Sebagian'
-                        : 'Belum Bayar'}',
+                    'Rp ${formatCurrency(payment.amount)} • ${payment.status == PaymentStatus.lunas ? 'Lunas' : payment.status == PaymentStatus.sebagian ? 'Sebagian' : 'Belum Bayar'}',
                   ),
                   trailing: payment.type == 'Saldo'
                       ? Text(
@@ -714,14 +1094,25 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                           ),
                         )
                       : payment.status == PaymentStatus.lunas
-                      ? const Icon(Icons.check_circle, color: AppColors.success)
-                      : TextButton(
-                          onPressed: () {
-                            SoundHelper().playClick();
-                            _togglePayment(idx);
-                          },
-                          child: const Text('Lunas'),
-                        ),
+                          ? const Icon(Icons.check_circle,
+                              color: AppColors.success)
+                          : widget.isArchived
+                              ? Text(
+                                  payment.status == PaymentStatus.sebagian
+                                      ? 'Sebagian'
+                                      : 'Belum Bayar',
+                                  style: TextStyle(
+                                    color: _statusColor(payment.status),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : TextButton(
+                                  onPressed: () {
+                                    SoundHelper().playClick();
+                                    _togglePayment(idx);
+                                  },
+                                  child: const Text('Lunas'),
+                                ),
                 ),
               );
             }).toList(),
@@ -752,8 +1143,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                       color: student.remaining > 0
                           ? AppColors.error
                           : student.remaining < 0
-                          ? AppColors.success
-                          : AppColors.textSecondary,
+                              ? AppColors.success
+                              : AppColors.textSecondary,
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -804,7 +1195,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                           ),
                         ),
                       ),
-                    if (student.remaining > 0)
+                    if (!widget.isArchived && student.remaining > 0)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(

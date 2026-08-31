@@ -1,9 +1,13 @@
 cd C:\project_flutter\bendahara\
 cd C:\project_flutter\bendahara\lib\
+
+$dst='C:\Users\Hype AMD\Archives\dart convert to text\lib'; if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }; New-Item -ItemType Directory -Force $dst | Out-Null; Get-ChildItem -Recurse -Filter *.dart | ForEach-Object { $rel=$_.FullName.Substring((Get-Location).Path.Length); $out=Join-Path $dst ($rel -replace '\.dart$','.txt'); New-Item -ItemType Directory -Force (Split-Path $out) | Out-Null; Copy-Item $_.FullName $out -Force }
+
 tree /F /A > "C:\Users\Hype AMD\Archives\Structure three\struktur_bendahara.txt"
 notepad "C:\Users\Hype AMD\Archives\Structure three\struktur_bendahara.txt"
 
-<!-- gaji guru dan karyawan=berbeda tergantung jam mengajar -->
+$dst="C:\Users\Hype AMD\Archives\dart convert to text\kode_bendahara.txt"; if(Test-Path $dst){Remove-Item $dst -Force}; Get-ChildItem -Recurse -Filter *.dart | ForEach-Object {Add-Content $dst "=================================================="; Add-Content $dst "FILE: $($_.FullName)"; Add-Content $dst "=================================================="; Get-Content $_.FullName | Add-Content $dst; Add-Content $dst ""}
+
 1. Card konsisten
 2. Responsiveness:buat handling untuk layar kecil
 3. Loading state:indikator loading saat proses
@@ -46,3 +50,4 @@ gaji guru:
                             PR
 1. memperbaiki apperaence ai pages
 2. tema di bottom navigation
+

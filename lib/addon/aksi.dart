@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/appearance.dart';
 import '../data.dart';
+import '../firebase/firestore_service.dart'; 
 import '../templates/sound_helper.dart';
 import '../features/ai_assistant.dart';
 import '../simulation/FAB_helper.dart';
@@ -184,134 +185,13 @@ class AksiHelper {
   ) {
     if (!parentContext.mounted) return;
 
-    final descCtrl = TextEditingController();
-    final amountCtrl = TextEditingController();
-
-    TransType selectedType = TransType.pemasukan;
-
     showDialog(
       context: parentContext,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Text('Tambah Transaksi'),
-
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<TransType>(
-                    value: selectedType,
-                    items: const [
-                      DropdownMenuItem(
-                        value: TransType.pemasukan,
-                        child: Text('Pemasukan'),
-                      ),
-                      DropdownMenuItem(
-                        value: TransType.pengeluaran,
-                        child: Text('Pengeluaran'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-
-                      setDialogState(() {
-                        selectedType = value;
-                      });
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Jenis',
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: descCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Deskripsi',
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: amountCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Jumlah (Rp)',
-                    ),
-                  ),
-                ],
-              ),
-
-              actions: [
-                // ================= BATAL =================
-                TextButton(
-                  onPressed: () {
-                    SoundHelper().playClick();
-
-                    Navigator.of(dialogContext).pop();
-
-                    descCtrl.dispose();
-                    amountCtrl.dispose();
-                  },
-                  child: const Text('Batal'),
-                ),
-
-                // ================= SIMPAN =================
-                FilledButton(
-                  onPressed: () {
-                    SoundHelper().playClick();
-
-                    if (descCtrl.text.trim().isEmpty ||
-                        amountCtrl.text.trim().isEmpty) {
-                      return;
-                    }
-
-                    final amount =
-                        double.tryParse(amountCtrl.text.trim()) ?? 0;
-
-                    final description = descCtrl.text.trim();
-
-                    final now = DateTime.now();
-
-                    localTransactions.insert(
-                      0,
-                      Transaction(
-                        id: 'TRX${localTransactions.length + 1}',
-                        type: selectedType,
-                        amount: amount,
-                        description: description,
-                        date: now,
-                      ),
-                    );
-
-                    localLogs.insert(
-                      0,
-                      ActivityLog(
-                        user: 'Admin',
-                        action: ActivityAction.tambah,
-                        detail: 'Tambah transaksi $description',
-                        timestamp: now,
-                      ),
-                    );
-
-                    // Tutup dialog dahulu
-                    Navigator.of(dialogContext).pop();
-
-                    descCtrl.dispose();
-                    amountCtrl.dispose();
-
-                    // Update setelah dialog ditutup
-                    onUpdate();
-                    _refreshCallback?.call();
-                  },
-                  child: const Text('Simpan'),
-                ),
-              ],
-            );
-          },
+        // Menggunakan StatefulWidget agar controller di dispose dengan aman
+        return _AddTransactionDialog(
+          onUpdate: onUpdate,
+          onRefresh: _refreshCallback,
         );
       },
     );
@@ -327,6 +207,158 @@ class AksiHelper {
     showDialog(
       context: parentContext,
       builder: (_) => const CalculatorDialog(),
+    );
+  }
+}
+
+// ============================================================
+// ============ STATEFUL WIDGET UNTUK DIALOG TRANSAKSI =========
+// ============================================================
+class _AddTransactionDialog extends StatefulWidget {
+  final VoidCallback onUpdate;
+  final VoidCallback? onRefresh;
+
+  const _AddTransactionDialog({
+    required this.onUpdate,
+    this.onRefresh,
+  });
+
+  @override
+  State<_AddTransactionDialog> createState() => _AddTransactionDialogState();
+}
+
+class _AddTransactionDialogState extends State<_AddTransactionDialog> {
+  final _descCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  TransType _selectedType = TransType.pemasukan;
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    // Controller dipastikan aman dibuang saat widget hilang
+    _descCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveTransaction() async {
+    SoundHelper().playClick();
+    if (_descCtrl.text.trim().isEmpty || _amountCtrl.text.trim().isEmpty) {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+    final description = _descCtrl.text.trim();
+    final now = DateTime.now();
+
+    final newTransaction = Transaction(
+      id: 'TRX${now.millisecondsSinceEpoch}',
+      type: _selectedType,
+      amount: amount,
+      description: description,
+      date: now,
+      category: _selectedType == TransType.pemasukan ? 'Pemasukan' : 'Pengeluaran',
+    );
+
+    final newLog = ActivityLog(
+      user: 'Admin',
+      action: ActivityAction.tambah,
+      detail: 'Tambah transaksi $description',
+      timestamp: now,
+    );
+
+    try {
+      // Simpan langsung ke Firestore
+      await addTransaction(newTransaction);
+      await addActivityLog(newLog);
+
+      // Simpan juga ke lokal untuk fallback
+      localTransactions.insert(0, newTransaction);
+      localLogs.insert(0, newLog);
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onUpdate();
+        widget.onRefresh?.call();
+      }
+    } catch (e) {
+      // Jika gagal (misalnya tidak ada internet)
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menambah transaksi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Tambah Transaksi'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DropdownButtonFormField<TransType>(
+            value: _selectedType,
+            items: const [
+              DropdownMenuItem(
+                value: TransType.pemasukan,
+                child: Text('Pemasukan'),
+              ),
+              DropdownMenuItem(
+                value: TransType.pengeluaran,
+                child: Text('Pengeluaran'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _selectedType = value;
+              });
+            },
+            decoration: const InputDecoration(labelText: 'Jenis'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _descCtrl,
+            decoration: const InputDecoration(labelText: 'Deskripsi'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Jumlah (Rp)'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () {
+            SoundHelper().playClick();
+            Navigator.of(context).pop();
+          },
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _saveTransaction,
+          child: _isSaving 
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('Simpan'),
+        ),
+      ],
     );
   }
 }

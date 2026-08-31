@@ -9,7 +9,7 @@ import '../firebase/firestore_service.dart';
 import '../templates/sound_helper.dart';
 import '../features/ai_assistant.dart';
 
-// ================== AKUN DIGITAL & LOG (Dipindah ke sini) ==================
+// ================== AKUN DIGITAL (Dipindah ke sini) ==================
 List<DigitalAccount> defaultAccounts = [
   DigitalAccount(name: 'Google Workspace', email: 'admin@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Email dan Drive'),
   DigitalAccount(name: 'SiPendik', email: 'sipendik@eduvest.sch.id', penanggungJawab: 'Bendahara', keterangan: 'Sistem Informasi Pendidikan'),
@@ -27,8 +27,6 @@ List<DigitalAccount> defaultAccounts = [
   DigitalAccount(name: 'Microsoft 365', email: 'office@eduvest.sch.id', penanggungJawab: 'Kepala Sekolah', keterangan: 'Office dan Teams'),
   DigitalAccount(name: 'E-Learning', email: 'elearning@eduvest.sch.id', penanggungJawab: 'Guru', keterangan: 'Moodle'),
 ];
-
-List<ActivityLog> localLogs = [];
 
 class SimulasiHelper {
   // ============================================================
@@ -48,7 +46,6 @@ class SimulasiHelper {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
-          // Tinggi dikecilkan jadi 0.65 dari layar
           height: MediaQuery.of(parentContext).size.height * 0.65,
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -318,7 +315,7 @@ class SimulasiHelper {
     return GridView.builder(
       padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, // Diubah jadi 3 kolom agar tombol lebih kecil
+        crossAxisCount: 3,
         childAspectRatio: 0.85,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
@@ -730,7 +727,6 @@ class AksiHelper {
     );
   }
 
-  // Ukuran Tombol FAB Menu dikecilkan
   static Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -818,7 +814,7 @@ class AksiHelper {
                   child: const Text('Batal'),
                 ),
                 FilledButton(
-                  onPressed: () {
+                  onPressed: () async {
                     SoundHelper().playClick();
                     if (descCtrl.text.trim().isEmpty ||
                         amountCtrl.text.trim().isEmpty) return;
@@ -827,32 +823,53 @@ class AksiHelper {
                     final description = descCtrl.text.trim();
                     final now = DateTime.now();
 
-                    localTransactions.insert(
-                      0,
-                      Transaction(
-                        id: 'TRX${localTransactions.length + 1}',
-                        type: selectedType,
-                        amount: amount,
-                        description: description,
-                        date: now,
-                      ),
+                    final newTransaction = Transaction(
+                      id: 'TRX${now.millisecondsSinceEpoch}',
+                      type: selectedType,
+                      amount: amount,
+                      description: description,
+                      date: now,
+                      category: selectedType == TransType.pemasukan ? 'Pemasukan' : 'Pengeluaran',
                     );
 
-                    localLogs.insert(
-                      0,
-                      ActivityLog(
-                        user: 'Admin',
-                        action: ActivityAction.tambah,
-                        detail: 'Tambah transaksi $description',
-                        timestamp: now,
-                      ),
+                    final newLog = ActivityLog(
+                      user: 'Admin',
+                      action: ActivityAction.tambah,
+                      detail: 'Tambah transaksi $description',
+                      timestamp: now,
                     );
 
-                    Navigator.of(dialogContext).pop();
-                    descCtrl.dispose();
-                    amountCtrl.dispose();
-                    onUpdate();
-                    _refreshCallback?.call();
+                    try {
+                      // Simpan langsung ke Firestore
+                      await addTransaction(newTransaction);
+                      await addActivityLog(newLog);
+
+                      // Simpan juga ke lokal untuk fallback
+                      localTransactions.insert(0, newTransaction);
+                      localLogs.insert(0, newLog);
+
+                      // Tutup dialog dahulu
+                      if (!parentContext.mounted) return;
+                      Navigator.of(dialogContext).pop();
+
+                      descCtrl.dispose();
+                      amountCtrl.dispose();
+
+                      // Update setelah dialog ditutup
+                      onUpdate();
+                      _refreshCallback?.call();
+                    } catch (e) {
+                      // Jika gagal (misalnya tidak ada internet)
+                      if (!parentContext.mounted) return;
+                      Navigator.of(dialogContext).pop();
+                      
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Gagal menambah transaksi: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   },
                   child: const Text('Simpan'),
                 ),

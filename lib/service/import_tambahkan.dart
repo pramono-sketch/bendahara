@@ -7,7 +7,8 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:permission_handler/permission_handler.dart';
 
 import '../data.dart';
-import '../simulation/FAB_helper.dart';
+import '../firebase/firestore_service.dart'; // Import Firestore
+
 // ============================================================
 // ================== EXCEL IMPORT MANAGER ====================
 // ============================================================
@@ -85,7 +86,6 @@ class ExcelImportManager {
 
   /// Menampilkan dialog popup berisi daftar file Excel dari folder import
   Future<void> showImportFileDialog(BuildContext context) async {
-    // ── FIX: Simpan NavigatorState sebelum async gap ──
     final navigator = Navigator.of(context);
 
     showDialog(
@@ -104,7 +104,6 @@ class ExcelImportManager {
 
     bool hasPermission = await _requestStoragePermission();
 
-    // ── FIX: Gunakan navigator/messenger yang disimpan, bukan context ──
     if (!navigator.mounted) return;
     navigator.pop(); // Tutup loading
 
@@ -147,7 +146,6 @@ class ExcelImportManager {
 
     if (!navigator.mounted) return;
 
-    // ── FIX: onShowGuide menggunakan page context (aman) ──
     showDialog(
       context: context,
       builder: (ctx) => ImportFileDialog(
@@ -162,8 +160,7 @@ class ExcelImportManager {
           importFromExcelPicker(context);
         },
         onShowGuide: () {
-          Navigator.pop(ctx); // Tutup ImportFileDialog
-          // Gunakan page context (bukan dialog context) → aman!
+          Navigator.pop(ctx); 
           showDialog(
             context: context,
             builder: (_) => GuideDialog(
@@ -261,7 +258,6 @@ class ExcelImportManager {
       int errorCount = 0;
       List<String> errorDetails = [];
 
-      // 🔥 PERBAIKAN: Gunakan sampleStudents (dari data.dart)
       for (int rowIndex = 1; rowIndex < sheet.rows.length; rowIndex++) {
         var row = sheet.rows[rowIndex];
         if (row.isEmpty) continue;
@@ -278,15 +274,7 @@ class ExcelImportManager {
           continue;
         }
 
-        // 🔥 PERBAIKAN: Gunakan sampleStudents
-        bool exists = sampleStudents.any((s) => s.nis == nis);
-        if (exists) {
-          errorCount++;
-          errorDetails.add('Baris ${rowIndex + 1}: NIS $nis sudah ada');
-          continue;
-        }
-
-        String id = 'STD${(sampleStudents.length + 1).toString().padLeft(3, '0')}';
+        String id = 'STD${DateTime.now().millisecondsSinceEpoch}_$rowIndex';
         Student newStudent = createStudentWithPayments(
           id: id,
           name: name,
@@ -295,22 +283,24 @@ class ExcelImportManager {
           alamat: alamat ?? '-',
           phone: phone ?? '-',
         );
-        // 🔥 PERBAIKAN: Tambahkan ke sampleStudents
-        sampleStudents.add(newStudent);
-        addedCount++;
+
+        try {
+          // FIX: Simpan ke Firestore, bukan list lokal
+          await saveStudent(newStudent);
+          addedCount++;
+        } catch (e) {
+          errorCount++;
+          errorDetails.add('Baris ${rowIndex + 1}: Gagal simpan (NIS mungkin duplikat)');
+        }
       }
 
       if (addedCount > 0) {
-        // 🔥 PERBAIKAN: Gunakan localLogs (dari data.dart)
-        localLogs.insert(
-          0,
-          ActivityLog(
-            user: 'Admin',
-            action: ActivityAction.tambah,
-            detail: 'Import $addedCount siswa dari Excel ($fileName)',
-            timestamp: DateTime.now(),
-          ),
-        );
+        await addActivityLog(ActivityLog(
+          user: 'Admin',
+          action: ActivityAction.tambah,
+          detail: 'Import $addedCount siswa dari Excel ($fileName)',
+          timestamp: DateTime.now(),
+        ));
       }
 
       messenger.showSnackBar(
@@ -367,9 +357,8 @@ class ExcelImportManager {
     }
   }
 
-  /// ── FIX: Export Template Petunjuk ke Folder Export ──
+  /// Export Template Petunjuk ke Folder Export
   Future<void> exportGuideFile(BuildContext context) async {
-    // Simpan referensi sebelum async gap
     final messenger = ScaffoldMessenger.of(context);
 
     try {
@@ -390,7 +379,6 @@ class ExcelImportManager {
       String filePath = '${exportDir.path}/format_import_siswa.csv';
       File file = File(filePath);
 
-      // Membuat isi file CSV
       String csvContent = "Nama,NIS,Kelas,Alamat,Telepon\n";
       csvContent += "Budi Santoso,12345,X TKJ,Jl. Mawar No.1,081234567890\n";
       csvContent += "Siti Aminah,12346,XI RPL,Jl. Melati No.2,081234567891\n";
@@ -423,9 +411,6 @@ class ImportFileDialog extends StatelessWidget {
   final String folderPath;
   final Function(File) onFileSelected;
   final VoidCallback onPickOtherFile;
-
-  /// ── FIX: Callback terpisah untuk show guide ──
-  /// Menggunakan page context, bukan dialog context
   final VoidCallback onShowGuide;
 
   const ImportFileDialog({
@@ -455,7 +440,6 @@ class ImportFileDialog extends StatelessWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.help_outline, color: Colors.blue),
-            // ── FIX: Gunakan callback, bukan inline Navigator.pop ──
             onPressed: onShowGuide,
             tooltip: 'Petunjuk Format',
           ),
@@ -577,7 +561,7 @@ class GuideDialog extends StatelessWidget {
         children: [
           Icon(Icons.menu_book, color: Colors.blue),
           SizedBox(width: 8),
-          Text('Petunjuk Import Excel'),
+          Text('Petunjuk Import'),
         ],
       ),
       content: SingleChildScrollView(
@@ -613,8 +597,6 @@ class GuideDialog extends StatelessWidget {
         ),
         ElevatedButton.icon(
           onPressed: () {
-            // ── FIX: Pop dialog dulu, lalu panggil onExport ──
-            // onExport menggunakan page context (bukan dialog context)
             Navigator.pop(context);
             onExport();
           },
