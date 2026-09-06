@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../constants/appearance.dart'; // 🔥 import warna
 import '../data.dart';
-import '../simulation/FAB_helper.dart';
 
 /// Halaman untuk menampilkan log aktivitas dengan filter dan pencarian.
 class LogAktivitasPage extends StatefulWidget {

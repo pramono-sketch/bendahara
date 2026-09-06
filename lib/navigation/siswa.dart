@@ -627,7 +627,6 @@ class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
                         itemCount: _students.length,
                         itemBuilder: (context, index) {
                           final s = _students[index];
-                          final majorColor = getMajorColor(s.kelas);
 
                           return Card(
                             elevation: 1,

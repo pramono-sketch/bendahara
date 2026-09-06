@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data.dart';
-import '../simulation/FAB_helper.dart';
 import '../templates/sound_helper.dart';
 import '../constants/appearance.dart'; // 🔥 import warna
 

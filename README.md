@@ -51,3 +51,4 @@ gaji guru:
 1. memperbaiki apperaence ai pages
 2. tema di bottom navigation
 
+openrouter
