@@ -224,6 +224,26 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   bool _isAurora(AppThemeMode mode) => mode == AppThemeMode.aurora;
   bool _isCyber(AppThemeMode mode) => mode == AppThemeMode.cyberpunk;
 
+  // Helper baru untuk menentukan warna background lekukan sesuai tema aktif
+  Color _getHeaderBgColor(AppThemeMode mode, ColorScheme colors) {
+    if (_isNeo(mode)) return AppColors.neoBaseAlt;
+    if (_isGlass(mode)) return AppColors.glassBg1;
+    if (_isModern(mode)) return AppColors.modernPrimary;
+    if (_isAurora(mode)) return AppColors.auroraSurface;
+    if (_isCyber(mode)) return AppColors.cyberSurface;
+    return colors.primary; // Light/Dark
+  }
+
+  // Helper baru untuk menentukan warna teks di atas lekukan agar kontras dan tidak aneh
+  Color _getHeaderTextColor(AppThemeMode mode, ColorScheme colors) {
+    if (_isNeo(mode)) return AppColors.neoTextPrimary;
+    if (_isGlass(mode)) return AppColors.glassTextPrimary;
+    if (_isModern(mode)) return Colors.white;
+    if (_isAurora(mode)) return AppColors.auroraTextPrimary;
+    if (_isCyber(mode)) return AppColors.cyberAccent1;
+    return colors.onPrimary; // Light/Dark
+  }
+
   Widget _buildThemedBackground(AppThemeMode themeMode, Widget child) {
     if (_isGlass(themeMode)) {
       return Container(
@@ -374,13 +394,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final themeMode = ref.watch(themeModeProvider);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final headerBgColor = _getHeaderBgColor(themeMode, colors);
+    final headerTextColor = _getHeaderTextColor(themeMode, colors);
 
     return _buildThemedBackground(
       themeMode,
       Scaffold(
         backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true, // Body mulai dari atas bersama AppBar
         appBar: AppBar(
           title: const Text('Eduvest Finance'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: headerTextColor, // Warna icon/text appbar mengikuti warna header
         ),
         body: _isLoading
             ? const LottieLoading()
@@ -388,113 +414,177 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 ? LottieError(message: 'Gagal memuat data. Periksa koneksi internet Anda.')
                 : RefreshIndicator(
                     onRefresh: _fetchData,
-                    child: SingleChildScrollView(
+                    child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // GREETING
-                          Text(
-                            '${_getGreeting()}, Admin 👋',
-                            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _getCurrentDate(),
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 24),
-
-                          // HERO CARD (SALDO)
-                          _buildSectionHeader('Ringkasan Saldo', themeMode),
-                          const SizedBox(height: 8),
-                          _buildSectionGroup(themeMode, [
-                            Padding(
-                              padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.only(bottom: 32),
+                      children: [
+                        // =========================================================
+                        // STRUKTUR BARU: HEADER LENGKUNG & KARTU MELAYANG (OVERLAPPING)
+                        // =========================================================
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            // 1. Background dengan lekukan (Curve)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: 220,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: headerBgColor,
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(36),
+                                    bottomRight: Radius.circular(36),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // 2. Header Teks di atas background lekukan
+                            Positioned(
+                              top: MediaQuery.of(context).padding.top + kToolbarHeight + 10,
+                              left: 20,
+                              right: 20,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Total Saldo Sekolah', style: theme.textTheme.bodyMedium),
-                                  const SizedBox(height: 8),
                                   Text(
-                                    'Rp ${formatCurrency(_totalIncomeAll - _totalExpenseAll)}',
-                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                    '${_getGreeting()}, Admin 👋',
+                                    style: theme.textTheme.headlineSmall?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: colors.primary,
+                                      color: headerTextColor,
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
-                                  Row(
-                                    children: [
-                                      Expanded(child: _buildBalanceItem('Pemasukan', _totalIncome, AppColors.success, Icons.arrow_upward)),
-                                      Container(width: 1, height: 40, color: _dividerColor(themeMode)),
-                                      const SizedBox(width: 16),
-                                      Expanded(child: _buildBalanceItem('Pengeluaran', _totalExpense, AppColors.error, Icons.arrow_downward)),
-                                    ],
-                                  )
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _getCurrentDate(),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: headerTextColor.withOpacity(0.8),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
-                          ]),
-                          const SizedBox(height: 24),
-
-                          // CHART PEMASUKAN
-                          _buildSectionHeader('Statistik Pemasukan (6 Bulan)', themeMode),
-                          const SizedBox(height: 8),
-                          _buildSectionGroup(themeMode, [
+                            // 3. Kartu Utama (Hero Card) yang posisinya diatur agar muncul menutupi lekukan
+                            // Menggunakan Padding non-positioned agar ukuran Stack menyesuaikan tinggi Kartu
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
+                              padding: const EdgeInsets.only(top: 160, left: 16, right: 16, bottom: 16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  SizedBox(
-                                    height: 200,
-                                    child: _buildBarChart(_getLast6MonthsLabels(), _getLast6MonthsValues(), themeMode),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: 24),
-
-                          // STATUS PEMBAYARAN SISWA
-                          _buildSectionHeader('Status Pembayaran Siswa', themeMode),
-                          const SizedBox(height: 8),
-                          _buildStudentPaymentCard(themeMode),
-                          const SizedBox(height: 24),
-
-                          // AI INSIGHT
-                          _buildSectionHeader('Insight Keuangan', themeMode),
-                          const SizedBox(height: 8),
-                          _buildSectionGroup(themeMode, [
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(
-                                    width: 40,
-                                    height: 40,
-                                    child: Lottie.asset(
-                                      'assets/animations/ai animation Flow 1.json',
-                                      fit: BoxFit.contain,
-                                      repeat: true,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
+                                  // Label Section dimasukkan ke dalam Stack agar menyatu dengan lekukan
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4, bottom: 8),
                                     child: Text(
-                                      _aiInsight,
-                                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                                      'RINGKASAN SALDO',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.0,
+                                        color: headerTextColor.withOpacity(0.9),
+                                      ),
                                     ),
                                   ),
+                                  _buildSectionGroup(themeMode, [
+                                    Padding(
+                                      padding: const EdgeInsets.all(20),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Total Saldo Sekolah', style: theme.textTheme.bodyMedium),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Rp ${formatCurrency(_totalIncomeAll - _totalExpenseAll)}',
+                                            style: theme.textTheme.headlineMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: colors.primary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 20),
+                                          Row(
+                                            children: [
+                                              Expanded(child: _buildBalanceItem('Pemasukan', _totalIncome, AppColors.success, Icons.arrow_upward)),
+                                              Container(width: 1, height: 40, color: _dividerColor(themeMode)),
+                                              const SizedBox(width: 16),
+                                              Expanded(child: _buildBalanceItem('Pengeluaran', _totalExpense, AppColors.error, Icons.arrow_downward)),
+                                            ],
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                  ]),
                                 ],
                               ),
                             ),
-                          ]),
-                        ],
-                      ),
+                          ],
+                        ),
+
+                        // =========================================================
+                        // SISA KONTEN DIBAWAHNYA
+                        // =========================================================
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // CHART PEMASUKAN
+                              _buildSectionHeader('Statistik Pemasukan (6 Bulan)', themeMode),
+                              const SizedBox(height: 8),
+                              _buildSectionGroup(themeMode, [
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        height: 200,
+                                        child: _buildBarChart(_getLast6MonthsLabels(), _getLast6MonthsValues(), themeMode),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ]),
+                              const SizedBox(height: 24),
+
+                              // STATUS PEMBAYARAN SISWA
+                              _buildSectionHeader('Status Pembayaran Siswa', themeMode),
+                              const SizedBox(height: 8),
+                              _buildStudentPaymentCard(themeMode),
+                              const SizedBox(height: 24),
+
+                              // AI INSIGHT
+                              _buildSectionHeader('Insight Keuangan', themeMode),
+                              const SizedBox(height: 8),
+                              _buildSectionGroup(themeMode, [
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: 40,
+                                        height: 40,
+                                        child: Lottie.asset(
+                                          'assets/animations/ai animation Flow 1.json',
+                                          fit: BoxFit.contain,
+                                          repeat: true,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _aiInsight,
+                                          style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ]),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
       ),

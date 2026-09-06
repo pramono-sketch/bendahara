@@ -69,7 +69,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             // ============================================
 
             _buildSectionHeader(
-              title: 'Tampilan',
+              title: translations.t('appearance'),
               themeMode: themeMode,
             ),
             const SizedBox(height: 8),
@@ -79,8 +79,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               children: [
                 ListTile(
                   leading: Icon(Icons.palette_outlined, color: colors.primary),
-                  title: const Text('Tema Aplikasi'),
-                  subtitle: Text(_getThemeLabel(currentThemeMode)),
+                  title: Text(translations.t('app_theme')),
+                  subtitle: Text(_getThemeLabel(currentThemeMode, translations)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showThemeDialog(context, ref),
                 ),
@@ -94,7 +94,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             // ============================================
 
             _buildSectionHeader(
-              title: 'Preferensi',
+              title: translations.t('preferences'),
               themeMode: themeMode,
             ),
             const SizedBox(height: 8),
@@ -127,8 +127,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           ),
                           IconButton(
                             tooltip: _volume == 0
-                                ? 'Aktifkan suara'
-                                : 'Matikan suara',
+                                ? translations.t('enable_sound')
+                                : translations.t('mute_sound'),
                             icon: Icon(
                               _volume == 0
                                   ? Icons.volume_off_outlined
@@ -210,7 +210,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             // ============================================
 
             _buildSectionHeader(
-              title: 'Data',
+              title: translations.t('data'),
               themeMode: themeMode,
             ),
             const SizedBox(height: 8),
@@ -233,9 +233,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                   SwitchListTile(
                     secondary: const Icon(Icons.egg_outlined),
-                    title: const Text('Tampilkan Easter Egg'),
-                    subtitle: const Text(
-                        'Aktifkan / nonaktifkan footer spesial'),
+                    title: Text(translations.t('show_easter_egg')),
+                    subtitle: Text(translations.t('easter_egg_subtitle')),
                     value: _easterEggFooterEnabled,
                     onChanged: (value) {
                       setState(() => _easterEggFooterEnabled = value);
@@ -252,7 +251,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             // ============================================
 
             _buildSectionHeader(
-              title: 'Tentang',
+              title: translations.t('about'),
               themeMode: themeMode,
             ),
             const SizedBox(height: 8),
@@ -277,6 +276,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               _buildEasterEggFooter(
                 themeMode: themeMode,
                 colors: colors,
+                translations: translations,
               ),
             ],
           ],
@@ -508,6 +508,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildEasterEggFooter({
     required AppThemeMode themeMode,
     required ColorScheme colors,
+    required Translations translations,
   }) {
     // NEOMORPHISM
     if (_isNeo(themeMode)) {
@@ -515,16 +516,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: neumorphismDecoration(borderRadius: 16, isPressed: false),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('🥚', style: TextStyle(fontSize: 22)),
-            SizedBox(width: 8),
+            const Text('🥚', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Selamat! Anda menemukan telur Paskah! 🥚',
+                translations.t('easter_egg_found'),
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF9B2C2C),
@@ -545,18 +546,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('🥚', style: TextStyle(fontSize: 22)),
-                  SizedBox(width: 8),
+                  const Text('🥚', style: TextStyle(fontSize: 22)),
+                  const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      'Selamat! Anda menemukan telur Paskah! 🥚',
+                      translations.t('easter_egg_found'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -577,16 +578,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: modernDecoration(borderRadius: 16),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('🥚', style: TextStyle(fontSize: 22)),
-            SizedBox(width: 8),
+            const Text('🥚', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Selamat! Anda menemukan telur Paskah! 🥚',
+                translations.t('easter_egg_found'),
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.modernPrimary,
@@ -604,16 +605,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: auroraDecoration(borderRadius: 16),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('🥚', style: TextStyle(fontSize: 22)),
-            SizedBox(width: 8),
+            const Text('🥚', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Selamat! Anda menemukan telur Paskah! 🥚',
+                translations.t('easter_egg_found'),
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.auroraAccent1,
@@ -631,16 +632,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: cyberpunkDecoration(borderRadius: 12),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('🥚', style: TextStyle(fontSize: 22)),
-            SizedBox(width: 8),
+            const Text('🥚', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Selamat! Anda menemukan telur Paskah! 🥚',
+                translations.t('easter_egg_found'),
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: AppColors.cyberAccent1,
@@ -660,16 +661,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Row(
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('🥚', style: TextStyle(fontSize: 22)),
-          SizedBox(width: 8),
+          const Text('🥚', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 8),
           Flexible(
             child: Text(
-              'Selamat! Anda menemukan telur Paskah! 🥚',
+              translations.t('easter_egg_found'),
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFFC62828),
@@ -687,12 +688,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   void _showThemeDialog(BuildContext context, WidgetRef ref) {
     final current = ref.read(themeModeProvider);
+    final translations = ref.read(translationsProvider);
 
     showDialog<void>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Pilih Tema'),
+          title: Text(translations.t('select_theme')),
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
@@ -704,7 +706,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       children: [
                         _buildThemeIcon(mode),
                         const SizedBox(width: 12),
-                        Text(_getThemeLabel(mode)),
+                        Text(_getThemeLabel(mode, translations)),
                       ],
                     ),
                     value: mode,
@@ -723,7 +725,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Tutup'),
+              child: Text(translations.t('close')),
             ),
           ],
         );
@@ -754,24 +756,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // ====================== THEME LABEL =======================
   // ==========================================================
 
-  String _getThemeLabel(AppThemeMode mode) {
+  String _getThemeLabel(AppThemeMode mode, Translations translations) {
     switch (mode) {
       case AppThemeMode.light:
-        return 'Terang';
+        return translations.t('theme_light');
       case AppThemeMode.dark:
-        return 'Gelap';
+        return translations.t('theme_dark');
       case AppThemeMode.neumorphism:
-        return 'Neomorphism';
+        return translations.t('theme_neumorphism');
       case AppThemeMode.glassmorphism:
-        return 'Glassmorphism';
+        return translations.t('theme_glassmorphism');
       case AppThemeMode.modern:
-        return 'Modern UI';
+        return translations.t('theme_modern');
       case AppThemeMode.aurora:
-        return 'Aurora UI';
+        return translations.t('theme_aurora');
       case AppThemeMode.cyberpunk:
-        return 'Cyberpunk Neon';
+        return translations.t('theme_cyberpunk');
       case AppThemeMode.system:
-        return 'Sistem';
+        return translations.t('theme_system');
     }
   }
 
@@ -789,9 +791,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (_backupClickCount == 3) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('sudah kubilang fitur belum ada'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(translations.t('easter_egg_hint')),
+          duration: const Duration(seconds: 2),
         ),
       );
       debugPrint('[SettingsPage] Easter egg hint shown at count 3.');
@@ -801,10 +803,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         context: context,
         dialogType: DialogType.info,
         animType: AnimType.bottomSlide,
-        title: 'Easter Egg!',
-        desc: 'you found easter egg, admin say: kita sayang pak win',
+        title: translations.t('easter_egg_title'),
+        desc: translations.t('easter_egg_desc'),
         btnOkOnPress: () {},
-        btnOkText: 'OK',
+        btnOkText: translations.t('ok'),
       ).show();
     } else if (_backupClickCount >= 7) {
       setState(() {
@@ -880,17 +882,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // ==========================================================
 
   void _showWhatsAppErrorDialog(BuildContext context) {
+    final translations = ref.read(translationsProvider);
     debugPrint('[SettingsPage] Showing WhatsApp error dialog.');
     AwesomeDialog(
       context: context,
       dialogType: DialogType.warning,
       animType: AnimType.bottomSlide,
-      title: 'WhatsApp Launch Failed',
-      desc: 'Unable to open WhatsApp or browser link.\n'
-          'Please check whether WhatsApp is installed and whether the device can open external links.\n'
-          'Target number: +6287833467630',
+      title: translations.t('whatsapp_error_title'),
+      desc: translations.t('whatsapp_error_desc'),
       btnOkOnPress: () {},
-      btnOkText: 'OK',
+      btnOkText: translations.t('ok'),
     ).show();
   }
 
