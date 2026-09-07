@@ -1,9 +1,11 @@
 // navigation/siswa.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/appearance.dart';
 import '../data.dart';
 import '../firebase/firestore_service.dart';
+import '../l10n/translations.dart';
 import '../templates/sound_helper.dart';
 
 // ========== FUNGSI BANTU UNTUK PROGRES ==========
@@ -21,14 +23,14 @@ Color _getProgressColor(double progress) {
 }
 
 // ================== HALAMAN UTAMA SISWA ==================
-class StudentsPage extends StatefulWidget {
+class StudentsPage extends ConsumerStatefulWidget {
   const StudentsPage({super.key});
 
   @override
-  State<StudentsPage> createState() => _StudentsPageState();
+  ConsumerState<StudentsPage> createState() => _StudentsPageState();
 }
 
-class _StudentsPageState extends State<StudentsPage> {
+class _StudentsPageState extends ConsumerState<StudentsPage> {
   String _searchQuery = '';
   String _filterKelas = 'Semua';
 
@@ -44,6 +46,7 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   Future<List<String>> _getKelasOptions() async {
+    final t = ref.read(translationsProvider).t;
     final snapshot =
         await studentsCollection.where('isActive', isEqualTo: true).get();
     final set = <String>{};
@@ -52,14 +55,16 @@ class _StudentsPageState extends State<StudentsPage> {
       final kelas = data['kelas'] as String?;
       if (kelas != null) set.add(kelas);
     }
-    return ['Semua', ...set.toList()..sort()];
+    return [t('all'), ...set.toList()..sort()];
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = ref.watch(translationsProvider).t;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Data Siswa Aktif'),
+        title: Text(t('active_students_data')),
         actions: [
           IconButton(
             icon: const Icon(Icons.archive),
@@ -70,7 +75,7 @@ class _StudentsPageState extends State<StudentsPage> {
                 MaterialPageRoute(builder: (_) => const ArchiveRootPage()),
               );
             },
-            tooltip: 'Lihat Arsip',
+            tooltip: t('view_archive'),
           ),
         ],
       ),
@@ -84,7 +89,7 @@ class _StudentsPageState extends State<StudentsPage> {
                   child: TextField(
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search),
-                      hintText: 'Cari nama, NIS...',
+                      hintText: t('search_name_nis'),
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -101,8 +106,10 @@ class _StudentsPageState extends State<StudentsPage> {
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) return const SizedBox.shrink();
                     final options = snapshot.data!;
+                    final currentVal =
+                        options.contains(_filterKelas) ? _filterKelas : options.first;
                     return DropdownButton<String>(
-                      value: _filterKelas,
+                      value: currentVal,
                       items: options.map((kelas) {
                         return DropdownMenuItem(
                           value: kelas,
@@ -130,7 +137,7 @@ class _StudentsPageState extends State<StudentsPage> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('Tidak ada siswa aktif'));
+                  return Center(child: Text(t('no_active_students')));
                 }
 
                 final allStudents = snapshot.data!;
@@ -140,12 +147,12 @@ class _StudentsPageState extends State<StudentsPage> {
                   bool matchNis = s.nis.toLowerCase().contains(query);
                   bool matchKelas = s.kelas.toLowerCase().contains(query);
                   bool matchFilter =
-                      (_filterKelas == 'Semua') || (s.kelas == _filterKelas);
+                      (_filterKelas == t('all')) || (s.kelas == _filterKelas);
                   return (matchName || matchNis || matchKelas) && matchFilter;
                 }).toList();
 
                 if (filtered.isEmpty) {
-                  return const Center(child: Text('Tidak ada siswa aktif'));
+                  return Center(child: Text(t('no_active_students')));
                 }
 
                 return ListView.builder(
@@ -221,16 +228,15 @@ class _StudentsPageState extends State<StudentsPage> {
 
 // ============================================================
 // ================== HALAMAN ARSIP ROOT ======================
-// Menampilkan daftar folder arsip (tahun ajaran) dari Firebase
 // ============================================================
-class ArchiveRootPage extends StatefulWidget {
+class ArchiveRootPage extends ConsumerStatefulWidget {
   const ArchiveRootPage({super.key});
 
   @override
-  State<ArchiveRootPage> createState() => _ArchiveRootPageState();
+  ConsumerState<ArchiveRootPage> createState() => _ArchiveRootPageState();
 }
 
-class _ArchiveRootPageState extends State<ArchiveRootPage> {
+class _ArchiveRootPageState extends ConsumerState<ArchiveRootPage> {
   List<Map<String, dynamic>> _folders = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -257,9 +263,11 @@ class _ArchiveRootPageState extends State<ArchiveRootPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = ref.watch(translationsProvider).t;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Arsip Siswa'),
+        title: Text(t('student_archive')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -267,7 +275,7 @@ class _ArchiveRootPageState extends State<ArchiveRootPage> {
               SoundHelper().playClick();
               _loadFolders();
             },
-            tooltip: 'Refresh',
+            tooltip: t('refresh'),
           ),
         ],
       ),
@@ -285,7 +293,7 @@ class _ArchiveRootPageState extends State<ArchiveRootPage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadFolders,
-                        child: const Text('Coba Lagi'),
+                        child: Text(t('try_again')),
                       ),
                     ],
                   ),
@@ -298,16 +306,16 @@ class _ArchiveRootPageState extends State<ArchiveRootPage> {
                           Icon(Icons.archive_outlined,
                               size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 16),
-                          const Text(
-                            'Belum ada arsip',
-                            style: TextStyle(
+                          Text(
+                            t('no_archive_yet'),
+                            style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'Arsip akan muncul setelah melakukan\nkenaikan kelas di menu Manajemen Data Siswa',
+                          Text(
+                            t('archive_will_appear'),
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey),
+                            style: const TextStyle(color: Colors.grey),
                           ),
                         ],
                       ),
@@ -342,7 +350,7 @@ class _ArchiveRootPageState extends State<ArchiveRootPage> {
                                   fontSize: 16,
                                 ),
                               ),
-                              subtitle: Text('$count siswa diarsipkan'),
+                              subtitle: Text('$count ${t('students_archived')}'),
                               trailing: const Icon(Icons.chevron_right),
                               onTap: () {
                                 SoundHelper().playClick();
@@ -365,17 +373,16 @@ class _ArchiveRootPageState extends State<ArchiveRootPage> {
 
 // ============================================================
 // ================== HALAMAN ARSIP PER JURUSAN ===============
-// Menampilkan daftar jurusan dalam tahun arsip tertentu
 // ============================================================
-class ArchiveMajorsPage extends StatefulWidget {
+class ArchiveMajorsPage extends ConsumerStatefulWidget {
   final String tahunArsip;
   const ArchiveMajorsPage({super.key, required this.tahunArsip});
 
   @override
-  State<ArchiveMajorsPage> createState() => _ArchiveMajorsPageState();
+  ConsumerState<ArchiveMajorsPage> createState() => _ArchiveMajorsPageState();
 }
 
-class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
+class _ArchiveMajorsPageState extends ConsumerState<ArchiveMajorsPage> {
   List<Map<String, dynamic>> _majors = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -400,7 +407,6 @@ class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
     }
   }
 
-  /// Warna berdasarkan jurusan
   Color _getMajorColor(String major) {
     switch (major) {
       case 'TKJ':
@@ -429,9 +435,11 @@ class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = ref.watch(translationsProvider).t;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Arsip ${widget.tahunArsip}'),
+        title: Text('${t('archive')} ${widget.tahunArsip}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -439,7 +447,7 @@ class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
               SoundHelper().playClick();
               _loadMajors();
             },
-            tooltip: 'Refresh',
+            tooltip: t('refresh'),
           ),
         ],
       ),
@@ -457,7 +465,7 @@ class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadMajors,
-                        child: const Text('Coba Lagi'),
+                        child: Text(t('try_again')),
                       ),
                     ],
                   ),
@@ -470,7 +478,7 @@ class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
                           Icon(Icons.folder_off,
                               size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 16),
-                          const Text('Tidak ada jurusan ditemukan'),
+                          Text(t('no_majors_found')),
                         ],
                       ),
                     )
@@ -499,13 +507,13 @@ class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
                                     color: color, size: 28),
                               ),
                               title: Text(
-                                'Jurusan $name',
+                                '${t('major')} $name',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
                               ),
-                              subtitle: Text('$count siswa'),
+                              subtitle: Text('$count ${t('students')}'),
                               trailing: const Icon(Icons.chevron_right),
                               onTap: () {
                                 SoundHelper().playClick();
@@ -530,9 +538,8 @@ class _ArchiveMajorsPageState extends State<ArchiveMajorsPage> {
 
 // ============================================================
 // ================== HALAMAN DAFTAR SISWA ARSIP ==============
-// Menampilkan daftar siswa dalam tahun arsip & jurusan tertentu
 // ============================================================
-class ArchiveStudentListPage extends StatefulWidget {
+class ArchiveStudentListPage extends ConsumerStatefulWidget {
   final String tahunArsip;
   final String jurusan;
 
@@ -543,11 +550,12 @@ class ArchiveStudentListPage extends StatefulWidget {
   });
 
   @override
-  State<ArchiveStudentListPage> createState() =>
+  ConsumerState<ArchiveStudentListPage> createState() =>
       _ArchiveStudentListPageState();
 }
 
-class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
+class _ArchiveStudentListPageState
+    extends ConsumerState<ArchiveStudentListPage> {
   List<Student> _students = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -575,6 +583,8 @@ class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = ref.watch(translationsProvider).t;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.jurusan} - ${widget.tahunArsip}'),
@@ -585,7 +595,7 @@ class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
               SoundHelper().playClick();
               _loadStudents();
             },
-            tooltip: 'Refresh',
+            tooltip: t('refresh'),
           ),
         ],
       ),
@@ -603,7 +613,7 @@ class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadStudents,
-                        child: const Text('Coba Lagi'),
+                        child: Text(t('try_again')),
                       ),
                     ],
                   ),
@@ -616,7 +626,7 @@ class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
                           Icon(Icons.people_outline,
                               size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 16),
-                          const Text('Tidak ada siswa arsip'),
+                          Text(t('no_archived_students')),
                         ],
                       ),
                     )
@@ -642,8 +652,8 @@ class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
                                 ),
                               ),
                               title: Text(s.name),
-                              subtitle:
-                                  Text('NIS: ${s.nis} • ${s.kelas}'),
+                              subtitle: Text(
+                                  '${t('nis_label')}: ${s.nis} • ${s.kelas}'),
                               trailing: const Icon(Icons.chevron_right,
                                   color: Colors.grey),
                               onTap: () {
@@ -669,9 +679,8 @@ class _ArchiveStudentListPageState extends State<ArchiveStudentListPage> {
 
 // ============================================================
 // ================== HALAMAN DETAIL SISWA ====================
-// Support isArchived: true untuk siswa arsip (read-only)
 // ============================================================
-class StudentDetailPage extends StatefulWidget {
+class StudentDetailPage extends ConsumerStatefulWidget {
   final Student student;
   final bool isArchived;
 
@@ -682,10 +691,10 @@ class StudentDetailPage extends StatefulWidget {
   });
 
   @override
-  State<StudentDetailPage> createState() => _StudentDetailPageState();
+  ConsumerState<StudentDetailPage> createState() => _StudentDetailPageState();
 }
 
-class _StudentDetailPageState extends State<StudentDetailPage> {
+class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
   late Student student;
   final TextEditingController _quickPayController = TextEditingController();
 
@@ -697,20 +706,21 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 
   // ========== FUNGSI PEMBAYARAN CEPAT ==========
   void _quickPayment() async {
-    // Jangan lakukan apapun jika siswa sudah diarsipkan
+    final t = ref.read(translationsProvider).t;
+
     if (widget.isArchived) return;
 
     final input = _quickPayController.text.trim();
     if (input.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Masukkan nominal pembayaran')),
+        SnackBar(content: Text(t('enter_payment_amount'))),
       );
       return;
     }
     double amount = double.tryParse(input) ?? 0;
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nominal harus lebih dari 0')),
+        SnackBar(content: Text(t('amount_must_be_positive'))),
       );
       return;
     }
@@ -747,15 +757,15 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         }
         _addTransaction(
           TransType.pemasukan,
-          'Saldo tabungan - ${student.name}',
+          '${t('savings_payment')} ${student.name}',
           amount,
         );
-        _log('Pembayaran saldo tabungan sebesar Rp ${formatCurrency(amount)}');
+        _log('${t('savings_payment_log')} Rp ${formatCurrency(amount)}');
         _quickPayController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Saldo tabungan bertambah Rp ${formatCurrency(amount)}',
+              '${t('savings_increased')} Rp ${formatCurrency(amount)}',
             ),
           ),
         );
@@ -802,28 +812,28 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
           }
           _addTransaction(
             TransType.pemasukan,
-            'Pembayaran lunas semua - ${student.name}',
+            '${t('full_payment')} ${student.name}',
             amount,
           );
           _log(
-            'Pembayaran cepat lunas semua, surplus Rp ${formatCurrency(surplus)} masuk saldo',
+            '${t('quick_payment_full_log')}, surplus Rp ${formatCurrency(surplus)} ${t('went_to_savings')}',
           );
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Semua lunas! Surplus Rp ${formatCurrency(surplus)} masuk saldo',
+                '${t('all_paid_surplus')} Rp ${formatCurrency(surplus)} ${t('went_to_savings')}',
               ),
             ),
           );
         } else {
           _addTransaction(
             TransType.pemasukan,
-            'Pembayaran lunas semua - ${student.name}',
+            '${t('full_payment')} ${student.name}',
             amount,
           );
-          _log('Pembayaran cepat lunas semua (pas)');
+          _log(t('quick_payment_full_log_exact'));
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Semua pembayaran lunas!')),
+            SnackBar(content: Text(t('all_payments_paid'))),
           );
         }
       } else {
@@ -843,14 +853,14 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         }
         _addTransaction(
           TransType.pemasukan,
-          'Pembayaran parsial - ${student.name}',
+          '${t('partial_payment')} ${student.name}',
           amount,
         );
-        _log('Pembayaran cepat parsial sebesar Rp ${formatCurrency(amount)}');
+        _log('${t('quick_payment_partial_log')} Rp ${formatCurrency(amount)}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Pembayaran Rp ${formatCurrency(amount)} didistribusikan',
+              '${t('payment_distributed')} Rp ${formatCurrency(amount)} ${t('distributed')}',
             ),
           ),
         );
@@ -872,34 +882,37 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   }
 
   void _addTransaction(TransType type, String desc, double amount) {
-    final t = Transaction(
+    final t = ref.read(translationsProvider).t;
+    final transactionType = type == TransType.pemasukan ? t('income') : t('expense');
+
+    final trx = Transaction(
       id: 'TRX${DateTime.now().millisecondsSinceEpoch}',
       type: type,
       amount: amount,
       description: desc,
       date: DateTime.now(),
-      category: type == TransType.pemasukan ? 'Pemasukan' : 'Pengeluaran',
+      category: transactionType,
     );
-    addTransaction(t);
+    addTransaction(trx);
   }
 
   Future<void> _saveStudentToFirestore() async {
-    // Jangan simpan jika siswa sudah diarsipkan
     if (widget.isArchived) return;
     await saveStudent(student);
   }
 
   // ========== TOGGLE PEMBAYARAN ==========
   void _togglePayment(int index) async {
-    // Jangan lakukan apapun jika siswa sudah diarsipkan
+    final t = ref.read(translationsProvider).t;
+
     if (widget.isArchived) return;
 
     setState(() {
       final item = student.payments[index];
       if (item.type == 'Saldo') {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Saldo tabungan tidak dapat diubah secara manual'),
+          SnackBar(
+            content: Text(t('savings_cannot_be_changed')),
           ),
         );
         return;
@@ -914,11 +927,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
           '${item.type} - ${student.name}',
           amountToPay,
         );
-        _log('Melunasi ${item.type}');
+        _log('${t('paid_off')} ${item.type}');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pembayaran sudah lunas dan tidak dapat dibatalkan'),
+          SnackBar(
+            content: Text(t('payment_cannot_be_canceled')),
           ),
         );
         return;
@@ -929,6 +942,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = ref.watch(translationsProvider).t;
+
     PaymentItem? saldoItem = student.payments.firstWhere(
       (p) => p.type == 'Saldo',
       orElse: () => PaymentItem(
@@ -952,7 +967,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Banner jika siswa sudah diarsipkan
             if (widget.isArchived)
               Container(
                 width: double.infinity,
@@ -969,8 +983,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Siswa ini sudah lulus dan diarsipkan. '
-                        'Data hanya bisa dilihat (read-only).',
+                        t('archived_student_notice'),
                         style: TextStyle(
                           color: Colors.grey.shade700,
                           fontWeight: FontWeight.w600,
@@ -987,16 +1000,16 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Informasi Siswa',
+                      t('student_info'),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 12),
-                    _infoRow('Nama', student.name),
-                    _infoRow('NIS', student.nis),
-                    _infoRow('Alamat', student.alamat),
-                    _infoRow('No. Telepon', student.phone),
+                    _infoRow(t('name'), student.name),
+                    _infoRow(t('nis_label'), student.nis),
+                    _infoRow(t('address'), student.alamat),
+                    _infoRow(t('phone_number'), student.phone),
                     _infoRow(
-                      'Jenis Kelamin',
+                      t('gender'),
                       getExtraInfo(student.id, 'jenisKelamin'),
                     ),
                   ],
@@ -1004,7 +1017,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-            // Card Pembayaran Cepat — hanya tampil jika BUKAN arsip
             if (!widget.isArchived)
               Card(
                 child: Padding(
@@ -1013,7 +1025,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Pembayaran Cepat',
+                        t('quick_payment'),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
@@ -1023,9 +1035,9 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                             child: TextField(
                               controller: _quickPayController,
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                hintText: 'Masukkan nominal',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                hintText: t('enter_amount'),
+                                border: const OutlineInputBorder(),
                                 prefixText: 'Rp ',
                               ),
                             ),
@@ -1037,7 +1049,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                               _quickPayment();
                             },
                             icon: const Icon(Icons.payment),
-                            label: const Text('Bayar'),
+                            label: Text(t('pay')),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
@@ -1047,7 +1059,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Nominal akan dialokasikan ke semua tagihan yang belum lunas. Kelebihan akan menjadi saldo tabungan.',
+                        t('quick_payment_hint'),
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -1059,7 +1071,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               ),
             if (!widget.isArchived) const SizedBox(height: 16),
             Text(
-              'Riwayat Pembayaran',
+              t('payment_history'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -1082,11 +1094,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                   ),
                   title: Text(payment.type),
                   subtitle: Text(
-                    'Rp ${formatCurrency(payment.amount)} • ${payment.status == PaymentStatus.lunas ? 'Lunas' : payment.status == PaymentStatus.sebagian ? 'Sebagian' : 'Belum Bayar'}',
+                    'Rp ${formatCurrency(payment.amount)} • ${payment.status == PaymentStatus.lunas ? t('paid') : payment.status == PaymentStatus.sebagian ? t('partial') : t('unpaid')}',
                   ),
                   trailing: payment.type == 'Saldo'
                       ? Text(
-                          'Saldo: Rp ${formatCurrency(payment.amount)}',
+                          '${t('balance_label')}: Rp ${formatCurrency(payment.amount)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.orange,
@@ -1098,8 +1110,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                           : widget.isArchived
                               ? Text(
                                   payment.status == PaymentStatus.sebagian
-                                      ? 'Sebagian'
-                                      : 'Belum Bayar',
+                                      ? t('partial')
+                                      : t('unpaid'),
                                   style: TextStyle(
                                     color: _statusColor(payment.status),
                                     fontWeight: FontWeight.bold,
@@ -1110,7 +1122,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                                     SoundHelper().playClick();
                                     _togglePayment(idx);
                                   },
-                                  child: const Text('Lunas'),
+                                  child: Text(t('mark_paid')),
                                 ),
                 ),
               );
@@ -1123,21 +1135,21 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Ringkasan Keuangan',
+                      t('financial_summary'),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     _summaryRow(
-                      'Total Tagihan',
+                      t('total_bills'),
                       'Rp ${formatCurrency(student.totalDue)}',
                     ),
                     _summaryRow(
-                      'Total Dibayar',
+                      t('total_paid'),
                       'Rp ${formatCurrency(student.totalPaid)}',
                     ),
                     const Divider(),
                     _summaryRow(
-                      'Sisa Tagihan',
+                      t('remaining_bills'),
                       'Rp ${formatCurrency(student.remaining)}',
                       color: student.remaining > 0
                           ? AppColors.error
@@ -1164,7 +1176,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Saldo Tabungan',
+                                t('savings_balance'),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   color: Colors.orange.shade800,
@@ -1187,7 +1199,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          '✅ Saldo ini dapat digunakan untuk pembayaran di tahun ajaran berikutnya (naik kelas).',
+                          '✅ ${t('savings_notice')}',
                           style: TextStyle(
                             color: AppColors.success,
                             fontSize: 12,
@@ -1198,7 +1210,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          '⚠️ Masih ada tagihan yang belum lunas. Gunakan pembayaran cepat atau lunasi per item.',
+                          '⚠️ ${t('unpaid_warning')}',
                           style: TextStyle(
                             color: AppColors.error,
                             fontSize: 12,
