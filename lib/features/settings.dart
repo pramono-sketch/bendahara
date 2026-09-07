@@ -918,7 +918,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 contentPadding: EdgeInsets.zero,
                 onChanged: (value) {
                   if (value == null) return;
-                  ref.read(localeProvider.notifier).state = value;
+                  ref.read(localeProvider.notifier).setLocale(value);
                   Navigator.pop(ctx);
                 },
               ),
@@ -929,7 +929,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 contentPadding: EdgeInsets.zero,
                 onChanged: (value) {
                   if (value == null) return;
-                  ref.read(localeProvider.notifier).state = value;
+                  ref.read(localeProvider.notifier).setLocale(value);
                   Navigator.pop(ctx);
                 },
               ),

@@ -1,11 +1,33 @@
 // lib/l10n/translations.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Provider untuk locale saat ini (default: Indonesia)
-final localeProvider = StateProvider<Locale>(
-  (ref) => const Locale('id'),
-);
+class LocaleNotifier extends Notifier<Locale> {
+  @override
+  Locale build() {
+    // Memuat bahasa yang tersimpan saat aplikasi dimulai
+    _loadLocale();
+    return const Locale('id'); // Default sementara sebelum data termuat
+  }
+
+  Future<void> _loadLocale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final langCode = prefs.getString('locale') ?? 'id';
+    state = Locale(langCode);
+  }
+
+  Future<void> setLocale(Locale locale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('locale', locale.languageCode);
+    state = locale;
+  }
+}
+
+final localeProvider = NotifierProvider<LocaleNotifier, Locale>(() {
+  return LocaleNotifier();
+});
 
 // Provider untuk objek terjemahan
 final translationsProvider = Provider<Translations>((ref) {
