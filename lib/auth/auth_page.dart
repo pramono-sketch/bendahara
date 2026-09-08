@@ -1,3 +1,5 @@
+// lib/pages/auth_page.dart
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,11 +7,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../firebase/firestore_service.dart';
+
 class AuthPage extends StatefulWidget {
-  const AuthPage({
-    super.key,
-    this.onAuthSuccess,
-  });
+  const AuthPage({super.key, this.onAuthSuccess});
 
   final VoidCallback? onAuthSuccess;
 
@@ -19,16 +20,10 @@ class AuthPage extends StatefulWidget {
 
 class _AuthPageState extends State<AuthPage> {
   // ============================================================
-  // FIRESTORE
+  // FIREBASE AUTH
   // ============================================================
 
-  static const String accountCollectionName = 'manajemen account';
-
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance;
-
-  final FirebaseAuth _firebaseAuth =
-      FirebaseAuth.instance;
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
   // ============================================================
   // GOOGLE SIGN IN
@@ -37,13 +32,14 @@ class _AuthPageState extends State<AuthPage> {
   static Future<void>? _googleInitialization;
 
   Future<void> _initializeGoogle() {
-    return _googleInitialization ??=
-        GoogleSignIn.instance.initialize();
+    return _googleInitialization ??= GoogleSignIn.instance.initialize();
   }
 
   // ============================================================
   // FORM
   // ============================================================
+
+  final TextEditingController _namaController = TextEditingController();
 
   bool _isLoading = false;
 
@@ -51,11 +47,8 @@ class _AuthPageState extends State<AuthPage> {
 
   String _selectedRole = 'Bendahara';
 
-  final TextEditingController _namaController =
-      TextEditingController();
-
   // ============================================================
-  // GOOGLE LOGIN
+  // GOOGLE AUTH
   // ============================================================
 
   Future<UserCredential> _signInWithGoogle() async {
@@ -64,49 +57,32 @@ class _AuthPageState extends State<AuthPage> {
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {
-      // Tidak masalah apabila belum ada sesi Google.
+      // Tidak masalah jika tidak ada sesi.
     }
 
     if (!GoogleSignIn.instance.supportsAuthenticate()) {
       throw Exception(
-        'Google Sign-In tidak tersedia pada platform ini.',
+        'Google Sign-In tidak tersedia '
+        'pada platform ini.',
       );
     }
 
-    final GoogleSignInAccount googleUser =
-        await GoogleSignIn.instance.authenticate();
+    final GoogleSignInAccount googleUser = await GoogleSignIn.instance
+        .authenticate();
 
-    final GoogleSignInAuthentication googleAuth =
-        googleUser.authentication;
+    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
     final String? idToken = googleAuth.idToken;
 
     if (idToken == null || idToken.isEmpty) {
-      throw Exception(
-        'Google tidak memberikan ID Token.',
-      );
+      throw Exception('Google tidak memberikan ID Token.');
     }
 
-    final AuthCredential credential =
-        GoogleAuthProvider.credential(
+    final AuthCredential credential = GoogleAuthProvider.credential(
       idToken: idToken,
     );
 
-    return await _firebaseAuth.signInWithCredential(
-      credential,
-    );
-  }
-
-  // ============================================================
-  // CEK ACCOUNT FIRESTORE
-  // ============================================================
-
-  Future<DocumentSnapshot<Map<String, dynamic>>>
-      _getAccount(String uid) async {
-    return await _firestore
-        .collection(accountCollectionName)
-        .doc(uid)
-        .get();
+    return await _firebaseAuth.signInWithCredential(credential);
   }
 
   // ============================================================
@@ -121,68 +97,58 @@ class _AuthPageState extends State<AuthPage> {
     });
 
     try {
-      final UserCredential credential =
-          await _signInWithGoogle();
+      final UserCredential credential = await _signInWithGoogle();
 
       final User? user = credential.user;
 
       if (user == null) {
-        throw Exception(
-          'User Firebase tidak ditemukan.',
-        );
+        throw Exception('User Firebase tidak ditemukan.');
       }
 
-      final DocumentSnapshot<Map<String, dynamic>> account =
-          await _getAccount(user.uid);
+      // ========================================================
+      // FIRESTORE DIPANGGIL DARI SERVICE
+      // ========================================================
 
-      if (!account.exists) {
+      final bool registered = await isUserAccountRegistered(user.uid);
+
+      if (!registered) {
         await _signOut();
 
         if (!mounted) return;
 
         _showError(
           'Akun Google ini belum terdaftar.\n\n'
-          'Silakan pilih menu Daftar untuk membuat akun.',
+          'Silakan pilih menu Daftar.',
         );
 
         return;
       }
 
-      final Map<String, dynamic> data =
-          account.data() ?? {};
+      final DocumentSnapshot<Map<String, dynamic>> account =
+          await fetchUserAccount(user.uid);
+
+      final Map<String, dynamic> data = account.data() ?? {};
 
       final String nama =
-          data['nama'] as String? ??
-              user.displayName ??
-              'Pengguna';
+          data['nama'] as String? ?? user.displayName ?? 'Pengguna';
 
-      final String role =
-          data['role'] as String? ?? 'bendahara';
+      final String role = data['role'] as String? ?? 'bendahara';
 
       if (!mounted) return;
 
-      await _showLoginSuccess(
-        nama: nama,
-        role: role,
-      );
+      await _showLoginSuccess(nama: nama, role: role);
 
       if (!mounted) return;
 
-      if (widget.onAuthSuccess != null) {
-        widget.onAuthSuccess!();
-      }
+      widget.onAuthSuccess?.call();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      _showError(
-        _firebaseAuthErrorMessage(e),
-      );
+      _showError(_firebaseAuthErrorMessage(e));
     } catch (e) {
       if (!mounted) return;
 
-      _showError(
-        'Login gagal.\n\n$e',
-      );
+      _showError('Login gagal.\n\n$e');
     } finally {
       if (!mounted) return;
 
@@ -193,7 +159,7 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   // ============================================================
-  // REGISTRASI
+  // REGISTER
   // ============================================================
 
   Future<void> _register() async {
@@ -204,67 +170,63 @@ class _AuthPageState extends State<AuthPage> {
     });
 
     try {
-      final UserCredential credential =
-          await _signInWithGoogle();
+      final UserCredential credential = await _signInWithGoogle();
 
       final User? user = credential.user;
 
       if (user == null) {
-        throw Exception(
-          'User Firebase tidak ditemukan.',
-        );
+        throw Exception('User Firebase tidak ditemukan.');
       }
 
-      final DocumentSnapshot<Map<String, dynamic>> account =
-          await _getAccount(user.uid);
+      // ========================================================
+      // CEK FIRESTORE MELALUI SERVICE
+      // ========================================================
 
-      if (account.exists) {
+      final bool registered = await isUserAccountRegistered(user.uid);
+
+      if (registered) {
         await _signOut();
 
         if (!mounted) return;
 
         _showError(
           'Akun Google ini sudah terdaftar.\n\n'
-          'Silakan gunakan menu Login.',
+          'Silakan gunakan Login.',
         );
 
         return;
       }
 
-      _namaController.text =
-          user.displayName?.trim() ?? '';
+      _namaController.text = user.displayName?.trim() ?? '';
 
       if (_namaController.text.isEmpty) {
-        _namaController.text =
-            user.email?.split('@').first ?? '';
+        _namaController.text = user.email?.split('@').first ?? '';
       }
 
       if (!mounted) return;
 
-      final Map<String, dynamic>? registrationData =
-          await _showRegisterDialog(user);
+      final Map<String, dynamic>? registrationData = await _showRegisterDialog(
+        user,
+      );
 
       if (registrationData == null) {
         await _signOut();
+
         return;
       }
 
-      final String nama =
-          registrationData['nama'] as String;
+      final String nama = registrationData['nama'] as String;
 
-      final String role =
-          registrationData['role'] as String;
+      final String role = registrationData['role'] as String;
 
       if (!mounted) return;
 
-      final bool? result =
-          await Navigator.of(context).push<bool>(
+      final bool? result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (_) => _OtpVerificationPage(
             user: user,
             nama: nama,
             role: role,
-            firestore: _firestore,
             firebaseAuth: _firebaseAuth,
           ),
         ),
@@ -277,25 +239,18 @@ class _AuthPageState extends State<AuthPage> {
 
         if (!mounted) return;
 
-        if (widget.onAuthSuccess != null) {
-          widget.onAuthSuccess!();
-        }
+        widget.onAuthSuccess?.call();
       } else {
-        // Tidak selesai daftar.
         await _signOut();
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      _showError(
-        _firebaseAuthErrorMessage(e),
-      );
+      _showError(_firebaseAuthErrorMessage(e));
     } catch (e) {
       if (!mounted) return;
 
-      _showError(
-        'Pendaftaran gagal.\n\n$e',
-      );
+      _showError('Pendaftaran gagal.\n\n$e');
     } finally {
       if (!mounted) return;
 
@@ -306,12 +261,10 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   // ============================================================
-  // FORM DETAIL REGISTER
+  // REGISTER DIALOG
   // ============================================================
 
-  Future<Map<String, dynamic>?> _showRegisterDialog(
-    User user,
-  ) async {
+  Future<Map<String, dynamic>?> _showRegisterDialog(User user) async {
     String selectedRole = _selectedRole;
 
     return showDialog<Map<String, dynamic>>(
@@ -319,38 +272,28 @@ class _AuthPageState extends State<AuthPage> {
       barrierDismissible: false,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (
-            context,
-            setDialogState,
-          ) {
+          builder: (context, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
+
               title: const Text(
                 'Buat Akun Baru',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
+
               content: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     CircleAvatar(
                       radius: 32,
-                      backgroundImage:
-                          user.photoURL != null
-                              ? NetworkImage(
-                                  user.photoURL!,
-                                )
-                              : null,
+                      backgroundImage: user.photoURL != null
+                          ? NetworkImage(user.photoURL!)
+                          : null,
                       child: user.photoURL == null
-                          ? const Icon(
-                              Icons.person,
-                              size: 32,
-                            )
+                          ? const Icon(Icons.person, size: 32)
                           : null,
                     ),
 
@@ -359,26 +302,20 @@ class _AuthPageState extends State<AuthPage> {
                     Text(
                       user.email ?? '-',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.black54,
-                      ),
+                      style: const TextStyle(color: Colors.black54),
                     ),
 
                     const SizedBox(height: 22),
 
                     TextField(
                       controller: _namaController,
-                      textCapitalization:
-                          TextCapitalization.words,
+                      textCapitalization: TextCapitalization.words,
                       decoration: InputDecoration(
                         labelText: 'Nama',
                         hintText: 'Masukkan nama',
-                        prefixIcon: const Icon(
-                          Icons.person_outline,
-                        ),
+                        prefixIcon: const Icon(Icons.person_outline),
                         border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                     ),
@@ -389,26 +326,22 @@ class _AuthPageState extends State<AuthPage> {
                       initialValue: selectedRole,
                       decoration: InputDecoration(
                         labelText: 'Role',
-                        prefixIcon: const Icon(
-                          Icons.badge_outlined,
-                        ),
+                        prefixIcon: const Icon(Icons.badge_outlined),
                         border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       items: const [
-                        DropdownMenuItem(
-                          value: 'Guru',
-                          child: Text('Guru'),
-                        ),
+                        DropdownMenuItem(value: 'Guru', child: Text('Guru')),
                         DropdownMenuItem(
                           value: 'Bendahara',
                           child: Text('Bendahara'),
                         ),
                       ],
                       onChanged: (value) {
-                        if (value == null) return;
+                        if (value == null) {
+                          return;
+                        }
 
                         setDialogState(() {
                           selectedRole = value;
@@ -421,31 +354,24 @@ class _AuthPageState extends State<AuthPage> {
                     const SizedBox(height: 18),
 
                     Container(
-                      padding:
-                          const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.blue
-                            .withValues(alpha: 0.07),
-                        borderRadius:
-                            BorderRadius.circular(16),
+                        color: Colors.blue.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 20,
-                          ),
+                          Icon(Icons.info_outline, size: 20),
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Setelah menekan lanjutkan, '
-                              'nomor telepon akan diverifikasi '
-                              'menggunakan kode OTP.',
-                              style: TextStyle(
-                                fontSize: 13,
-                              ),
+                              'Setelah menekan '
+                              'lanjutkan, nomor '
+                              'telepon akan '
+                              'diverifikasi '
+                              'menggunakan OTP.',
+                              style: TextStyle(fontSize: 13),
                             ),
                           ),
                         ],
@@ -454,46 +380,35 @@ class _AuthPageState extends State<AuthPage> {
                   ],
                 ),
               ),
+
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(
-                      dialogContext,
-                      null,
-                    );
+                    Navigator.pop(dialogContext, null);
                   },
                   child: const Text('Batal'),
                 ),
+
                 FilledButton(
                   onPressed: () {
-                    final String nama =
-                        _namaController.text.trim();
+                    final String nama = _namaController.text.trim();
 
                     if (nama.isEmpty) {
-                      ScaffoldMessenger.of(
-                        dialogContext,
-                      ).showSnackBar(
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
                         const SnackBar(
-                          content: Text(
-                            'Nama tidak boleh kosong.',
-                          ),
+                          content: Text('Nama tidak boleh kosong.'),
                         ),
                       );
 
                       return;
                     }
 
-                    Navigator.pop(
-                      dialogContext,
-                      {
-                        'nama': nama,
-                        'role': selectedRole,
-                      },
-                    );
+                    Navigator.pop(dialogContext, {
+                      'nama': nama,
+                      'role': selectedRole,
+                    });
                   },
-                  child: const Text(
-                    'Lanjutkan',
-                  ),
+                  child: const Text('Lanjutkan'),
                 ),
               ],
             );
@@ -502,6 +417,13 @@ class _AuthPageState extends State<AuthPage> {
       },
     );
   }
+
+  // ============================================================
+  // OTP PAGE
+  // ============================================================
+
+  // OTP tetap berada sebagai page internal file ini.
+  // Firestore tidak ditulis di sini.
 
   // ============================================================
   // SIGN OUT
@@ -518,7 +440,7 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   // ============================================================
-  // DIALOG SUCCESS
+  // SUCCESS
   // ============================================================
 
   Future<void> _showLoginSuccess({
@@ -534,10 +456,7 @@ class _AuthPageState extends State<AuthPage> {
           ),
           title: const Row(
             children: [
-              Icon(
-                Icons.check_circle,
-                color: Colors.green,
-              ),
+              Icon(Icons.check_circle, color: Colors.green),
               SizedBox(width: 10),
               Text('Login Berhasil'),
             ],
@@ -570,22 +489,16 @@ class _AuthPageState extends State<AuthPage> {
           ),
           title: const Row(
             children: [
-              Icon(
-                Icons.verified,
-                color: Colors.green,
-              ),
+              Icon(Icons.verified, color: Colors.green),
               SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Akun Berhasil Dibuat',
-                ),
-              ),
+              Expanded(child: Text('Akun Berhasil Dibuat')),
             ],
           ),
           content: const Text(
             'Akun Google dan nomor telepon '
             'berhasil diverifikasi.\n\n'
-            'Data akun sudah disimpan ke Firestore.',
+            'Data akun telah disimpan ke '
+            'collection manajemen account.',
           ),
           actions: [
             FilledButton(
@@ -601,12 +514,10 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   // ============================================================
-  // ERROR MESSAGE
+  // AUTH ERROR
   // ============================================================
 
-  String _firebaseAuthErrorMessage(
-    FirebaseAuthException e,
-  ) {
+  String _firebaseAuthErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'network-request-failed':
         return 'Tidak ada koneksi internet.';
@@ -626,22 +537,18 @@ class _AuthPageState extends State<AuthPage> {
             'oleh provider lain.';
 
       default:
-        return e.message ??
-            'Terjadi kesalahan autentikasi.';
+        return e.message ?? 'Terjadi kesalahan autentikasi.';
     }
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
   // ============================================================
-  // UI
+  // MAIN UI
   // ============================================================
 
   @override
@@ -653,9 +560,7 @@ class _AuthPageState extends State<AuthPage> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 430,
-              ),
+              constraints: const BoxConstraints(maxWidth: 430),
               child: Column(
                 children: [
                   const SizedBox(height: 20),
@@ -665,8 +570,7 @@ class _AuthPageState extends State<AuthPage> {
                     height: 86,
                     decoration: BoxDecoration(
                       color: Colors.blue,
-                      borderRadius:
-                          BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(26),
                     ),
                     child: const Icon(
                       Icons.account_balance_wallet_rounded,
@@ -680,10 +584,7 @@ class _AuthPageState extends State<AuthPage> {
                   const Text(
                     'Manajemen Bendahara',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
 
                   const SizedBox(height: 8),
@@ -693,10 +594,7 @@ class _AuthPageState extends State<AuthPage> {
                         ? 'Masuk menggunakan akun Google'
                         : 'Buat akun guru atau bendahara',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.black54,
-                      fontSize: 15,
-                    ),
+                    style: const TextStyle(color: Colors.black54, fontSize: 15),
                   ),
 
                   const SizedBox(height: 30),
@@ -705,8 +603,7 @@ class _AuthPageState extends State<AuthPage> {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius:
-                          BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       children: [
@@ -723,6 +620,7 @@ class _AuthPageState extends State<AuthPage> {
                                   },
                           ),
                         ),
+
                         Expanded(
                           child: _ModeButton(
                             text: 'Daftar',
@@ -746,14 +644,12 @@ class _AuthPageState extends State<AuthPage> {
                     elevation: 0,
                     color: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(26),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
                             _isLoginMode
@@ -770,12 +666,11 @@ class _AuthPageState extends State<AuthPage> {
                           Text(
                             _isLoginMode
                                 ? 'Gunakan akun Google yang sudah '
-                                  'terdaftar di aplikasi.'
-                                : 'Gunakan akun Google kamu. Setelah itu '
-                                  'nomor telepon akan diverifikasi.',
-                            style: const TextStyle(
-                              color: Colors.black54,
-                            ),
+                                      'terdaftar di aplikasi.'
+                                : 'Gunakan akun Google kamu. Setelah '
+                                      'itu nomor telepon akan '
+                                      'diverifikasi.',
+                            style: const TextStyle(color: Colors.black54),
                           ),
 
                           const SizedBox(height: 26),
@@ -786,57 +681,39 @@ class _AuthPageState extends State<AuthPage> {
                               onPressed: _isLoading
                                   ? null
                                   : _isLoginMode
-                                      ? _login
-                                      : _register,
+                                  ? _login
+                                  : _register,
+
                               icon: _isLoading
                                   ? const SizedBox(
                                       width: 22,
                                       height: 22,
-                                      child:
-                                          CircularProgressIndicator(
+                                      child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : Container(
-                                      width: 28,
-                                      height: 28,
-                                      alignment:
-                                          Alignment.center,
-                                      decoration:
-                                          BoxDecoration(
-                                        borderRadius:
-                                            BorderRadius
-                                                .circular(7),
-                                      ),
-                                      child: const Text(
-                                        'G',
-                                        style: TextStyle(
-                                          fontSize: 22,
-                                          fontWeight:
-                                              FontWeight.bold,
-                                        ),
+                                  : const Text(
+                                      'G',
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
+
                               label: Text(
                                 _isLoading
                                     ? 'Memproses...'
                                     : _isLoginMode
-                                        ? 'Masuk dengan Google'
-                                        : 'Daftar dengan Google',
+                                    ? 'Masuk dengan Google'
+                                    : 'Daftar dengan Google',
                               ),
-                              style: OutlinedButton
-                                  .styleFrom(
-                                shape:
-                                    RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                    16,
-                                  ),
+
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                textStyle:
-                                    const TextStyle(
-                                  fontWeight:
-                                      FontWeight.w600,
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -847,31 +724,24 @@ class _AuthPageState extends State<AuthPage> {
                           Row(
                             children: [
                               Expanded(
-                                child: Divider(
-                                  color:
-                                      Colors.grey.shade300,
-                                ),
+                                child: Divider(color: Colors.grey.shade300),
                               ),
+
                               Padding(
-                                padding:
-                                    const EdgeInsets
-                                        .symmetric(
+                                padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
                                 ),
                                 child: Text(
                                   'Google Account',
                                   style: TextStyle(
-                                    color: Colors
-                                        .grey.shade500,
+                                    color: Colors.grey.shade500,
                                     fontSize: 12,
                                   ),
                                 ),
                               ),
+
                               Expanded(
-                                child: Divider(
-                                  color:
-                                      Colors.grey.shade300,
-                                ),
+                                child: Divider(color: Colors.grey.shade300),
                               ),
                             ],
                           ),
@@ -887,10 +757,7 @@ class _AuthPageState extends State<AuthPage> {
                         ? 'Akun harus sudah terdaftar di Firestore.'
                         : 'Pendaftaran membutuhkan verifikasi OTP.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black45,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.black45),
                   ),
                 ],
               ),
@@ -904,6 +771,7 @@ class _AuthPageState extends State<AuthPage> {
   @override
   void dispose() {
     _namaController.dispose();
+
     super.dispose();
   }
 }
@@ -928,27 +796,18 @@ class _ModeButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(
-          milliseconds: 220,
-        ),
-        padding: const EdgeInsets.symmetric(
-          vertical: 13,
-        ),
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: selected
-              ? Colors.blue
-              : Colors.transparent,
-          borderRadius:
-              BorderRadius.circular(12),
+          color: selected ? Colors.blue : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           text,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: selected
-                ? Colors.white
-                : Colors.black54,
+            color: selected ? Colors.white : Colors.black54,
           ),
         ),
       ),
@@ -957,7 +816,7 @@ class _ModeButton extends StatelessWidget {
 }
 
 // ============================================================
-// OTP PAGE
+// OTP VERIFICATION PAGE
 // ============================================================
 
 class _OtpVerificationPage extends StatefulWidget {
@@ -965,56 +824,43 @@ class _OtpVerificationPage extends StatefulWidget {
     required this.user,
     required this.nama,
     required this.role,
-    required this.firestore,
     required this.firebaseAuth,
   });
 
   final User user;
+
   final String nama;
+
   final String role;
 
-  final FirebaseFirestore firestore;
   final FirebaseAuth firebaseAuth;
 
   @override
-  State<_OtpVerificationPage> createState() =>
-      _OtpVerificationPageState();
+  State<_OtpVerificationPage> createState() => _OtpVerificationPageState();
 }
 
-class _OtpVerificationPageState
-    extends State<_OtpVerificationPage> {
+class _OtpVerificationPageState extends State<_OtpVerificationPage> {
   // ============================================================
   // NOMOR TESTING
   // ============================================================
 
-  static const String testingPhoneNumber =
-      '+6287833467630';
+  static const String testingPhoneNumber = '+6287833467630';
 
   // ============================================================
-  // OTP SETTINGS
+  // OTP TIMER
   // ============================================================
 
   static const int otpDurationSeconds = 5 * 60;
 
-  // ============================================================
-  // CONTROLLER
-  // ============================================================
-
-  final TextEditingController _otpController =
-      TextEditingController();
-
-  // ============================================================
-  // STATE
-  // ============================================================
-
   Timer? _timer;
+
+  final TextEditingController _otpController = TextEditingController();
 
   String? _verificationId;
 
   int? _resendToken;
 
-  int _remainingSeconds =
-      otpDurationSeconds;
+  int _remainingSeconds = otpDurationSeconds;
 
   bool _otpSent = false;
 
@@ -1026,16 +872,11 @@ class _OtpVerificationPageState
 
   String? _errorMessage;
 
-  // ============================================================
-  // INIT
-  // ============================================================
-
   @override
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _sendOtp();
     });
   }
@@ -1054,8 +895,7 @@ class _OtpVerificationPageState
       _otpSent = false;
       _expired = false;
       _errorMessage = null;
-      _remainingSeconds =
-          otpDurationSeconds;
+      _remainingSeconds = otpDurationSeconds;
       _verificationId = null;
     });
 
@@ -1067,50 +907,37 @@ class _OtpVerificationPageState
 
         forceResendingToken: _resendToken,
 
-        verificationCompleted:
-            (PhoneAuthCredential credential) async {
-          await _finishVerification(
-            credential,
-          );
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          await _finishVerification(credential);
         },
 
-        verificationFailed:
-            (FirebaseAuthException e) {
+        verificationFailed: (FirebaseAuthException e) {
           if (!mounted) return;
 
           setState(() {
             _isSendingOtp = false;
-            _errorMessage =
-                _phoneErrorMessage(e);
+            _errorMessage = _phoneErrorMessage(e);
           });
         },
 
-        codeSent: (
-          String verificationId,
-          int? resendToken,
-        ) {
+        codeSent: (String verificationId, int? resendToken) {
           if (!mounted) return;
 
           setState(() {
-            _verificationId =
-                verificationId;
-            _resendToken =
-                resendToken;
+            _verificationId = verificationId;
+            _resendToken = resendToken;
             _otpSent = true;
             _isSendingOtp = false;
             _expired = false;
             _errorMessage = null;
-            _remainingSeconds =
-                otpDurationSeconds;
+            _remainingSeconds = otpDurationSeconds;
           });
 
           _startTimer();
         },
 
-        codeAutoRetrievalTimeout:
-            (String verificationId) {
-          _verificationId =
-              verificationId;
+        codeAutoRetrievalTimeout: (String verificationId) {
+          _verificationId = verificationId;
         },
       );
     } catch (e) {
@@ -1118,43 +945,40 @@ class _OtpVerificationPageState
 
       setState(() {
         _isSendingOtp = false;
-        _errorMessage =
-            'Gagal meminta OTP.\n$e';
+        _errorMessage = 'Gagal meminta OTP.\n$e';
       });
     }
   }
 
   // ============================================================
-  // TIMER 5 MENIT
+  // TIMER
   // ============================================================
 
   void _startTimer() {
     _timer?.cancel();
 
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
 
-        if (_remainingSeconds <= 1) {
-          timer.cancel();
+        return;
+      }
 
-          setState(() {
-            _remainingSeconds = 0;
-            _expired = true;
-          });
-
-          return;
-        }
+      if (_remainingSeconds <= 1) {
+        timer.cancel();
 
         setState(() {
-          _remainingSeconds--;
+          _remainingSeconds = 0;
+          _expired = true;
         });
-      },
-    );
+
+        return;
+      }
+
+      setState(() {
+        _remainingSeconds--;
+      });
+    });
   }
 
   // ============================================================
@@ -1165,29 +989,22 @@ class _OtpVerificationPageState
     if (_isVerifying) return;
 
     if (_expired) {
-      _showError(
-        'OTP sudah melewati batas 5 menit.',
-      );
+      _showError('OTP sudah melewati batas 5 menit.');
 
       return;
     }
 
-    final String smsCode =
-        _otpController.text.trim();
+    final String smsCode = _otpController.text.trim();
 
     if (smsCode.length != 6) {
-      _showError(
-        'OTP harus terdiri dari 6 angka.',
-      );
+      _showError('OTP harus terdiri dari 6 angka.');
 
       return;
     }
 
-    final String? verificationId =
-        _verificationId;
+    final String? verificationId = _verificationId;
 
-    if (verificationId == null ||
-        verificationId.isEmpty) {
+    if (verificationId == null || verificationId.isEmpty) {
       _showError(
         'Sesi OTP belum tersedia. '
         'Silakan kirim OTP lagi.',
@@ -1202,107 +1019,77 @@ class _OtpVerificationPageState
     });
 
     try {
-      final PhoneAuthCredential credential =
-          PhoneAuthProvider.credential(
+      final PhoneAuthCredential credential = PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: smsCode,
       );
 
-      await _finishVerification(
-        credential,
-      );
+      await _finishVerification(credential);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
       setState(() {
         _isVerifying = false;
-        _errorMessage =
-            _phoneErrorMessage(e);
+        _errorMessage = _phoneErrorMessage(e);
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
         _isVerifying = false;
-        _errorMessage =
-            'Verifikasi gagal.\n$e';
+        _errorMessage = 'Verifikasi gagal.\n$e';
       });
     }
   }
 
   // ============================================================
-  // LINK PHONE KE AKUN GOOGLE
+  // LINK PHONE + SIMPAN FIRESTORE
   // ============================================================
 
-  Future<void> _finishVerification(
-    PhoneAuthCredential credential,
-  ) async {
+  Future<void> _finishVerification(PhoneAuthCredential credential) async {
     try {
-      final User? currentUser =
-          widget.firebaseAuth.currentUser;
+      final User? currentUser = widget.firebaseAuth.currentUser;
 
       if (currentUser == null) {
-        throw Exception(
-          'Sesi login Google sudah tidak tersedia.',
-        );
+        throw Exception('Sesi Google sudah tidak tersedia.');
       }
 
       User user = currentUser;
 
       try {
-        final UserCredential linkedCredential =
-            await user.linkWithCredential(
+        final UserCredential linkedCredential = await user.linkWithCredential(
           credential,
         );
 
-        user =
-            linkedCredential.user ?? user;
+        user = linkedCredential.user ?? user;
       } on FirebaseAuthException catch (e) {
-        if (e.code ==
-            'provider-already-linked') {
-          user =
-              widget.firebaseAuth.currentUser ??
-                  user;
+        if (e.code == 'provider-already-linked') {
+          user = widget.firebaseAuth.currentUser ?? user;
         } else {
           rethrow;
         }
       }
 
-      await widget.firestore
-          .collection(
-            AuthPageStateHelper.accountCollectionName,
-          )
-          .doc(user.uid)
-          .set(
-        {
-          'uid': user.uid,
-          'nama': widget.nama,
-          'email': user.email,
-          'photoUrl': user.photoURL,
-          'role': widget.role.toLowerCase(),
-          'nomorTelepon':
-              testingPhoneNumber,
-          'nomorTerverifikasi': true,
-          'provider': 'google.com',
-          'createdAt':
-              FieldValue.serverTimestamp(),
-          'updatedAt':
-              FieldValue.serverTimestamp(),
-        },
-        SetOptions(
-          merge: true,
-        ),
+      // ========================================================
+      // FIRESTORE SEPENUHNYA DIPANGGIL MELALUI SERVICE
+      // ========================================================
+
+      await createUserAccount(
+        uid: user.uid,
+        nama: widget.nama,
+        email: user.email,
+        photoUrl: user.photoURL,
+        role: widget.role.toLowerCase(),
+        nomorTelepon: testingPhoneNumber,
+        nomorTerverifikasi: true,
+        provider: 'google.com',
       );
 
       if (!mounted) return;
 
       _timer?.cancel();
 
-      await Future<void>.delayed(
-        const Duration(
-          milliseconds: 300,
-        ),
-      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
 
       if (!mounted) return;
 
@@ -1312,27 +1099,23 @@ class _OtpVerificationPageState
 
       setState(() {
         _isVerifying = false;
-        _errorMessage =
-            _phoneErrorMessage(e);
+        _errorMessage = _phoneErrorMessage(e);
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
         _isVerifying = false;
-        _errorMessage =
-            'Gagal menyimpan akun.\n$e';
+        _errorMessage = 'Gagal menyimpan akun.\n$e';
       });
     }
   }
 
   // ============================================================
-  // ERROR OTP
+  // OTP ERROR
   // ============================================================
 
-  String _phoneErrorMessage(
-    FirebaseAuthException e,
-  ) {
+  String _phoneErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-phone-number':
         return 'Nomor telepon tidak valid.';
@@ -1365,61 +1148,40 @@ class _OtpVerificationPageState
             'diaktifkan di Firebase Console.';
 
       default:
-        return e.message ??
-            'Verifikasi nomor gagal.';
+        return e.message ?? 'Verifikasi nomor gagal.';
     }
   }
 
   // ============================================================
-  // FORMAT TIMER
+  // TIMER FORMAT
   // ============================================================
 
   String _formatTimer() {
-    final int minutes =
-        _remainingSeconds ~/ 60;
+    final int minutes = _remainingSeconds ~/ 60;
 
-    final int seconds =
-        _remainingSeconds % 60;
+    final int seconds = _remainingSeconds % 60;
 
     return '${minutes.toString().padLeft(2, '0')}:'
         '${seconds.toString().padLeft(2, '0')}';
   }
 
-  // ============================================================
-  // MASK NOMOR
-  // ============================================================
-
   String _maskedPhone() {
-    const String phone =
-        testingPhoneNumber;
+    const String phone = testingPhoneNumber;
 
     if (phone.length <= 7) {
       return phone;
     }
 
-    final String first =
-        phone.substring(0, 5);
+    final String first = phone.substring(0, 5);
 
-    final String last =
-        phone.substring(
-      phone.length - 3,
-    );
+    final String last = phone.substring(phone.length - 3);
 
     return '$first******$last';
   }
 
-  // ============================================================
-  // ERROR UI
-  // ============================================================
-
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior:
-            SnackBarBehavior.floating,
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -1430,52 +1192,36 @@ class _OtpVerificationPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFF6F7FB),
+      backgroundColor: const Color(0xFFF6F7FB),
+
       appBar: AppBar(
-        title: const Text(
-          'Verifikasi OTP',
-        ),
-        backgroundColor:
-            Colors.transparent,
+        title: const Text('Verifikasi OTP'),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
+
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(
-                maxWidth: 430,
-              ),
+              constraints: const BoxConstraints(maxWidth: 430),
               child: Card(
                 elevation: 0,
                 color: Colors.white,
-                shape:
-                    RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(
-                    26,
-                  ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(26),
                 ),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
                       Container(
                         width: 80,
                         height: 80,
-                        decoration:
-                            BoxDecoration(
+                        decoration: BoxDecoration(
                           color: Colors.blue,
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            24,
-                          ),
+                          borderRadius: BorderRadius.circular(24),
                         ),
                         child: const Icon(
                           Icons.sms_outlined,
@@ -1490,22 +1236,19 @@ class _OtpVerificationPageState
                         'Verifikasi Nomor',
                         style: TextStyle(
                           fontSize: 26,
-                          fontWeight:
-                              FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
 
                       const SizedBox(height: 8),
 
                       Text(
-                        'Masukkan kode OTP yang '
-                        'dikirim ke\n${_maskedPhone()}',
-                        textAlign:
-                            TextAlign.center,
-                        style:
-                            const TextStyle(
-                          color:
-                              Colors.black54,
+                        'Masukkan kode OTP '
+                        'yang dikirim ke\n'
+                        '${_maskedPhone()}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.black54,
                           height: 1.5,
                         ),
                       ),
@@ -1517,220 +1260,130 @@ class _OtpVerificationPageState
                           children: [
                             CircularProgressIndicator(),
                             SizedBox(height: 12),
-                            Text(
-                              'Meminta kode OTP...',
-                            ),
+                            Text('Meminta kode OTP...'),
                           ],
                         )
                       else if (!_otpSent)
-                        const Text(
-                          'Belum menerima kode OTP.',
-                        )
+                        const Text('Belum menerima kode OTP.')
                       else ...[
                         Container(
-                          width:
-                              double.infinity,
-                          padding:
-                              const EdgeInsets
-                                  .symmetric(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
                             vertical: 15,
                             horizontal: 16,
                           ),
-                          decoration:
-                              BoxDecoration(
+                          decoration: BoxDecoration(
                             color: _expired
-                                ? Colors.red
-                                    .withValues(
-                                    alpha:
-                                        0.07,
-                                  )
-                                : Colors.blue
-                                    .withValues(
-                                    alpha:
-                                        0.07,
-                                  ),
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              16,
-                            ),
+                                ? Colors.red.withValues(alpha: 0.07)
+                                : Colors.blue.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment
-                                    .center,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
                                 _expired
-                                    ? Icons
-                                        .timer_off_outlined
-                                    : Icons
-                                        .timer_outlined,
+                                    ? Icons.timer_off_outlined
+                                    : Icons.timer_outlined,
                                 size: 21,
-                                color: _expired
-                                    ? Colors.red
-                                    : Colors.blue,
+                                color: _expired ? Colors.red : Colors.blue,
                               ),
-                              const SizedBox(
-                                width: 8,
-                              ),
+                              const SizedBox(width: 8),
                               Text(
                                 _expired
                                     ? 'OTP Kedaluwarsa'
-                                    : 'Waktu: '
-                                      '${_formatTimer()}',
+                                    : 'Waktu: ${_formatTimer()}',
                                 style: TextStyle(
-                                  fontWeight:
-                                      FontWeight
-                                          .w600,
-                                  color: _expired
-                                      ? Colors.red
-                                      : Colors.blue,
+                                  fontWeight: FontWeight.w600,
+                                  color: _expired ? Colors.red : Colors.blue,
                                 ),
                               ),
                             ],
                           ),
                         ),
 
-                        const SizedBox(
-                          height: 24,
-                        ),
+                        const SizedBox(height: 24),
 
                         TextField(
-                          controller:
-                              _otpController,
-                          keyboardType:
-                              TextInputType
-                                  .number,
-                          textAlign:
-                              TextAlign.center,
+                          controller: _otpController,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
                           maxLength: 6,
-                          enabled:
-                              !_expired &&
-                                  !_isVerifying,
-                          style:
-                              const TextStyle(
+                          enabled: !_expired && !_isVerifying,
+                          style: const TextStyle(
                             fontSize: 28,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 8,
                           ),
-                          decoration:
-                              InputDecoration(
-                            hintText:
-                                '000000',
+                          decoration: InputDecoration(
+                            hintText: '000000',
                             counterText: '',
-                            border:
-                                OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                16,
-                              ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                         ),
 
-                        const SizedBox(
-                          height: 18,
-                        ),
+                        const SizedBox(height: 18),
 
                         SizedBox(
-                          width:
-                              double.infinity,
+                          width: double.infinity,
                           height: 54,
-                          child:
-                              FilledButton(
-                            onPressed: _expired ||
-                                    _isVerifying
+                          child: FilledButton(
+                            onPressed: _expired || _isVerifying
                                 ? null
                                 : _verifyOtp,
-                            child:
-                                _isVerifying
-                                    ? const SizedBox(
-                                        width: 23,
-                                        height: 23,
-                                        child:
-                                            CircularProgressIndicator(
-                                          strokeWidth:
-                                              2,
-                                          color: Colors
-                                              .white,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Verifikasi OTP',
-                                      ),
+                            child: _isVerifying
+                                ? const SizedBox(
+                                    width: 23,
+                                    height: 23,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Verifikasi OTP'),
                           ),
                         ),
 
-                        const SizedBox(
-                          height: 12,
-                        ),
+                        const SizedBox(height: 12),
 
                         SizedBox(
-                          width:
-                              double.infinity,
+                          width: double.infinity,
                           height: 48,
-                          child:
-                              OutlinedButton(
-                            onPressed: _expired &&
-                                    !_isSendingOtp
+                          child: OutlinedButton(
+                            onPressed: _expired && !_isSendingOtp
                                 ? _sendOtp
                                 : null,
-                            child: const Text(
-                              'Kirim OTP Baru',
-                            ),
+                            child: const Text('Kirim OTP Baru'),
                           ),
                         ),
                       ],
 
-                      if (_errorMessage !=
-                          null) ...[
-                        const SizedBox(
-                          height: 18,
-                        ),
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 18),
+
                         Container(
-                          width:
-                              double.infinity,
-                          padding:
-                              const EdgeInsets
-                                  .all(13),
-                          decoration:
-                              BoxDecoration(
-                            color: Colors.red
-                                .withValues(
-                              alpha: 0.07,
-                            ),
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              14,
-                            ),
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(13),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
-                            crossAxisAlignment:
-                                CrossAxisAlignment
-                                    .start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(
-                                Icons
-                                    .error_outline,
-                                color:
-                                    Colors.red,
+                                Icons.error_outline,
+                                color: Colors.red,
                               ),
-                              const SizedBox(
-                                width: 10,
-                              ),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   _errorMessage!,
-                                  style:
-                                      const TextStyle(
-                                    color:
-                                        Colors.red,
-                                    fontSize:
-                                        13,
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ),
@@ -1739,46 +1392,32 @@ class _OtpVerificationPageState
                         ),
                       ],
 
-                      const SizedBox(
-                        height: 24,
-                      ),
+                      const SizedBox(height: 24),
 
                       const Divider(),
 
-                      const SizedBox(
-                        height: 16,
-                      ),
+                      const SizedBox(height: 16),
 
                       _InfoRow(
-                        icon:
-                            Icons.person_outline,
+                        icon: Icons.person_outline,
                         label: 'Nama',
-                        value:
-                            widget.nama,
+                        value: widget.nama,
                       ),
 
-                      const SizedBox(
-                        height: 10,
-                      ),
+                      const SizedBox(height: 10),
 
                       _InfoRow(
-                        icon:
-                            Icons.badge_outlined,
+                        icon: Icons.badge_outlined,
                         label: 'Role',
                         value: widget.role,
                       ),
 
-                      const SizedBox(
-                        height: 10,
-                      ),
+                      const SizedBox(height: 10),
 
                       _InfoRow(
-                        icon:
-                            Icons.email_outlined,
+                        icon: Icons.email_outlined,
                         label: 'Email',
-                        value:
-                            widget.user.email ??
-                                '-',
+                        value: widget.user.email ?? '-',
                       ),
                     ],
                   ),
@@ -1794,7 +1433,9 @@ class _OtpVerificationPageState
   @override
   void dispose() {
     _timer?.cancel();
+
     _otpController.dispose();
+
     super.dispose();
   }
 }
@@ -1811,55 +1452,37 @@ class _InfoRow extends StatelessWidget {
   });
 
   final IconData icon;
+
   final String label;
+
   final String value;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 19,
-          color: Colors.black54,
-        ),
+        Icon(icon, size: 19, color: Colors.black54),
+
         const SizedBox(width: 10),
+
         SizedBox(
           width: 65,
           child: Text(
             label,
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: Colors.black54, fontSize: 13),
           ),
         ),
+
         const SizedBox(width: 8),
+
         Expanded(
           child: Text(
             value,
-            overflow:
-                TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight:
-                  FontWeight.w600,
-              fontSize: 13,
-            ),
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
           ),
         ),
       ],
     );
   }
-}
-
-// ============================================================
-// HELPER
-// ============================================================
-//
-// Karena _OtpVerificationPage berada dalam file yang sama,
-// helper ini menjaga nama collection tetap satu sumber.
-
-class AuthPageStateHelper {
-  static const String accountCollectionName =
-      'manajemen account';
 }

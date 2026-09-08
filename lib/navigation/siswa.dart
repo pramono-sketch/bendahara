@@ -9,6 +9,7 @@ import '../firebase/firestore_service.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/theme_helper.dart';
 import '../l10n/translations.dart';
+import '../templates/custom_animation.dart';
 import '../templates/sound_helper.dart';
 
 // ============================================================
@@ -157,45 +158,41 @@ class _StudentsPageState extends ConsumerState<StudentsPage> {
 
                   const SizedBox(width: 8),
 
+                  // ==================================================
+                  // FILTER KELAS
+                  // ==================================================
                   FutureBuilder<List<String>>(
                     future: _getKelasOptions(),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          !snapshot.hasData) {
-                        return const SizedBox(
-                          width: 35,
-                          height: 35,
-                          child: Padding(
-                            padding: EdgeInsets.all(8),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        return const Icon(
-                          Icons.error_outline,
-                          color: Colors.red,
-                        );
-                      }
-
                       final classes = snapshot.data ?? [];
 
+                      // Selama data kelas belum selesai dimuat,
+                      // dropdown tetap menampilkan "Semua".
+                      final items = [
+                        DropdownMenuItem<String>(
+                          value: _allClassFilter,
+                          child: Text(allText),
+                        ),
+                        ...classes.map((kelas) {
+                          return DropdownMenuItem<String>(
+                            value: kelas,
+                            child: Text(kelas),
+                          );
+                        }),
+                      ];
+
+                      // Jika filter sebelumnya sudah tidak tersedia
+                      // setelah data diperbarui, kembali ke "Semua".
+                      final currentValue =
+                          _filterKelas == _allClassFilter ||
+                              classes.contains(_filterKelas)
+                          ? _filterKelas
+                          : _allClassFilter;
+
                       return DropdownButton<String>(
-                        value: _filterKelas,
+                        value: currentValue,
                         dropdownColor: Theme.of(context).colorScheme.surface,
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: _allClassFilter,
-                            child: Text(allText),
-                          ),
-                          ...classes.map((kelas) {
-                            return DropdownMenuItem<String>(
-                              value: kelas,
-                              child: Text(kelas),
-                            );
-                          }),
-                        ],
+                        items: items,
                         onChanged: (value) {
                           if (value == null) {
                             return;
@@ -221,9 +218,17 @@ class _StudentsPageState extends ConsumerState<StudentsPage> {
               child: StreamBuilder<List<Student>>(
                 stream: _studentsStream,
                 builder: (context, snapshot) {
+                  // ==================================================
+                  // LOADING SISWA
+                  // ==================================================
+
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const LottieLoading();
                   }
+
+                  // ==================================================
+                  // ERROR FIREBASE
+                  // ==================================================
 
                   if (snapshot.hasError) {
                     return _FirebaseErrorView(
@@ -231,14 +236,18 @@ class _StudentsPageState extends ConsumerState<StudentsPage> {
                     );
                   }
 
+                  // ==================================================
+                  // TIDAK ADA DATA
+                  // ==================================================
+
                   if (!snapshot.hasData) {
-                    return Center(child: Text(t('no_active_students')));
+                    return LottieError(message: t('no_active_students'));
                   }
 
                   final allStudents = snapshot.data!;
 
                   if (allStudents.isEmpty) {
-                    return Center(child: Text(t('no_active_students')));
+                    return LottieError(message: t('no_active_students'));
                   }
 
                   final query = _searchQuery.toLowerCase().trim();
@@ -261,8 +270,12 @@ class _StudentsPageState extends ConsumerState<StudentsPage> {
                     return (matchName || matchNis || matchKelas) && matchFilter;
                   }).toList();
 
+                  // ==================================================
+                  // HASIL FILTER KOSONG
+                  // ==================================================
+
                   if (filtered.isEmpty) {
-                    return Center(child: Text(t('no_active_students')));
+                    return LottieError(message: t('no_active_students'));
                   }
 
                   return ListView.builder(
@@ -378,17 +391,13 @@ class _FirebaseErrorView extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.cloud_off, size: 64, color: Colors.red),
-
             const SizedBox(height: 16),
-
             const Text(
               'Gagal membaca data Firebase',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 12),
-
             Text(
               message,
               textAlign: TextAlign.center,
@@ -475,9 +484,8 @@ class _ArchiveRootPageState extends ConsumerState<ArchiveRootPage> {
             ),
           ],
         ),
-
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const LottieLoading()
             : _errorMessage != null
             ? Center(
                 child: SingleChildScrollView(
@@ -519,9 +527,7 @@ class _ArchiveRootPageState extends ConsumerState<ArchiveRootPage> {
                       size: 64,
                       color: Theme.of(context).colorScheme.outline,
                     ),
-
                     const SizedBox(height: 16),
-
                     Text(
                       t('no_archive_yet'),
                       style: const TextStyle(
@@ -529,9 +535,7 @@ class _ArchiveRootPageState extends ConsumerState<ArchiveRootPage> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
                     const SizedBox(height: 8),
-
                     Text(
                       t('archive_will_appear'),
                       textAlign: TextAlign.center,
@@ -714,9 +718,8 @@ class _ArchiveMajorsPageState extends ConsumerState<ArchiveMajorsPage> {
             ),
           ],
         ),
-
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const LottieLoading()
             : _errorMessage != null
             ? Center(
                 child: SingleChildScrollView(
@@ -917,9 +920,8 @@ class _ArchiveStudentListPageState
             ),
           ],
         ),
-
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const LottieLoading()
             : _errorMessage != null
             ? Center(
                 child: SingleChildScrollView(
@@ -953,20 +955,7 @@ class _ArchiveStudentListPageState
                 ),
               )
             : _students.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.people_outline,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(t('no_archived_students')),
-                  ],
-                ),
-              )
+            ? LottieError(message: t('no_archived_students'))
             : RefreshIndicator(
                 onRefresh: _loadStudents,
                 child: ListView.builder(
@@ -1389,13 +1378,10 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
               : getMajorColor(student.kelas),
           foregroundColor: Colors.white,
         ),
-
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-
             children: [
               // ==================================================
               // ARCHIVED NOTICE
@@ -1414,9 +1400,7 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                     child: Row(
                       children: [
                         Icon(Icons.archive, color: colors.onSurface),
-
                         const SizedBox(width: 8),
-
                         Expanded(
                           child: Text(
                             t('archived_student_notice'),
@@ -1447,17 +1431,11 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                           t('student_info'),
                           style: theme.textTheme.titleMedium,
                         ),
-
                         const SizedBox(height: 12),
-
                         _infoRow(t('name'), student.name),
-
                         _infoRow(t('nis_label'), student.nis),
-
                         _infoRow(t('address'), student.alamat),
-
                         _infoRow(t('phone_number'), student.phone),
-
                         _infoRow(
                           t('gender'),
                           getExtraInfo(student.id, 'jenisKelamin'),
@@ -1485,9 +1463,7 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                             t('quick_payment'),
                             style: theme.textTheme.titleMedium,
                           ),
-
                           const SizedBox(height: 8),
-
                           Row(
                             children: [
                               Expanded(
@@ -1501,9 +1477,7 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                                   ),
                                 ),
                               ),
-
                               const SizedBox(width: 8),
-
                               ElevatedButton.icon(
                                 onPressed: () {
                                   SoundHelper().playClick();
@@ -1519,9 +1493,7 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                               ),
                             ],
                           ),
-
                           const SizedBox(height: 8),
-
                           Text(
                             t('quick_payment_hint'),
                             style: TextStyle(
@@ -1576,9 +1548,7 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                           color: _statusColor(payment.status),
                         ),
                       ),
-
                       title: Text(payment.type),
-
                       subtitle: Text(
                         'Rp ${formatCurrency(payment.amount)} • '
                         '${payment.status == PaymentStatus.lunas
@@ -1587,7 +1557,6 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                             ? t('partial')
                             : t('unpaid')}',
                       ),
-
                       trailing: payment.type == 'Saldo'
                           ? Text(
                               '${t('balance_label')}: '
@@ -1642,21 +1611,16 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                           t('financial_summary'),
                           style: theme.textTheme.titleMedium,
                         ),
-
                         const SizedBox(height: 8),
-
                         _summaryRow(
                           t('total_bills'),
                           'Rp ${formatCurrency(student.totalDue)}',
                         ),
-
                         _summaryRow(
                           t('total_paid'),
                           'Rp ${formatCurrency(student.totalPaid)}',
                         ),
-
                         const Divider(),
-
                         _summaryRow(
                           t('remaining_bills'),
                           'Rp ${formatCurrency(student.remaining)}',
@@ -1666,7 +1630,6 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                               ? AppColors.success
                               : colors.onSurface,
                         ),
-
                         const SizedBox(height: 8),
 
                         // ==================================================
@@ -1700,7 +1663,6 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                                   ),
                                 ],
                               ),
-
                               Text(
                                 'Rp ${formatCurrency(saldo)}',
                                 style: const TextStyle(
@@ -1773,7 +1735,6 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
               style: TextStyle(color: colors.onSurfaceVariant),
             ),
           ),
-
           Expanded(
             child: Text(
               value,
@@ -1804,7 +1765,6 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
             label,
             style: TextStyle(fontSize: 14, color: colors.onSurfaceVariant),
           ),
-
           Text(
             value,
             style: TextStyle(

@@ -1,15 +1,23 @@
 // navigation/akun.dart
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:awesome_dialog/awesome_dialog.dart'; // 🔥 import awesome_dialog
 
-import '../constants/appearance.dart'; // 🔥 import warna
+import 'dart:io';
+
+import 'package:awesome_dialog/awesome_dialog.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../constants/appearance.dart';
+import '../helpers/scroll_reveal.dart';
+import '../helpers/theme_helper.dart';
 import '../templates/sound_helper.dart';
 
-// ===================== HEART CLIPPER =====================
+// ============================================================
+// HEART CLIPPER
+// ============================================================
+
 class HeartClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
@@ -21,18 +29,10 @@ class HeartClipper extends CustomClipper<Path> {
     path.moveTo(w * 0.5, h * 0.25);
 
     // Lengkungan kiri
-    path.cubicTo(
-      w * 0.15, h * 0.00,
-      w * -0.05, h * 0.45,
-      w * 0.5, h * 0.95,
-    );
+    path.cubicTo(w * 0.15, h * 0.00, w * -0.05, h * 0.45, w * 0.5, h * 0.95);
 
     // Lengkungan kanan
-    path.cubicTo(
-      w * 1.05, h * 0.45,
-      w * 0.85, h * 0.00,
-      w * 0.5, h * 0.25,
-    );
+    path.cubicTo(w * 1.05, h * 0.45, w * 0.85, h * 0.00, w * 0.5, h * 0.25);
 
     path.close();
 
@@ -40,33 +40,44 @@ class HeartClipper extends CustomClipper<Path> {
   }
 
   @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+  bool shouldReclip(CustomClipper<Path> oldClipper) {
+    return false;
+  }
 }
 
-// ===================== HALAMAN AKUN =====================
-class AkunPage extends StatefulWidget {
+// ============================================================
+// HALAMAN AKUN
+// ============================================================
+
+class AkunPage extends ConsumerStatefulWidget {
   const AkunPage({super.key});
 
   @override
-  State<AkunPage> createState() => _AkunPageState();
+  ConsumerState<AkunPage> createState() => _AkunPageState();
 }
 
-class _AkunPageState extends State<AkunPage> {
+class _AkunPageState extends ConsumerState<AkunPage> {
   String _username = 'Admin Sekolah';
   String _email = 'admin@eduvest.sch.id';
   String _role = 'Administrator';
   String _nis = 'ADM-2026-001';
   String _phone = '0812-3456-7890';
   String _address = 'Jl. Pendidikan No. 123, Jakarta';
-  bool _isHeartShape = false; // 🔥 State untuk bentuk avatar
+
+  bool _isHeartShape = false;
 
   String? _profileImagePath;
+
   final ImagePicker _picker = ImagePicker();
 
   final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
+
   final _emailController = TextEditingController();
+
   final _phoneController = TextEditingController();
+
   final _addressController = TextEditingController();
 
   bool _isLoading = true;
@@ -74,18 +85,31 @@ class _AkunPageState extends State<AkunPage> {
   @override
   void initState() {
     super.initState();
+
     _loadProfileData();
   }
+
+  // ==========================================================
+  // LOAD PROFILE
+  // ==========================================================
 
   Future<void> _loadProfileData() async {
     try {
       WidgetsFlutterBinding.ensureInitialized();
+
       final prefs = await SharedPreferences.getInstance();
+
       _username = prefs.getString('username') ?? 'Admin Sekolah';
+
       _email = prefs.getString('email') ?? 'admin@eduvest.sch.id';
+
       _phone = prefs.getString('phone') ?? '0812-3456-7890';
-      _address = prefs.getString('address') ?? 'Jl. Pendidikan No. 123, Jakarta';
+
+      _address =
+          prefs.getString('address') ?? 'Jl. Pendidikan No. 123, Jakarta';
+
       _profileImagePath = prefs.getString('profileImagePath');
+
       _isHeartShape = prefs.getBool('isHeartShape') ?? false;
     } catch (e) {
       debugPrint('Gagal load profil: $e');
@@ -93,23 +117,37 @@ class _AkunPageState extends State<AkunPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+
           _nameController.text = _username;
+
           _emailController.text = _email;
+
           _phoneController.text = _phone;
+
           _addressController.text = _address;
         });
       }
     }
   }
 
+  // ==========================================================
+  // SAVE PROFILE
+  // ==========================================================
+
   Future<void> _saveProfileData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
       await prefs.setString('username', _username);
+
       await prefs.setString('email', _email);
+
       await prefs.setString('phone', _phone);
+
       await prefs.setString('address', _address);
+
       await prefs.setBool('isHeartShape', _isHeartShape);
+
       if (_profileImagePath != null) {
         await prefs.setString('profileImagePath', _profileImagePath!);
       } else {
@@ -120,85 +158,132 @@ class _AkunPageState extends State<AkunPage> {
     }
   }
 
+  // ==========================================================
+  // COPY IMAGE
+  // ==========================================================
+
   Future<String?> _copyImageToPermanentDir(File imageFile) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
+
       final String fileName =
           'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
       final File newFile = await imageFile.copy('${dir.path}/$fileName');
+
       return newFile.path;
     } catch (e) {
       debugPrint('Gagal menyimpan foto: $e');
+
       return null;
     }
   }
 
+  // ==========================================================
+  // BUILD
+  // ==========================================================
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profil Saya'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () {
-              SoundHelper().playClick();
-              _showEditProfileDialog();
-            },
-            tooltip: 'Edit Profil',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildProfileHeader(),
-                  const SizedBox(height: 24),
-                  _buildInfoCard(),
-                  const SizedBox(height: 24),
-                  _buildMenuCard(),
-                  const SizedBox(height: 16),
-                ],
-              ),
+    final themeMode = ref.watch(themeModeProvider);
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('Profil Saya'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () {
+                SoundHelper().playClick();
+
+                _showEditProfileDialog();
+              },
+              tooltip: 'Edit Profil',
             ),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // ==================================================
+                    // PROFILE HEADER
+                    // ==================================================
+                    ScrollReveal(
+                      delay: const Duration(milliseconds: 50),
+                      child: _buildProfileHeader(),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ==================================================
+                    // USER INFO
+                    // ==================================================
+                    ScrollReveal(
+                      delay: const Duration(milliseconds: 120),
+                      child: _buildInfoCard(),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ==================================================
+                    // ACCOUNT MENU
+                    // ==================================================
+                    ScrollReveal(
+                      delay: const Duration(milliseconds: 190),
+                      child: _buildMenuCard(),
+                    ),
+
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+      ),
     );
   }
 
   // ============================================================
-  // WIDGET: Header Profil (dengan opsi bentuk hati)
+  // PROFILE HEADER
   // ============================================================
+
   Widget _buildProfileHeader() {
+    final theme = Theme.of(context);
+
+    final colors = theme.colorScheme;
+
+    final themeMode = ref.read(themeModeProvider);
+
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+
     Widget avatar = CircleAvatar(
       radius: 60,
       backgroundImage: _profileImagePath != null
           ? FileImage(File(_profileImagePath!))
           : null,
-      backgroundColor: Colors.grey.shade200,
+      backgroundColor: colors.surfaceContainerHighest,
       child: _profileImagePath == null
           ? Text(
               _username.isNotEmpty ? _username[0].toUpperCase() : 'A',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 48,
                 fontWeight: FontWeight.bold,
-                color: AppColors.primary,
+                color: accentColor,
               ),
             )
           : null,
     );
 
     if (_isHeartShape) {
-      avatar = ClipPath(
-        clipper: HeartClipper(),
-        child: avatar,
-      );
+      avatar = ClipPath(clipper: HeartClipper(), child: avatar);
     }
 
     return Card(
-      elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -206,6 +291,7 @@ class _AkunPageState extends State<AkunPage> {
             GestureDetector(
               onTap: () {
                 SoundHelper().playClick();
+
                 _showImagePickerDialog();
               },
               child: Stack(
@@ -216,13 +302,13 @@ class _AkunPageState extends State<AkunPage> {
                     right: 0,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
+                      decoration: BoxDecoration(
+                        color: accentColor,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.camera_alt,
-                        color: Colors.white,
+                        color: colors.onPrimary,
                         size: 20,
                       ),
                     ),
@@ -230,35 +316,39 @@ class _AkunPageState extends State<AkunPage> {
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
+
             Text(
               _username,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colors.onSurface,
+              ),
             ),
+
             const SizedBox(height: 4),
+
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: accentColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 _role,
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: accentColor,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
+
             const SizedBox(height: 8),
+
             Text(
               _email,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 14),
             ),
           ],
         ),
@@ -267,11 +357,15 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // WIDGET: Kartu Informasi Detail
+  // INFO CARD
   // ============================================================
+
   Widget _buildInfoCard() {
+    final theme = Theme.of(context);
+
+    final colors = theme.colorScheme;
+
     return Card(
-      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -279,17 +373,26 @@ class _AkunPageState extends State<AkunPage> {
           children: [
             Text(
               'Informasi Pengguna',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colors.onSurface,
+              ),
             ),
+
             const SizedBox(height: 16),
+
             _buildInfoRow(Icons.badge, 'NIS/NIK', _nis),
-            const Divider(),
+
+            Divider(color: _getDividerColor()),
+
             _buildInfoRow(Icons.phone, 'No. Telepon', _phone),
-            const Divider(),
+
+            Divider(color: _getDividerColor()),
+
             _buildInfoRow(Icons.location_on, 'Alamat', _address),
-            const Divider(),
+
+            Divider(color: _getDividerColor()),
+
             _buildInfoRow(
               Icons.calendar_today,
               'Bergabung Sejak',
@@ -301,30 +404,39 @@ class _AkunPageState extends State<AkunPage> {
     );
   }
 
+  // ============================================================
+  // INFO ROW
+  // ============================================================
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    final theme = Theme.of(context);
+
+    final colors = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.textSecondary, size: 20),
+          Icon(icon, color: colors.onSurfaceVariant, size: 20),
+
           const SizedBox(width: 12),
+
           Expanded(
             flex: 2,
             child: Text(
               label,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
             ),
           ),
+
           Expanded(
             flex: 3,
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
+                color: colors.onSurface,
               ),
             ),
           ),
@@ -334,11 +446,11 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // WIDGET: Kartu Menu Akun
+  // MENU CARD
   // ============================================================
+
   Widget _buildMenuCard() {
     return Card(
-      elevation: 2,
       child: Column(
         children: [
           _buildMenuItem(
@@ -347,26 +459,33 @@ class _AkunPageState extends State<AkunPage> {
             subtitle: 'Ubah informasi pribadi',
             onTap: () {
               SoundHelper().playClick();
+
               _showEditProfileDialog();
             },
           ),
-          const Divider(height: 1),
+
+          Divider(height: 1, color: _getDividerColor()),
+
           _buildMenuItem(
             icon: Icons.lock_outline,
             title: 'Ganti Password',
             subtitle: 'Perbarui kata sandi akun',
             onTap: () {
               SoundHelper().playClick();
+
               _showChangePasswordDialog();
             },
           ),
-          const Divider(height: 1),
+
+          Divider(height: 1, color: _getDividerColor()),
+
           _buildMenuItem(
             icon: Icons.logout,
             title: 'Logout',
             subtitle: 'Keluar dari aplikasi',
             onTap: () {
               SoundHelper().playClick();
+
               _showLogoutDialog();
             },
             isLogout: true,
@@ -376,6 +495,10 @@ class _AkunPageState extends State<AkunPage> {
     );
   }
 
+  // ============================================================
+  // MENU ITEM
+  // ============================================================
+
   Widget _buildMenuItem({
     required IconData icon,
     required String title,
@@ -383,49 +506,80 @@ class _AkunPageState extends State<AkunPage> {
     required VoidCallback onTap,
     bool isLogout = false,
   }) {
+    final theme = Theme.of(context);
+
+    final colors = theme.colorScheme;
+
+    final themeMode = ref.read(themeModeProvider);
+
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+
+    final iconColor = isLogout ? colors.error : accentColor;
+
+    final titleColor = isLogout ? colors.error : colors.onSurface;
+
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isLogout ? Colors.red : AppColors.primary,
-      ),
+      leading: Icon(icon, color: iconColor),
       title: Text(
         title,
-        style: TextStyle(
-          color: isLogout ? Colors.red : null,
-          fontWeight: FontWeight.w500,
-        ),
+        style: TextStyle(color: titleColor, fontWeight: FontWeight.w500),
       ),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: colors.onSurfaceVariant),
+      ),
+      trailing: Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
       onTap: onTap,
     );
   }
 
   // ============================================================
-  // DIALOG: Pilih Foto
+  // DIVIDER COLOR
   // ============================================================
+
+  Color _getDividerColor() {
+    final themeMode = ref.read(themeModeProvider);
+
+    return ThemeHelper.dividerColor(themeMode);
+  }
+
+  // ============================================================
+  // IMAGE PICKER DIALOG
+  // ============================================================
+
   void _showImagePickerDialog() {
+    final colors = Theme.of(context).colorScheme;
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: Icon(Icons.photo_library, color: colors.primary),
               title: const Text('Pilih dari Galeri'),
               onTap: () {
                 SoundHelper().playClick();
+
                 Navigator.pop(ctx);
+
                 _pickImage(ImageSource.gallery);
               },
             ),
+
             ListTile(
-              leading: const Icon(Icons.photo_camera),
+              leading: Icon(Icons.photo_camera, color: colors.primary),
               title: const Text('Ambil Foto'),
               onTap: () {
                 SoundHelper().playClick();
+
                 Navigator.pop(ctx);
+
                 _pickImage(ImageSource.camera);
               },
             ),
@@ -435,240 +589,295 @@ class _AkunPageState extends State<AkunPage> {
     );
   }
 
+  // ============================================================
+  // PICK IMAGE
+  // ============================================================
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
         imageQuality: 80,
       );
+
       if (image != null) {
         final File imageFile = File(image.path);
+
         final String? permanentPath = await _copyImageToPermanentDir(imageFile);
+
         if (permanentPath != null) {
           setState(() {
             _profileImagePath = permanentPath;
           });
+
           await _saveProfileData();
+
+          if (!mounted) return;
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Foto profil berhasil diubah')),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Gagal menyimpan foto')),
-          );
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Gagal menyimpan foto')));
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat gambar: $e')),
-      );
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memuat gambar: $e')));
     }
   }
 
   // ============================================================
-  // DIALOG: Edit Profil (dengan switch + Easter Egg popup)
+  // EDIT PROFILE DIALOG
   // ============================================================
+
   void _showEditProfileDialog() {
     _nameController.text = _username;
+
     _emailController.text = _email;
+
     _phoneController.text = _phone;
+
     _addressController.text = _address;
 
-    // 🔥 Salin nilai _isHeartShape untuk digunakan di dialog
     bool localHeartShape = _isHeartShape;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          title: const Text('Edit Profil'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nama Lengkap',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) =>
-                          v!.trim().isEmpty ? 'Nama wajib diisi' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) =>
-                          v!.trim().isEmpty ? 'Email wajib diisi' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'No. Telepon',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _addressController,
-                      decoration: const InputDecoration(
-                        labelText: 'Alamat',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    // 🔥 Switch untuk bentuk avatar + Easter Egg popup
-                    SwitchListTile(
-                      title: const Text('Bentuk Avatar Hati'),
-                      subtitle: const Text('Ubah avatar menjadi bentuk love'),
-                      value: localHeartShape,
-                      onChanged: (val) {
-                        // Putar suara notifikasi
-                        SoundHelper().playNotification();
+        builder: (ctx, setStateDialog) {
+          final colors = Theme.of(context).colorScheme;
 
-                        // 🔥 Jika diaktifkan (dari false ke true), tampilkan popup Easter Egg
-                        if (val && !localHeartShape) {
-                          AwesomeDialog(
-                            context: ctx,
-                            dialogType: DialogType.info,
-                            animType: AnimType.bottomSlide,
-                            headerAnimationLoop: false,
-                            title: '💖 Easter Egg!',
-                            desc:
-                                'Selamat! Anda mengaktifkan mode avatar hati.\nSemangat belajar dan berkarya! 🚀',
-                            btnOkOnPress: () {},
-                            btnOkIcon: Icons.favorite,
-                            btnOkColor: AppColors.primary,
-                            btnOkText: '❤️ Mantap!',
-                            useRootNavigator: false, // penting agar tidak konflik dengan dialog
-                          ).show();
-                        }
+          return AlertDialog(
+            title: const Text('Edit Profil'),
 
-                        setStateDialog(() {
-                          localHeartShape = val;
-                        });
-                      },
-                      activeColor: AppColors.primary,
-                    ),
-                  ],
+            content: SizedBox(
+              width: double.maxFinite,
+
+              child: Form(
+                key: _formKey,
+
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+
+                    children: [
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nama Lengkap',
+                        ),
+                        validator: (v) =>
+                            v!.trim().isEmpty ? 'Nama wajib diisi' : null,
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: _emailController,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        validator: (v) =>
+                            v!.trim().isEmpty ? 'Email wajib diisi' : null,
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'No. Telepon',
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: _addressController,
+                        decoration: const InputDecoration(labelText: 'Alamat'),
+                        maxLines: 2,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      SwitchListTile(
+                        title: const Text('Bentuk Avatar Hati'),
+
+                        subtitle: const Text('Ubah avatar menjadi bentuk love'),
+
+                        value: localHeartShape,
+
+                        onChanged: (val) {
+                          SoundHelper().playNotification();
+
+                          if (val && !localHeartShape) {
+                            AwesomeDialog(
+                              context: ctx,
+                              dialogType: DialogType.info,
+                              animType: AnimType.bottomSlide,
+                              headerAnimationLoop: false,
+                              title: '💖 Easter Egg!',
+                              desc:
+                                  'Selamat! Anda mengaktifkan mode avatar hati.\nSemangat belajar dan berkarya! 🚀',
+                              btnOkOnPress: () {},
+                              btnOkIcon: Icons.favorite,
+                              btnOkColor: colors.primary,
+                              btnOkText: '❤️ Mantap!',
+                              useRootNavigator: false,
+                            ).show();
+                          }
+
+                          setStateDialog(() {
+                            localHeartShape = val;
+                          });
+                        },
+
+                        activeColor: colors.primary,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                SoundHelper().playClick();
-                Navigator.pop(ctx);
-              },
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                SoundHelper().playClick();
-                if (_formKey.currentState!.validate()) {
-                  setState(() {
-                    _username = _nameController.text.trim();
-                    _email = _emailController.text.trim();
-                    _phone = _phoneController.text.trim();
-                    _address = _addressController.text.trim();
-                    _isHeartShape = localHeartShape;
-                  });
-                  await _saveProfileData();
+
+            actions: [
+              TextButton(
+                onPressed: () {
+                  SoundHelper().playClick();
+
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Profil berhasil diperbarui')),
-                  );
-                }
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
-        ),
+                },
+                child: const Text('Batal'),
+              ),
+
+              ElevatedButton(
+                onPressed: () async {
+                  SoundHelper().playClick();
+
+                  if (_formKey.currentState!.validate()) {
+                    setState(() {
+                      _username = _nameController.text.trim();
+
+                      _email = _emailController.text.trim();
+
+                      _phone = _phoneController.text.trim();
+
+                      _address = _addressController.text.trim();
+
+                      _isHeartShape = localHeartShape;
+                    });
+
+                    await _saveProfileData();
+
+                    if (!mounted) return;
+
+                    Navigator.pop(ctx);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Profil berhasil diperbarui'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Simpan'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   // ============================================================
-  // DIALOG: Ganti Password
+  // CHANGE PASSWORD
   // ============================================================
+
   void _showChangePasswordDialog() {
     final oldPasswordController = TextEditingController();
+
     final newPasswordController = TextEditingController();
+
     final confirmPasswordController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ganti Password'),
+
         content: SizedBox(
           width: double.maxFinite,
+
           child: Column(
             mainAxisSize: MainAxisSize.min,
+
             children: [
               TextField(
                 controller: oldPasswordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password Lama',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'Password Lama'),
                 obscureText: true,
               ),
+
               const SizedBox(height: 12),
+
               TextField(
                 controller: newPasswordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password Baru',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'Password Baru'),
                 obscureText: true,
               ),
+
               const SizedBox(height: 12),
+
               TextField(
                 controller: confirmPasswordController,
                 decoration: const InputDecoration(
                   labelText: 'Konfirmasi Password Baru',
-                  border: OutlineInputBorder(),
                 ),
                 obscureText: true,
               ),
             ],
           ),
         ),
+
         actions: [
           TextButton(
             onPressed: () {
               SoundHelper().playClick();
+
               Navigator.pop(ctx);
             },
             child: const Text('Batal'),
           ),
+
           ElevatedButton(
             onPressed: () {
               SoundHelper().playClick();
-              if (newPasswordController.text != confirmPasswordController.text) {
+
+              if (newPasswordController.text !=
+                  confirmPasswordController.text) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Password baru tidak cocok')),
                 );
+
                 return;
               }
+
               if (newPasswordController.text.length < 6) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Password minimal 6 karakter')),
                 );
+
                 return;
               }
+
               Navigator.pop(ctx);
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Password berhasil diubah')),
               );
@@ -681,31 +890,42 @@ class _AkunPageState extends State<AkunPage> {
   }
 
   // ============================================================
-  // DIALOG: Logout
+  // LOGOUT
   // ============================================================
+
   void _showLogoutDialog() {
+    final colors = Theme.of(context).colorScheme;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Konfirmasi Logout'),
+
         content: const Text('Apakah Anda yakin ingin keluar?'),
+
         actions: [
           TextButton(
             onPressed: () {
               SoundHelper().playClick();
+
               Navigator.pop(ctx);
             },
             child: const Text('Batal'),
           ),
+
           ElevatedButton(
             onPressed: () {
               SoundHelper().playClick();
+
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Berhasil logout')),
-              );
+
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Berhasil logout')));
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+
+            style: ElevatedButton.styleFrom(backgroundColor: colors.error),
+
             child: const Text('Logout'),
           ),
         ],
@@ -713,12 +933,20 @@ class _AkunPageState extends State<AkunPage> {
     );
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
     _nameController.dispose();
+
     _emailController.dispose();
+
     _phoneController.dispose();
+
     _addressController.dispose();
+
     super.dispose();
   }
 }

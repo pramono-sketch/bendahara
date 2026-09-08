@@ -21,10 +21,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
     defaultConfig {
         applicationId = "com.example.bendahara"
 
@@ -40,6 +36,15 @@ android {
             // Masih menggunakan debug signing untuk sementara.
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+// 📍 Konfigurasi Kotlin
+kotlin {
+    compilerOptions {
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
+        )
     }
 }
 

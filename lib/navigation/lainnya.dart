@@ -15,6 +15,7 @@ import '../helpers/theme_helper.dart';
 import '../l10n/translations.dart';
 import '../templates/sound_helper.dart';
 import '../simulation/lottie_prev.dart';
+import '../auth/auth_page.dart';
 
 class MorePage extends ConsumerStatefulWidget {
   const MorePage({super.key});
@@ -76,6 +77,11 @@ class _MorePageState extends ConsumerState<MorePage> {
         'title': translations.t('animation_gallery'),
         'icon': Icons.animation,
         'page': const LottieAnimationGallery(),
+      },
+      {
+        'title': translations.t('auth'),
+        'icon': Icons.account_circle,
+        'page': const AuthPage(),
       },
       {
         'title': translations.t('settings'),
