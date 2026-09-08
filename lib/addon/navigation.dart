@@ -10,7 +10,7 @@ import '../navigation/laporan.dart';
 import '../navigation/lainnya.dart';
 import '../navigation/akun.dart';
 import 'aksi.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/sound_helper.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});

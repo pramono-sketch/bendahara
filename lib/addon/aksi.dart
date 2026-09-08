@@ -1,12 +1,15 @@
-// addon/aksi.dart
+// lib/addon/aksi.dart
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/appearance.dart';
 import '../data.dart';
-import '../firebase/firestore_service.dart'; 
-import '../templates/sound_helper.dart';
+import '../firebase/firestore_service.dart';
+import '../helpers/sound_helper.dart';
 import '../features/ai_assistant.dart';
 import '../simulation/FAB_helper.dart';
+import '../l10n/translations.dart';
 
 class AksiHelper {
   // -------- Callback refresh untuk dashboard --------
@@ -23,6 +26,12 @@ class AksiHelper {
   ) {
     if (!parentContext.mounted) return;
 
+    final translations = ProviderScope.containerOf(
+      parentContext,
+    ).read(
+      translationsProvider,
+    );
+
     showModalBottomSheet(
       context: parentContext,
       shape: const RoundedRectangleBorder(
@@ -31,7 +40,12 @@ class AksiHelper {
         ),
       ),
       builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        padding: const EdgeInsets.fromLTRB(
+          24,
+          16,
+          24,
+          32,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -43,11 +57,12 @@ class AksiHelper {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+
             const SizedBox(height: 20),
 
-            const Text(
-              'Menu Cepat',
-              style: TextStyle(
+            Text(
+              translations.t('quick_menu'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -61,7 +76,9 @@ class AksiHelper {
                 // ================= TAMBAH TRANSAKSI =================
                 _buildQuickAction(
                   icon: Icons.add_card,
-                  label: 'Tambah\nTransaksi',
+                  label: translations.t(
+                    'add_transaction',
+                  ),
                   onTap: () {
                     SoundHelper().playClick();
 
@@ -81,7 +98,9 @@ class AksiHelper {
                 // ================= KALKULATOR =================
                 _buildQuickAction(
                   icon: Icons.calculate,
-                  label: 'Kalkulator',
+                  label: translations.t(
+                    'calculator',
+                  ),
                   onTap: () {
                     SoundHelper().playClick();
 
@@ -90,7 +109,9 @@ class AksiHelper {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!parentContext.mounted) return;
 
-                      showCalculatorDialog(parentContext);
+                      showCalculatorDialog(
+                        parentContext,
+                      );
                     });
                   },
                 ),
@@ -98,7 +119,9 @@ class AksiHelper {
                 // ================= SIMULASI =================
                 _buildQuickAction(
                   icon: Icons.developer_mode,
-                  label: 'Simulasi\nData',
+                  label: translations.t(
+                    'simulation_data',
+                  ),
                   onTap: () {
                     SoundHelper().playClick();
 
@@ -119,7 +142,9 @@ class AksiHelper {
                 // ================= AI =================
                 _buildQuickAction(
                   icon: Icons.auto_awesome,
-                  label: 'AI\nAssistant',
+                  label: translations.t(
+                    'ai_assistant',
+                  ),
                   onTap: () {
                     SoundHelper().playClick();
 
@@ -188,7 +213,8 @@ class AksiHelper {
     showDialog(
       context: parentContext,
       builder: (dialogContext) {
-        // Menggunakan StatefulWidget agar controller di dispose dengan aman
+        // Menggunakan StatefulWidget agar controller
+        // di dispose dengan aman.
         return _AddTransactionDialog(
           onUpdate: onUpdate,
           onRefresh: _refreshCallback,
@@ -201,7 +227,9 @@ class AksiHelper {
   // ================== KALKULATOR ==============================
   // ============================================================
 
-  static void showCalculatorDialog(BuildContext parentContext) {
+  static void showCalculatorDialog(
+    BuildContext parentContext,
+  ) {
     if (!parentContext.mounted) return;
 
     showDialog(
@@ -214,6 +242,7 @@ class AksiHelper {
 // ============================================================
 // ============ STATEFUL WIDGET UNTUK DIALOG TRANSAKSI =========
 // ============================================================
+
 class _AddTransactionDialog extends StatefulWidget {
   final VoidCallback onUpdate;
   final VoidCallback? onRefresh;
@@ -224,33 +253,50 @@ class _AddTransactionDialog extends StatefulWidget {
   });
 
   @override
-  State<_AddTransactionDialog> createState() => _AddTransactionDialogState();
+  State<_AddTransactionDialog> createState() =>
+      _AddTransactionDialogState();
 }
 
-class _AddTransactionDialogState extends State<_AddTransactionDialog> {
+class _AddTransactionDialogState
+    extends State<_AddTransactionDialog> {
   final _descCtrl = TextEditingController();
+
   final _amountCtrl = TextEditingController();
-  TransType _selectedType = TransType.pemasukan;
+
+  TransType _selectedType =
+      TransType.pemasukan;
+
   bool _isSaving = false;
 
   @override
   void dispose() {
-    // Controller dipastikan aman dibuang saat widget hilang
+    // Controller dipastikan aman dibuang saat widget hilang.
     _descCtrl.dispose();
+
     _amountCtrl.dispose();
+
     super.dispose();
   }
 
   Future<void> _saveTransaction() async {
     SoundHelper().playClick();
-    if (_descCtrl.text.trim().isEmpty || _amountCtrl.text.trim().isEmpty) {
+
+    if (_descCtrl.text.trim().isEmpty ||
+        _amountCtrl.text.trim().isEmpty) {
       return;
     }
 
     setState(() => _isSaving = true);
 
-    final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
-    final description = _descCtrl.text.trim();
+    final amount =
+        double.tryParse(
+          _amountCtrl.text.trim(),
+        ) ??
+        0;
+
+    final description =
+        _descCtrl.text.trim();
+
     final now = DateTime.now();
 
     final newTransaction = Transaction(
@@ -259,37 +305,70 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       amount: amount,
       description: description,
       date: now,
-      category: _selectedType == TransType.pemasukan ? 'Pemasukan' : 'Pengeluaran',
+      category:
+          _selectedType ==
+                  TransType.pemasukan
+              ? 'Pemasukan'
+              : 'Pengeluaran',
     );
 
     final newLog = ActivityLog(
       user: 'Admin',
       action: ActivityAction.tambah,
-      detail: 'Tambah transaksi $description',
+      detail:
+          'Tambah transaksi $description',
       timestamp: now,
     );
 
     try {
-      // Simpan langsung ke Firestore
-      await addTransaction(newTransaction);
-      await addActivityLog(newLog);
+      // Simpan langsung ke Firestore.
+      await addTransaction(
+        newTransaction,
+      );
 
-      // Simpan juga ke lokal untuk fallback
-      localTransactions.insert(0, newTransaction);
-      localLogs.insert(0, newLog);
+      await addActivityLog(
+        newLog,
+      );
+
+      // Simpan juga ke lokal untuk fallback.
+      localTransactions.insert(
+        0,
+        newTransaction,
+      );
+
+      localLogs.insert(
+        0,
+        newLog,
+      );
 
       if (mounted) {
         Navigator.of(context).pop();
+
         widget.onUpdate();
+
         widget.onRefresh?.call();
       }
     } catch (e) {
-      // Jika gagal (misalnya tidak ada internet)
+      // Jika gagal (misalnya tidak ada internet).
       if (mounted) {
-        setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        setState(
+          () => _isSaving = false,
+        );
+
+        final translations =
+            ProviderScope.containerOf(
+              context,
+            ).read(
+              translationsProvider,
+            );
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(
           SnackBar(
-            content: Text('Gagal menambah transaksi: $e'),
+            content: Text(
+              '${translations.t('failed_add_transaction')}: $e',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -298,65 +377,126 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
+    final translations =
+        ProviderScope.containerOf(
+          context,
+        ).read(
+          translationsProvider,
+        );
+
     return AlertDialog(
-      title: const Text('Tambah Transaksi'),
+      title: Text(
+        translations.t(
+          'add_transaction',
+        ),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<TransType>(
             value: _selectedType,
-            items: const [
+            items: [
               DropdownMenuItem(
                 value: TransType.pemasukan,
-                child: Text('Pemasukan'),
+                child: Text(
+                  translations.t(
+                    'income',
+                  ),
+                ),
               ),
               DropdownMenuItem(
                 value: TransType.pengeluaran,
-                child: Text('Pengeluaran'),
+                child: Text(
+                  translations.t(
+                    'expense',
+                  ),
+                ),
               ),
             ],
             onChanged: (value) {
               if (value == null) return;
+
               setState(() {
                 _selectedType = value;
               });
             },
-            decoration: const InputDecoration(labelText: 'Jenis'),
+            decoration: InputDecoration(
+              labelText: translations.t(
+                'transaction_type',
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(
+            height: 12,
+          ),
+
           TextField(
             controller: _descCtrl,
-            decoration: const InputDecoration(labelText: 'Deskripsi'),
+            decoration: InputDecoration(
+              labelText: translations.t(
+                'description',
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(
+            height: 12,
+          ),
+
           TextField(
             controller: _amountCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Jumlah (Rp)'),
+            keyboardType:
+                TextInputType.number,
+            decoration: InputDecoration(
+              labelText: translations.t(
+                'amount_rupiah',
+              ),
+            ),
           ),
         ],
       ),
       actions: [
         TextButton(
-          onPressed: _isSaving ? null : () {
-            SoundHelper().playClick();
-            Navigator.of(context).pop();
-          },
-          child: const Text('Batal'),
+          onPressed: _isSaving
+              ? null
+              : () {
+                  SoundHelper().playClick();
+
+                  Navigator.of(
+                    context,
+                  ).pop();
+                },
+          child: Text(
+            translations.t(
+              'cancel',
+            ),
+          ),
         ),
+
         FilledButton(
-          onPressed: _isSaving ? null : _saveTransaction,
-          child: _isSaving 
+          onPressed:
+              _isSaving
+                  ? null
+                  : _saveTransaction,
+          child: _isSaving
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(
+                  child:
+                      CircularProgressIndicator(
                     color: Colors.white,
                     strokeWidth: 2,
                   ),
                 )
-              : const Text('Simpan'),
+              : Text(
+                  translations.t(
+                    'save',
+                  ),
+                ),
         ),
       ],
     );
@@ -364,28 +504,37 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 }
 
 // ============================================================
-// ================== KALKULATOR DIALOG ==========================
+// ================== KALKULATOR DIALOG =======================
 // ============================================================
 
-class CalculatorDialog extends StatefulWidget {
+class CalculatorDialog
+    extends StatefulWidget {
   const CalculatorDialog({
     super.key,
   });
 
   @override
-  State<CalculatorDialog> createState() => _CalculatorDialogState();
+  State<CalculatorDialog> createState() =>
+      _CalculatorDialogState();
 }
 
-class _CalculatorDialogState extends State<CalculatorDialog> {
+class _CalculatorDialogState
+    extends State<CalculatorDialog> {
   String _display = '0';
+
   String _expression = '';
+
   String _operator = '';
+
   double _firstOperand = 0;
 
   bool _newNumber = true;
+
   bool _isResult = false;
 
-  void _pressDigit(String digit) {
+  void _pressDigit(
+    String digit,
+  ) {
     SoundHelper().playClick();
 
     setState(() {
@@ -394,15 +543,21 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
         _expression = '';
         _isResult = false;
         _newNumber = false;
+
         return;
       }
 
-      if (digit == '.' && _display.contains('.')) {
+      if (digit == '.' &&
+          _display.contains('.')) {
         return;
       }
 
       if (_newNumber) {
-        _display = digit == '.' ? '0.' : digit;
+        _display =
+            digit == '.'
+                ? '0.'
+                : digit;
+
         _newNumber = false;
       } else {
         if (_display.length < 15) {
@@ -412,96 +567,140 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
     });
   }
 
-  void _pressOperator(String op) {
+  void _pressOperator(
+    String op,
+  ) {
     SoundHelper().playClick();
 
-    if (_operator.isNotEmpty && !_newNumber) {
+    if (_operator.isNotEmpty &&
+        !_newNumber) {
       _calculateResult();
     }
 
     setState(() {
-      _firstOperand = double.tryParse(_display) ?? 0;
+      _firstOperand =
+          double.tryParse(
+            _display,
+          ) ??
+          0;
+
       _operator = op;
-      _expression = '$_display $op ';
+
+      _expression =
+          '$_display $op ';
+
       _newNumber = true;
+
       _isResult = false;
     });
   }
 
   void _calculateResult() {
-    final second = double.tryParse(_display) ?? 0;
+    final second =
+        double.tryParse(
+          _display,
+        ) ??
+        0;
 
     double result = 0;
+
     String resultStr = '';
 
     switch (_operator) {
       case '+':
-        result = _firstOperand + second;
+        result =
+            _firstOperand + second;
 
         resultStr =
             '${_firstOperand.toStringAsFixed(0)} + '
             '${second.toStringAsFixed(0)} =';
+
         break;
 
       case '-':
-        result = _firstOperand - second;
+        result =
+            _firstOperand - second;
 
         resultStr =
             '${_firstOperand.toStringAsFixed(0)} - '
             '${second.toStringAsFixed(0)} =';
+
         break;
 
       case '×':
-        result = _firstOperand * second;
+        result =
+            _firstOperand * second;
 
         resultStr =
             '${_firstOperand.toStringAsFixed(0)} × '
             '${second.toStringAsFixed(0)} =';
+
         break;
 
       case '÷':
         if (second == 0) {
           setState(() {
             _display = 'Error';
+
             _operator = '';
+
             _newNumber = true;
+
             _isResult = true;
           });
+
           return;
         }
 
-        result = _firstOperand / second;
+        result =
+            _firstOperand / second;
 
         resultStr =
             '${_firstOperand.toStringAsFixed(0)} ÷ '
             '${second.toStringAsFixed(0)} =';
+
         break;
 
       default:
         return;
     }
 
-    String displayResult = result
-        .toStringAsFixed(2)
-        .replaceAll(RegExp(r'\.00$'), '');
+    String displayResult =
+        result
+            .toStringAsFixed(2)
+            .replaceAll(
+              RegExp(r'\.00$'),
+              '',
+            );
 
-    if (displayResult.length > 15) {
-      displayResult = result.toStringAsExponential(2);
+    if (displayResult.length >
+        15) {
+      displayResult =
+          result.toStringAsExponential(
+            2,
+          );
     }
 
     setState(() {
       _display = displayResult;
+
       _expression = resultStr;
+
       _operator = '';
+
       _newNumber = true;
+
       _isResult = true;
     });
   }
 
   void _pressEquals() {
-    if (_operator.isEmpty) return;
+    if (_operator.isEmpty) {
+      return;
+    }
 
     SoundHelper().playClick();
+
     _calculateResult();
   }
 
@@ -510,10 +709,15 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
 
     setState(() {
       _display = '0';
+
       _expression = '';
+
       _operator = '';
+
       _firstOperand = 0;
+
       _newNumber = true;
+
       _isResult = false;
     });
   }
@@ -523,17 +727,20 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
 
     if (_isResult) {
       _pressClear();
+
       return;
     }
 
     setState(() {
       if (_display.length > 1) {
-        _display = _display.substring(
+        _display =
+            _display.substring(
           0,
           _display.length - 1,
         );
       } else {
         _display = '0';
+
         _newNumber = true;
       }
     });
@@ -543,13 +750,21 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
     SoundHelper().playClick();
 
     setState(() {
-      final value = double.tryParse(_display) ?? 0;
+      final value =
+          double.tryParse(
+            _display,
+          ) ??
+          0;
 
       final result = value / 100;
 
-      _display = result
-          .toStringAsFixed(2)
-          .replaceAll(RegExp(r'\.00$'), '');
+      _display =
+          result
+              .toStringAsFixed(2)
+              .replaceAll(
+                RegExp(r'\.00$'),
+                '',
+              );
 
       _isResult = true;
     });
@@ -559,40 +774,68 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
     SoundHelper().playClick();
 
     setState(() {
-      final value = double.tryParse(_display) ?? 0;
+      final value =
+          double.tryParse(
+            _display,
+          ) ??
+          0;
 
-      final result = value * -1;
+      final result =
+          value * -1;
 
-      _display = result
-          .toStringAsFixed(2)
-          .replaceAll(RegExp(r'\.00$'), '');
+      _display =
+          result
+              .toStringAsFixed(2)
+              .replaceAll(
+                RegExp(r'\.00$'),
+                '');
     });
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
+    final translations =
+        ProviderScope.containerOf(
+          context,
+        ).read(
+          translationsProvider,
+        );
+
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius:
+            BorderRadius.circular(20),
       ),
       backgroundColor: Colors.white,
       elevation: 8,
       child: Container(
         width: 320,
-        padding: const EdgeInsets.all(20),
+        padding:
+            const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize:
+              MainAxisSize.min,
           children: [
             // ================= HEADER =================
+
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment:
+                  MainAxisAlignment
+                      .spaceBetween,
               children: [
-                const Text(
-                  'Kalkulator',
-                  style: TextStyle(
+                Text(
+                  translations.t(
+                    'calculator',
+                  ),
+                  style: const TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    fontWeight:
+                        FontWeight.bold,
+                    color:
+                        AppColors
+                            .textPrimary,
                   ),
                 ),
 
@@ -602,71 +845,113 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                     size: 20,
                   ),
                   onPressed: () {
-                    SoundHelper().playClick();
-                    Navigator.of(context).pop();
+                    SoundHelper()
+                        .playClick();
+
+                    Navigator.of(
+                      context,
+                    ).pop();
                   },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                  padding:
+                      EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(),
                   splashRadius: 20,
                 ),
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(
+              height: 16,
+            ),
 
             // ================= DISPLAY =================
+
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+              padding:
+                  const EdgeInsets.all(
+                16,
+              ),
+              decoration:
+                  BoxDecoration(
+                gradient:
+                    LinearGradient(
+                  begin:
+                      Alignment.topLeft,
+                  end:
+                      Alignment.bottomRight,
                   colors: [
                     AppColors.surface,
-                    Colors.grey.shade50,
+                    Colors
+                        .grey
+                        .shade50,
                   ],
                 ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey.shade200,
+                borderRadius:
+                    BorderRadius.circular(
+                  12,
+                ),
+                border:
+                    Border.all(
+                  color:
+                      Colors.grey
+                          .shade200,
                   width: 1,
                 ),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment:
+                    CrossAxisAlignment.end,
                 children: [
-                  if (_expression.isNotEmpty)
+                  if (_expression
+                      .isNotEmpty)
                     Text(
                       _expression,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w400,
+                        color:
+                            Colors
+                                .grey
+                                .shade600,
+                        fontWeight:
+                            FontWeight.w400,
                       ),
                     ),
 
-                  const SizedBox(height: 4),
+                  const SizedBox(
+                    height: 4,
+                  ),
 
                   Text(
                     _display,
                     style: TextStyle(
                       fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: _display == 'Error'
-                          ? AppColors.error
-                          : AppColors.textPrimary,
+                      fontWeight:
+                          FontWeight.bold,
+                      color:
+                          _display ==
+                                  'Error'
+                              ? AppColors
+                                  .error
+                              : AppColors
+                                  .textPrimary,
                       height: 1.2,
                     ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow:
+                        TextOverflow
+                            .ellipsis,
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(
+              height: 16,
+            ),
 
             // ================= BUTTON =================
+
             Column(
               children: [
                 Row(
@@ -674,117 +959,197 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                     _calcButton(
                       'AC',
                       _pressClear,
-                      color: Colors.grey.shade200,
-                      textColor: AppColors.textPrimary,
+                      color:
+                          Colors
+                              .grey
+                              .shade200,
+                      textColor:
+                          AppColors
+                              .textPrimary,
                     ),
                     _calcButton(
                       '⌫',
                       _pressDelete,
-                      color: Colors.grey.shade200,
-                      textColor: AppColors.textPrimary,
+                      color:
+                          Colors
+                              .grey
+                              .shade200,
+                      textColor:
+                          AppColors
+                              .textPrimary,
                     ),
                     _calcButton(
                       '%',
                       _pressPercent,
-                      color: Colors.grey.shade200,
-                      textColor: AppColors.textPrimary,
+                      color:
+                          Colors
+                              .grey
+                              .shade200,
+                      textColor:
+                          AppColors
+                              .textPrimary,
                     ),
                     _calcButton(
                       '÷',
-                      () => _pressOperator('÷'),
-                      color: AppColors.primary,
-                      textColor: Colors.white,
+                      () =>
+                          _pressOperator(
+                            '÷',
+                          ),
+                      color:
+                          AppColors
+                              .primary,
+                      textColor:
+                          Colors.white,
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
 
                 Row(
                   children: [
                     _calcButton(
                       '7',
-                      () => _pressDigit('7'),
+                      () =>
+                          _pressDigit(
+                            '7',
+                          ),
                     ),
                     _calcButton(
                       '8',
-                      () => _pressDigit('8'),
+                      () =>
+                          _pressDigit(
+                            '8',
+                          ),
                     ),
                     _calcButton(
                       '9',
-                      () => _pressDigit('9'),
+                      () =>
+                          _pressDigit(
+                            '9',
+                          ),
                     ),
                     _calcButton(
                       '×',
-                      () => _pressOperator('×'),
-                      color: AppColors.primary,
-                      textColor: Colors.white,
+                      () =>
+                          _pressOperator(
+                            '×',
+                          ),
+                      color:
+                          AppColors
+                              .primary,
+                      textColor:
+                          Colors.white,
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
 
                 Row(
                   children: [
                     _calcButton(
                       '4',
-                      () => _pressDigit('4'),
+                      () =>
+                          _pressDigit(
+                            '4',
+                          ),
                     ),
                     _calcButton(
                       '5',
-                      () => _pressDigit('5'),
+                      () =>
+                          _pressDigit(
+                            '5',
+                          ),
                     ),
                     _calcButton(
                       '6',
-                      () => _pressDigit('6'),
+                      () =>
+                          _pressDigit(
+                            '6',
+                          ),
                     ),
                     _calcButton(
                       '-',
-                      () => _pressOperator('-'),
-                      color: AppColors.primary,
-                      textColor: Colors.white,
+                      () =>
+                          _pressOperator(
+                            '-',
+                          ),
+                      color:
+                          AppColors
+                              .primary,
+                      textColor:
+                          Colors.white,
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
 
                 Row(
                   children: [
                     _calcButton(
                       '1',
-                      () => _pressDigit('1'),
+                      () =>
+                          _pressDigit(
+                            '1',
+                          ),
                     ),
                     _calcButton(
                       '2',
-                      () => _pressDigit('2'),
+                      () =>
+                          _pressDigit(
+                            '2',
+                          ),
                     ),
                     _calcButton(
                       '3',
-                      () => _pressDigit('3'),
+                      () =>
+                          _pressDigit(
+                            '3',
+                          ),
                     ),
                     _calcButton(
                       '+',
-                      () => _pressOperator('+'),
-                      color: AppColors.primary,
-                      textColor: Colors.white,
+                      () =>
+                          _pressOperator(
+                            '+',
+                          ),
+                      color:
+                          AppColors
+                              .primary,
+                      textColor:
+                          Colors.white,
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
 
                 Row(
                   children: [
                     _calcButton(
                       '0',
-                      () => _pressDigit('0'),
+                      () =>
+                          _pressDigit(
+                            '0',
+                          ),
                       flex: 2,
                     ),
                     _calcButton(
                       '.',
-                      () => _pressDigit('.'),
+                      () =>
+                          _pressDigit(
+                            '.',
+                          ),
                     ),
                     _calcButton(
                       '±',
@@ -793,8 +1158,11 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                     _calcButton(
                       '=',
                       _pressEquals,
-                      color: AppColors.primary,
-                      textColor: Colors.white,
+                      color:
+                          AppColors
+                              .primary,
+                      textColor:
+                          Colors.white,
                     ),
                   ],
                 ),
@@ -814,55 +1182,98 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
     int flex = 1,
   }) {
     final bool isOperator =
-        color == AppColors.primary;
+        color ==
+            AppColors.primary;
 
     final bool isFunction =
-        color == Colors.grey.shade200;
+        color ==
+            Colors.grey.shade200;
 
     return Expanded(
       flex: flex,
       child: Padding(
-        padding: const EdgeInsets.all(3),
+        padding:
+            const EdgeInsets.all(3),
         child: Material(
-          color: color ?? Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color:
+              color ??
+              Colors.white,
+          borderRadius:
+              BorderRadius.circular(
+            12,
+          ),
           elevation:
-              isOperator || isFunction ? 0 : 1,
+              isOperator ||
+                      isFunction
+                  ? 0
+                  : 1,
           shadowColor:
-              Colors.black.withOpacity(0.05),
+              Colors.black.withOpacity(
+            0.05,
+          ),
           child: InkWell(
             onTap: onTap,
             borderRadius:
-                BorderRadius.circular(12),
-            splashColor: isOperator
-                ? Colors.white.withOpacity(0.3)
-                : AppColors.primary.withOpacity(0.1),
-            highlightColor: isOperator
-                ? Colors.white.withOpacity(0.2)
-                : Colors.grey.withOpacity(0.1),
+                BorderRadius.circular(
+              12,
+            ),
+            splashColor:
+                isOperator
+                    ? Colors.white
+                        .withOpacity(
+                        0.3,
+                      )
+                    : AppColors
+                        .primary
+                        .withOpacity(
+                        0.1,
+                      ),
+            highlightColor:
+                isOperator
+                    ? Colors.white
+                        .withOpacity(
+                        0.2,
+                      )
+                    : Colors.grey
+                        .withOpacity(
+                        0.1,
+                      ),
             child: Container(
               height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
+              alignment:
+                  Alignment.center,
+              decoration:
+                  BoxDecoration(
                 borderRadius:
-                    BorderRadius.circular(12),
-                border: isFunction || isOperator
-                    ? null
-                    : Border.all(
-                        color: Colors.grey.shade200,
-                        width: 1,
-                      ),
+                    BorderRadius.circular(
+                  12,
+                ),
+                border:
+                    isFunction ||
+                            isOperator
+                        ? null
+                        : Border.all(
+                            color:
+                                Colors
+                                    .grey
+                                    .shade200,
+                            width: 1,
+                          ),
               ),
               child: Text(
                 label,
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: isOperator
-                      ? FontWeight.bold
-                      : FontWeight.w500,
+                  fontWeight:
+                      isOperator
+                          ? FontWeight
+                              .bold
+                          : FontWeight
+                              .w500,
                   color:
                       textColor ??
-                      AppColors.textPrimary,
+                      AppColors
+                          .textPrimary,
                 ),
               ),
             ),

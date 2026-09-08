@@ -9,17 +9,19 @@ import '../data.dart';
 import '../firebase/firestore_service.dart';
 import '../addon/aksi.dart';
 import '../helpers/theme_helper.dart';
-import '../templates/custom_animation.dart';
+import '../helpers/custom_animation.dart';
 import '../helpers/scroll_reveal.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  ConsumerState<DashboardPage> createState() => _DashboardPageState();
+  ConsumerState<DashboardPage> createState() =>
+      _DashboardPageState();
 }
 
-class _DashboardPageState extends ConsumerState<DashboardPage> {
+class _DashboardPageState
+    extends ConsumerState<DashboardPage> {
   bool _isLoading = true;
   bool _hasError = false;
 
@@ -37,7 +39,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // =========================================================
 
   Future<Map<int, double>> _getMonthlyIncome() async {
-    final transactions = await fetchAllTransactions();
+    final transactions =
+        await fetchAllTransactions();
 
     Map<int, double> monthly = {};
 
@@ -45,7 +48,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       if (t.type == TransType.pemasukan) {
         final month = t.date.month;
 
-        monthly[month] = (monthly[month] ?? 0) + t.amount;
+        monthly[month] =
+            (monthly[month] ?? 0) + t.amount;
       }
     }
 
@@ -60,7 +64,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final now = DateTime.now();
     final month = now.month;
 
-    final transactions = await fetchAllTransactions();
+    final transactions =
+        await fetchAllTransactions();
 
     double total = 0;
 
@@ -79,7 +84,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final now = DateTime.now();
     final month = now.month;
 
-    final transactions = await fetchAllTransactions();
+    final transactions =
+        await fetchAllTransactions();
 
     double total = 0;
 
@@ -95,7 +101,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Future<double> _getTotalIncomeAllTime() async {
-    final transactions = await fetchAllTransactions();
+    final transactions =
+        await fetchAllTransactions();
 
     double total = 0;
 
@@ -109,7 +116,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Future<double> _getTotalExpenseAllTime() async {
-    final transactions = await fetchAllTransactions();
+    final transactions =
+        await fetchAllTransactions();
 
     double total = 0;
 
@@ -125,19 +133,24 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Future<String> _generateAIInsight() async {
     final totalIncome = _totalIncome;
     final totalExpense = _totalExpense;
-    final balance = totalIncome - totalExpense;
+    final balance =
+        totalIncome - totalExpense;
 
     final now = DateTime.now();
 
-    int lastMonth = now.month - 1;
-    int lastYear = now.year;
+    int lastMonth =
+        now.month - 1;
+
+    int lastYear =
+        now.year;
 
     if (lastMonth == 0) {
       lastMonth = 12;
       lastYear--;
     }
 
-    final transactions = await fetchAllTransactions();
+    final transactions =
+        await fetchAllTransactions();
 
     double lastMonthIncome = 0;
 
@@ -149,22 +162,27 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       }
     }
 
-    final activeStudents = _activeStudents;
+    final activeStudents =
+        _activeStudents;
 
     final paidStudents =
-        activeStudents.where((s) => !s.hasOutstanding).length;
+        activeStudents
+            .where(
+              (s) => !s.hasOutstanding,
+            )
+            .length;
 
-    final totalStudents = activeStudents.length;
+    final totalStudents =
+        activeStudents.length;
 
-    final persentaseLunas = totalStudents > 0
-        ? (paidStudents / totalStudents * 100)
-        : 0;
+    final persentaseLunas =
+        totalStudents > 0
+            ? (paidStudents /
+                    totalStudents *
+                    100)
+            : 0;
 
     List<String> insights = [];
-
-    // ---------------------------------------------------------
-    // STATUS PEMBAYARAN
-    // ---------------------------------------------------------
 
     if (persentaseLunas >= 80) {
       insights.add(
@@ -182,14 +200,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       );
     }
 
-    // ---------------------------------------------------------
-    // PERBANDINGAN PEMASUKAN
-    // ---------------------------------------------------------
+    if (lastMonthIncome > 0 &&
+        totalIncome > 0) {
+      final selisih =
+          totalIncome -
+              lastMonthIncome;
 
-    if (lastMonthIncome > 0 && totalIncome > 0) {
-      final selisih = totalIncome - lastMonthIncome;
-
-      final persenChange = selisih / lastMonthIncome * 100;
+      final persenChange =
+          selisih /
+              lastMonthIncome *
+              100;
 
       if (persenChange > 0) {
         insights.add(
@@ -202,15 +222,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           '${persenChange.abs().toStringAsFixed(1)}% dibanding bulan lalu.',
         );
       } else {
-        insights.add('➖ Pemasukan bulan ini stabil.');
+        insights.add(
+          '➖ Pemasukan bulan ini stabil.',
+        );
       }
-    } else if (totalIncome > 0 && lastMonthIncome == 0) {
-      insights.add('💰 Bulan ini mulai ada pemasukan baru.');
+    } else if (totalIncome > 0 &&
+        lastMonthIncome == 0) {
+      insights.add(
+        '💰 Bulan ini mulai ada pemasukan baru.',
+      );
     }
-
-    // ---------------------------------------------------------
-    // SALDO
-    // ---------------------------------------------------------
 
     if (balance > 0) {
       insights.add(
@@ -221,7 +242,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         '🔴 Saldo negatif: Rp ${formatCurrency(balance)}. Perhatikan pengeluaran.',
       );
     } else {
-      insights.add('⚖️ Saldo impas.');
+      insights.add(
+        '⚖️ Saldo impas.',
+      );
     }
 
     return insights.join(' • ');
@@ -236,19 +259,26 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     });
 
     try {
-      _activeStudents = await fetchActiveStudents();
+      _activeStudents =
+          await fetchActiveStudents();
 
-      _totalIncome = await _getCurrentMonthIncome();
+      _totalIncome =
+          await _getCurrentMonthIncome();
 
-      _totalExpense = await _getCurrentMonthExpense();
+      _totalExpense =
+          await _getCurrentMonthExpense();
 
-      _totalIncomeAll = await _getTotalIncomeAllTime();
+      _totalIncomeAll =
+          await _getTotalIncomeAllTime();
 
-      _totalExpenseAll = await _getTotalExpenseAllTime();
+      _totalExpenseAll =
+          await _getTotalExpenseAllTime();
 
-      _monthlyIncome = await _getMonthlyIncome();
+      _monthlyIncome =
+          await _getMonthlyIncome();
 
-      _aiInsight = await _generateAIInsight();
+      _aiInsight =
+          await _generateAIInsight();
     } catch (e) {
       _hasError = true;
 
@@ -292,7 +322,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // =========================================================
 
   String _getGreeting() {
-    final hour = DateTime.now().hour;
+    final hour =
+        DateTime.now().hour;
 
     if (hour < 11) {
       return 'Selamat Pagi';
@@ -348,29 +379,58 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // =========================================================
 
   @override
-  Widget build(BuildContext context) {
-    final themeMode = ref.watch(themeModeProvider);
+  Widget build(
+    BuildContext context,
+  ) {
+    final themeMode =
+        ref.watch(themeModeProvider);
 
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
 
-    final colors = theme.colorScheme;
+    final colors =
+        theme.colorScheme;
 
     final headerBgColor =
-        ThemeHelper.getHeaderBgColor(themeMode, colors);
+        ThemeHelper.getHeaderBgColor(
+      themeMode,
+      colors,
+    );
 
     final headerTextColor =
-        ThemeHelper.getHeaderTextColor(themeMode, colors);
+        ThemeHelper.getHeaderTextColor(
+      themeMode,
+      colors,
+    );
 
-    return ThemeHelper.buildThemedBackground(
+    final scaffoldBackgroundColor =
+        ThemeHelper.getScaffoldBackgroundColor(
+      themeMode,
+      colors,
+    );
+
+    return ThemeHelper
+        .buildThemedBackground(
       themeMode,
       Scaffold(
-        backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
+        // =====================================================
+        // PERBAIKAN NEUMORPHISM
+        // =====================================================
+
+        backgroundColor:
+            scaffoldBackgroundColor,
+
+        extendBodyBehindAppBar:
+            true,
+
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
+          backgroundColor:
+              Colors.transparent,
           elevation: 0,
-          foregroundColor: headerTextColor,
+          foregroundColor:
+              headerTextColor,
         ),
+
         body: _isLoading
             ? const LottieLoading()
             : _hasError
@@ -379,67 +439,80 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                         'Gagal memuat data. Periksa koneksi internet Anda.',
                   )
                 : RefreshIndicator(
-                    onRefresh: _fetchData,
-                    child: NotificationListener<
-                        OverscrollIndicatorNotification>(
-                      onNotification: (notification) {
-                        notification.disallowIndicator();
+                    onRefresh:
+                        _fetchData,
+                    child:
+                        NotificationListener<
+                            OverscrollIndicatorNotification>(
+                      onNotification:
+                          (notification) {
+                        notification
+                            .disallowIndicator();
 
                         return false;
                       },
-                      child: ListView(
+                      child:
+                          ListView(
                         physics:
                             const AlwaysScrollableScrollPhysics(),
                         padding:
-                            const EdgeInsets.only(bottom: 32),
+                            const EdgeInsets.only(
+                          bottom: 32,
+                        ),
                         children: [
                           // =====================================================
                           // HEADER + HERO CARD
                           // =====================================================
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              // -------------------------------------------------
-                              // HEADER BACKGROUND
-                              // -------------------------------------------------
 
+                          Stack(
+                            clipBehavior:
+                                Clip.none,
+                            children: [
                               Positioned(
                                 top: 0,
                                 left: 0,
                                 right: 0,
                                 height: 260,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: headerBgColor,
+                                child:
+                                    Container(
+                                  decoration:
+                                      BoxDecoration(
+                                    color:
+                                        headerBgColor,
                                     borderRadius:
                                         const BorderRadius.only(
                                       bottomLeft:
-                                          Radius.circular(36),
+                                          Radius.circular(
+                                        36,
+                                      ),
                                       bottomRight:
-                                          Radius.circular(36),
+                                          Radius.circular(
+                                        36,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
 
-                              // -------------------------------------------------
-                              // HEADER TEXT
-                              // -------------------------------------------------
-
                               Positioned(
-                                top:
-                                    MediaQuery.of(context)
+                                top: MediaQuery.of(
+                                          context,
+                                        )
                                             .padding
                                             .top +
-                                        kToolbarHeight +
-                                        10,
+                                    kToolbarHeight +
+                                    10,
                                 left: 20,
                                 right: 20,
-                                child: ScrollReveal(
-                                  delay: const Duration(
-                                    milliseconds: 50,
+                                child:
+                                    ScrollReveal(
+                                  delay:
+                                      const Duration(
+                                    milliseconds:
+                                        50,
                                   ),
-                                  child: Column(
+                                  child:
+                                      Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -455,7 +528,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                               headerTextColor,
                                         ),
                                       ),
-                                      const SizedBox(height: 12),
+                                      const SizedBox(
+                                        height: 12,
+                                      ),
                                       Text(
                                         '${_getGreeting()}, Admin 👋',
                                         style: theme
@@ -468,15 +543,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                               headerTextColor,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(
+                                        height: 4,
+                                      ),
                                       Text(
                                         _getCurrentDate(),
                                         style: theme
                                             .textTheme
                                             .bodyMedium
                                             ?.copyWith(
-                                          color: headerTextColor
-                                              .withOpacity(0.8),
+                                          color:
+                                              headerTextColor.withOpacity(
+                                            0.8,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -484,22 +563,23 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                 ),
                               ),
 
-                              // -------------------------------------------------
-                              // HERO CARD
-                              // -------------------------------------------------
-
                               ScrollReveal(
-                                delay: const Duration(
-                                  milliseconds: 120,
+                                delay:
+                                    const Duration(
+                                  milliseconds:
+                                      120,
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(
+                                child:
+                                    Padding(
+                                  padding:
+                                      const EdgeInsets.only(
                                     top: 200,
                                     left: 16,
                                     right: 16,
                                     bottom: 16,
                                   ),
-                                  child: Column(
+                                  child:
+                                      Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -509,40 +589,49 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                           left: 4,
                                           bottom: 8,
                                         ),
-                                        child: Text(
+                                        child:
+                                            Text(
                                           'RINGKASAN SALDO',
-                                          style: TextStyle(
-                                            fontSize: 11.5,
+                                          style:
+                                              TextStyle(
+                                            fontSize:
+                                                11.5,
                                             fontWeight:
                                                 FontWeight.w700,
-                                            letterSpacing: 1.0,
-                                            color: headerTextColor
-                                                .withOpacity(0.9),
+                                            letterSpacing:
+                                                1.0,
+                                            color:
+                                                headerTextColor.withOpacity(
+                                              0.9,
+                                            ),
                                           ),
                                         ),
                                       ),
+
                                       ThemeHelper
                                           .buildSectionGroup(
                                         themeMode,
                                         [
                                           Padding(
                                             padding:
-                                                const EdgeInsets
-                                                    .all(20),
-                                            child: Column(
+                                                const EdgeInsets.all(
+                                              20,
+                                            ),
+                                            child:
+                                                Column(
                                               crossAxisAlignment:
-                                                  CrossAxisAlignment
-                                                      .start,
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   'Total Saldo Sekolah',
-                                                  style: theme
-                                                      .textTheme
-                                                      .bodyMedium,
+                                                  style:
+                                                      theme.textTheme.bodyMedium,
                                                 ),
+
                                                 const SizedBox(
                                                   height: 8,
                                                 ),
+
                                                 Text(
                                                   'Rp ${formatCurrency(_totalIncomeAll - _totalExpenseAll)}',
                                                   style: theme
@@ -550,15 +639,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                                       .headlineMedium
                                                       ?.copyWith(
                                                     fontWeight:
-                                                        FontWeight
-                                                            .bold,
-                                                    color: colors
-                                                        .primary,
+                                                        FontWeight.bold,
+                                                    color:
+                                                        colors.primary,
                                                   ),
                                                 ),
+
                                                 const SizedBox(
                                                   height: 20,
                                                 ),
+
                                                 Row(
                                                   children: [
                                                     Expanded(
@@ -566,32 +656,34 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                                           _buildBalanceItem(
                                                         'Pemasukan',
                                                         _totalIncome,
-                                                        AppColors
-                                                            .success,
-                                                        Icons
-                                                            .arrow_upward,
+                                                        AppColors.success,
+                                                        Icons.arrow_upward,
                                                       ),
                                                     ),
+
                                                     Container(
-                                                      width: 1,
-                                                      height: 40,
-                                                      color: ThemeHelper
-                                                          .dividerColor(
+                                                      width:
+                                                          1,
+                                                      height:
+                                                          40,
+                                                      color:
+                                                          ThemeHelper.dividerColor(
                                                         themeMode,
                                                       ),
                                                     ),
+
                                                     const SizedBox(
-                                                      width: 16,
+                                                      width:
+                                                          16,
                                                     ),
+
                                                     Expanded(
                                                       child:
                                                           _buildBalanceItem(
                                                         'Pengeluaran',
                                                         _totalExpense,
-                                                        AppColors
-                                                            .error,
-                                                        Icons
-                                                            .arrow_downward,
+                                                        AppColors.error,
+                                                        Icons.arrow_downward,
                                                       ),
                                                     ),
                                                   ],
@@ -608,28 +700,25 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                             ],
                           ),
 
-                          // =====================================================
-                          // KONTEN LAIN
-                          // =====================================================
-
                           Padding(
                             padding:
                                 const EdgeInsets.symmetric(
-                              horizontal: 16.0,
+                              horizontal:
+                                  16.0,
                             ),
-                            child: Column(
+                            child:
+                                Column(
                               crossAxisAlignment:
                                   CrossAxisAlignment.start,
                               children: [
-                                // =================================================
-                                // CHART
-                                // =================================================
-
                                 ScrollReveal(
-                                  delay: const Duration(
-                                    milliseconds: 100,
+                                  delay:
+                                      const Duration(
+                                    milliseconds:
+                                        100,
                                   ),
-                                  child: Column(
+                                  child:
+                                      Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -639,27 +728,31 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                         'Statistik Pemasukan (6 Bulan)',
                                         themeMode,
                                       ),
-                                      const SizedBox(height: 8),
+
+                                      const SizedBox(
+                                        height: 8,
+                                      ),
+
                                       ThemeHelper
                                           .buildSectionGroup(
                                         themeMode,
                                         [
                                           Padding(
                                             padding:
-                                                const EdgeInsets
-                                                    .fromLTRB(
+                                                const EdgeInsets.fromLTRB(
                                               8,
                                               20,
                                               16,
                                               8,
                                             ),
-                                            child: Column(
+                                            child:
+                                                Column(
                                               crossAxisAlignment:
-                                                  CrossAxisAlignment
-                                                      .start,
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 SizedBox(
-                                                  height: 200,
+                                                  height:
+                                                      200,
                                                   child:
                                                       _buildBarChart(
                                                     _getLast6MonthsLabels(),
@@ -676,17 +769,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                   ),
                                 ),
 
-                                const SizedBox(height: 24),
-
-                                // =================================================
-                                // STATUS SISWA
-                                // =================================================
+                                const SizedBox(
+                                  height:
+                                      24,
+                                ),
 
                                 ScrollReveal(
-                                  delay: const Duration(
-                                    milliseconds: 150,
+                                  delay:
+                                      const Duration(
+                                    milliseconds:
+                                        150,
                                   ),
-                                  child: Column(
+                                  child:
+                                      Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -696,7 +791,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                         'Status Pembayaran Siswa',
                                         themeMode,
                                       ),
-                                      const SizedBox(height: 8),
+
+                                      const SizedBox(
+                                        height: 8,
+                                      ),
+
                                       _buildStudentPaymentCard(
                                         themeMode,
                                       ),
@@ -704,17 +803,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                   ),
                                 ),
 
-                                const SizedBox(height: 24),
-
-                                // =================================================
-                                // AI INSIGHT
-                                // =================================================
+                                const SizedBox(
+                                  height:
+                                      24,
+                                ),
 
                                 ScrollReveal(
-                                  delay: const Duration(
-                                    milliseconds: 200,
+                                  delay:
+                                      const Duration(
+                                    milliseconds:
+                                        200,
                                   ),
-                                  child: Column(
+                                  child:
+                                      Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -724,39 +825,50 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                         'Insight Keuangan',
                                         themeMode,
                                       ),
-                                      const SizedBox(height: 8),
+
+                                      const SizedBox(
+                                        height: 8,
+                                      ),
+
                                       ThemeHelper
                                           .buildSectionGroup(
                                         themeMode,
                                         [
                                           Padding(
                                             padding:
-                                                const EdgeInsets
-                                                    .all(16),
-                                            child: Row(
+                                                const EdgeInsets.all(
+                                              16,
+                                            ),
+                                            child:
+                                                Row(
                                               crossAxisAlignment:
-                                                  CrossAxisAlignment
-                                                      .start,
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 const SizedBox(
-                                                  width: 40,
-                                                  height: 40,
+                                                  width:
+                                                      40,
+                                                  height:
+                                                      40,
                                                   child:
                                                       LottieAiAnimation(
-                                                    size: 40,
+                                                    size:
+                                                        40,
                                                   ),
                                                 ),
+
                                                 const SizedBox(
-                                                  width: 12,
+                                                  width:
+                                                      12,
                                                 ),
+
                                                 Expanded(
-                                                  child: Text(
+                                                  child:
+                                                      Text(
                                                     _aiInsight,
-                                                    style: theme
-                                                        .textTheme
-                                                        .bodyMedium
-                                                        ?.copyWith(
-                                                      height: 1.4,
+                                                    style:
+                                                        theme.textTheme.bodyMedium?.copyWith(
+                                                      height:
+                                                          1.4,
                                                     ),
                                                   ),
                                                 ),
@@ -789,10 +901,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     Color color,
     IconData icon,
   ) {
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         Row(
           children: [
@@ -801,18 +915,29 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               color: color,
               size: 16,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(
+              width: 4,
+            ),
             Text(
               title,
-              style: theme.textTheme.labelLarge,
+              style:
+                  theme.textTheme.labelLarge,
             ),
           ],
         ),
-        const SizedBox(height: 4),
+
+        const SizedBox(
+          height: 4,
+        ),
+
         Text(
           'Rp ${formatCurrency(amount)}',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+          style: theme
+              .textTheme
+              .titleMedium
+              ?.copyWith(
+            fontWeight:
+                FontWeight.bold,
           ),
         ),
       ],
@@ -826,78 +951,136 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget _buildStudentPaymentCard(
     AppThemeMode themeMode,
   ) {
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
 
-    final colors = theme.colorScheme;
+    final colors =
+        theme.colorScheme;
 
     final paidStudents =
-        _activeStudents.where((s) => !s.hasOutstanding).length;
+        _activeStudents
+            .where(
+              (s) => !s.hasOutstanding,
+            )
+            .length;
 
-    final totalStudents = _activeStudents.length;
+    final totalStudents =
+        _activeStudents.length;
 
-    final persentaseLunas = totalStudents > 0
-        ? (paidStudents / totalStudents * 100)
-        : 0;
+    final persentaseLunas =
+        totalStudents > 0
+            ? (paidStudents /
+                    totalStudents *
+                    100)
+            : 0;
 
-    return ThemeHelper.buildSectionGroup(
+    return ThemeHelper
+        .buildSectionGroup(
       themeMode,
       [
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+          padding:
+              const EdgeInsets.all(
+            16,
+          ),
+          child:
+              Row(
             children: [
               Expanded(
-                child: Column(
+                child:
+                    Column(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Siswa Lunas',
-                      style: theme.textTheme.bodyMedium,
+                      style: theme
+                          .textTheme
+                          .bodyMedium,
                     ),
-                    const SizedBox(height: 4),
+
+                    const SizedBox(
+                      height: 4,
+                    ),
+
                     Text(
                       '$paidStudents / $totalStudents Siswa',
-                      style: theme.textTheme.titleLarge
+                      style: theme
+                          .textTheme
+                          .titleLarge
                           ?.copyWith(
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                            FontWeight
+                                .bold,
                       ),
                     ),
-                    const SizedBox(height: 12),
+
+                    const SizedBox(
+                      height: 12,
+                    ),
+
                     ClipRRect(
                       borderRadius:
-                          BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: totalStudents > 0
-                            ? paidStudents / totalStudents
+                          BorderRadius
+                              .circular(
+                        8,
+                      ),
+                      child:
+                          LinearProgressIndicator(
+                        value: totalStudents >
+                                0
+                            ? paidStudents /
+                                totalStudents
                             : 0,
                         backgroundColor:
-                            colors.surfaceContainerHighest,
-                        color: AppColors.success,
-                        minHeight: 8,
+                            colors
+                                .surfaceContainerHighest,
+                        color:
+                            AppColors.success,
+                        minHeight:
+                            8,
                       ),
                     ),
-                    const SizedBox(height: 8),
+
+                    const SizedBox(
+                      height: 8,
+                    ),
+
                     Text(
                       '${persentaseLunas.toStringAsFixed(0)}% dari total siswa aktif telah melunasi pembayaran.',
-                      style:
-                          theme.textTheme.labelMedium,
+                      style: theme
+                          .textTheme
+                          .labelMedium,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+
+              const SizedBox(
+                width: 16,
+              ),
+
               Container(
                 width: 80,
                 height: 80,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color:
-                      AppColors.success.withOpacity(0.1),
-                  shape: BoxShape.circle,
+                padding:
+                    const EdgeInsets.all(
+                  8,
                 ),
-                child: const LottieBenefits(
-                  size: 64,
+                decoration:
+                    BoxDecoration(
+                  color: AppColors
+                      .success
+                      .withOpacity(
+                    0.1,
+                  ),
+                  shape:
+                      BoxShape.circle,
+                ),
+                child:
+                    const LottieBenefits(
+                  size:
+                      64,
                 ),
               ),
             ],
@@ -911,7 +1094,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // MONTH LABELS
   // =========================================================
 
-  List<String> _getLast6MonthsLabels() {
+  List<String>
+      _getLast6MonthsLabels() {
     const monthLabels = [
       'Jan',
       'Feb',
@@ -927,18 +1111,25 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       'Des',
     ];
 
-    final now = DateTime.now();
+    final now =
+        DateTime.now();
 
     List<String> labels = [];
 
-    for (int i = 5; i >= 0; i--) {
-      int month = now.month - i;
+    for (int i = 5;
+        i >= 0;
+        i--) {
+      int month =
+          now.month - i;
 
       if (month <= 0) {
         month += 12;
       }
 
-      labels.add(monthLabels[month - 1]);
+      labels.add(
+        monthLabels[
+            month - 1],
+      );
     }
 
     return labels;
@@ -948,19 +1139,28 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // MONTH VALUES
   // =========================================================
 
-  List<double> _getLast6MonthsValues() {
-    final now = DateTime.now();
+  List<double>
+      _getLast6MonthsValues() {
+    final now =
+        DateTime.now();
 
     List<double> values = [];
 
-    for (int i = 5; i >= 0; i--) {
-      int month = now.month - i;
+    for (int i = 5;
+        i >= 0;
+        i--) {
+      int month =
+          now.month - i;
 
       if (month <= 0) {
         month += 12;
       }
 
-      values.add(_monthlyIncome[month] ?? 0);
+      values.add(
+        _monthlyIncome[
+                month] ??
+            0,
+      );
     }
 
     return values;
@@ -975,17 +1175,26 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     List<double> values,
     AppThemeMode themeMode,
   ) {
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
 
-    final colors = theme.colorScheme;
+    final colors =
+        theme.colorScheme;
 
     final maxVal =
-        values.reduce((a, b) => a > b ? a : b);
+        values.reduce(
+      (a, b) =>
+          a > b ? a : b,
+    );
 
     final double maxY =
-        maxVal > 0 ? maxVal : 1;
+        maxVal > 0
+            ? maxVal
+            : 1;
 
-    final List<BarChartGroupData> barGroups =
+    final List<
+            BarChartGroupData>
+        barGroups =
         List.generate(
       labels.length,
       (index) {
@@ -993,12 +1202,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           x: index,
           barRods: [
             BarChartRodData(
-              toY: values[index],
-              color: colors.primary,
-              width: 14,
+              toY:
+                  values[index],
+              color:
+                  colors.primary,
+              width:
+                  14,
               borderRadius:
                   const BorderRadius.vertical(
-                top: Radius.circular(6),
+                top:
+                    Radius.circular(
+                  6,
+                ),
               ),
             ),
           ],
@@ -1009,89 +1224,127 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return BarChart(
       BarChartData(
         alignment:
-            BarChartAlignment.spaceAround,
-        maxY: maxY * 1.2,
-        minY: 0,
-        groupsSpace: 16,
-        barGroups: barGroups,
+            BarChartAlignment
+                .spaceAround,
 
-        // -----------------------------------------------------
-        // GRID
-        // -----------------------------------------------------
+        maxY:
+            maxY * 1.2,
 
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: maxY / 4,
-          getDrawingHorizontalLine: (value) {
+        minY:
+            0,
+
+        groupsSpace:
+            16,
+
+        barGroups:
+            barGroups,
+
+        gridData:
+            FlGridData(
+          show:
+              true,
+
+          drawVerticalLine:
+              false,
+
+          horizontalInterval:
+              maxY / 4,
+
+          getDrawingHorizontalLine:
+              (value) {
             return FlLine(
-              color: ThemeHelper.dividerColor(
+              color:
+                  ThemeHelper
+                      .dividerColor(
                 themeMode,
               ),
-              strokeWidth: 1,
-              dashArray: [5, 5],
+              strokeWidth:
+                  1,
+              dashArray: [
+                5,
+                5,
+              ],
             );
           },
         ),
 
-        // -----------------------------------------------------
-        // TITLES
-        // -----------------------------------------------------
+        titlesData:
+            FlTitlesData(
+          show:
+              true,
 
-        titlesData: FlTitlesData(
-          show: true,
+          bottomTitles:
+              AxisTitles(
+            sideTitles:
+                SideTitles(
+              showTitles:
+                  true,
 
-          // ---------------------------------------------------
-          // BOTTOM
-          // ---------------------------------------------------
+              reservedSize:
+                  28,
 
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 28,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
+              getTitlesWidget:
+                  (value, meta) {
+                final index =
+                    value.toInt();
 
-                if (index >= 0 &&
-                    index < labels.length) {
+                if (index >=
+                        0 &&
+                    index <
+                        labels.length) {
                   return Padding(
                     padding:
-                        const EdgeInsets.only(
-                      top: 8.0,
+                        const EdgeInsets
+                            .only(
+                      top:
+                          8.0,
                     ),
-                    child: Text(
-                      labels[index],
+                    child:
+                        Text(
+                      labels[
+                          index],
                       style:
                           theme.textTheme.labelMedium,
                     ),
                   );
                 }
 
-                return const SizedBox.shrink();
+                return const SizedBox
+                    .shrink();
               },
             ),
           ),
 
-          // ---------------------------------------------------
-          // LEFT
-          // ---------------------------------------------------
+          leftTitles:
+              AxisTitles(
+            sideTitles:
+                SideTitles(
+              showTitles:
+                  true,
 
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-              interval: maxY / 4,
-              getTitlesWidget: (value, meta) {
-                if (value == 0) {
-                  return const SizedBox.shrink();
+              reservedSize:
+                  40,
+
+              interval:
+                  maxY / 4,
+
+              getTitlesWidget:
+                  (value, meta) {
+                if (value ==
+                    0) {
+                  return const SizedBox
+                      .shrink();
                 }
 
                 return Padding(
                   padding:
-                      const EdgeInsets.only(
-                    right: 4.0,
+                      const EdgeInsets
+                          .only(
+                    right:
+                        4.0,
                   ),
-                  child: Text(
+                  child:
+                      Text(
                     '${(value / 1000).toInt()}k',
                     style:
                         theme.textTheme.labelMedium,
@@ -1101,52 +1354,58 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ),
           ),
 
-          // ---------------------------------------------------
-          // TOP
-          // ---------------------------------------------------
-
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: false,
+          topTitles:
+              const AxisTitles(
+            sideTitles:
+                SideTitles(
+              showTitles:
+                  false,
             ),
           ),
 
-          // ---------------------------------------------------
-          // RIGHT
-          // ---------------------------------------------------
-
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: false,
+          rightTitles:
+              const AxisTitles(
+            sideTitles:
+                SideTitles(
+              showTitles:
+                  false,
             ),
           ),
         ),
 
-        // -----------------------------------------------------
-        // BORDER
-        // -----------------------------------------------------
-
         borderData:
-            FlBorderData(show: false),
+            FlBorderData(
+          show:
+              false,
+        ),
 
-        // -----------------------------------------------------
-        // TOUCH
-        // -----------------------------------------------------
+        barTouchData:
+            BarTouchData(
+          enabled:
+              true,
 
-        barTouchData: BarTouchData(
-          enabled: true,
           touchTooltipData:
               BarTouchTooltipData(
-            getTooltipColor: (_) =>
-                colors.primary,
+            getTooltipColor:
+                (_) =>
+                    colors.primary,
+
             getTooltipItem:
-                (group, groupIndex, rod, rodIndex) {
+                (
+              group,
+              groupIndex,
+              rod,
+              rodIndex,
+            ) {
               return BarTooltipItem(
                 'Rp ${formatCurrency(rod.toY)}',
                 TextStyle(
-                  color: colors.onPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  color:
+                      colors.onPrimary,
+                  fontWeight:
+                      FontWeight.bold,
+                  fontSize:
+                      12,
                 ),
               );
             },

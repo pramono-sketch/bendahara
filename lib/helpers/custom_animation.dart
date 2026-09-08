@@ -1,3 +1,4 @@
+// lib/helpers/custom_animation.dart
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 

@@ -8,7 +8,7 @@ import '../constants/appearance.dart';
 import '../data.dart';
 import '../firebase/firestore_service.dart';
 import '../service/import_tambahkan.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/sound_helper.dart';
 
 // ============================================================
 // ================== HALAMAN MANAJEMEN SISWA ==================

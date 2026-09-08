@@ -11,7 +11,7 @@ import '../helpers/scroll_reveal.dart';
 import '../constants/appearance.dart';
 import '../helpers/theme_helper.dart';
 import '../l10n/translations.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/sound_helper.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -38,6 +38,54 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _volume = SoundHelper().getVolume();
   }
 
+  // ==========================================================
+  // SOUND
+  // ==========================================================
+
+  void _playClick() {
+    SoundHelper().playClick();
+  }
+
+  void _playNotification() {
+    SoundHelper().playNotification();
+  }
+
+  // ==========================================================
+  // THEMED SNACKBAR
+  // ==========================================================
+
+  void _showThemedSnackBar(
+    String message, {
+    Duration duration = const Duration(seconds: 2),
+  }) {
+    final themeMode = ref.read(themeModeProvider);
+
+    final colors = Theme.of(context).colorScheme;
+
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: isGlass
+            ? AppColors.glassBg1
+            : colors.surfaceContainerHighest,
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isGlass ? Colors.white : colors.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        duration: duration,
+      ),
+    );
+  }
+
+  // ==========================================================
+  // BUILD
+  // ==========================================================
+
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
@@ -58,49 +106,47 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              _playClick();
+
+              Navigator.pop(context);
+            },
           ),
           title: Text(translations.t('settings')),
         ),
-
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
-
           children: [
-            // ============================================
+            // ==================================================
             // TAMPILAN
-            // ============================================
+            // ==================================================
             ScrollReveal(
               delay: const Duration(milliseconds: 50),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-
                 children: [
                   ThemeHelper.buildSectionHeader(
                     context,
                     translations.t('appearance'),
                     themeMode,
                   ),
-
                   const SizedBox(height: 8),
-
                   ThemeHelper.buildSectionGroup(themeMode, [
                     ListTile(
                       leading: Icon(
                         Icons.palette_outlined,
                         color: colors.primary,
                       ),
-
                       title: Text(translations.t('app_theme')),
-
                       subtitle: Text(
                         _getThemeLabel(currentThemeMode, translations),
                       ),
-
                       trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        _playClick();
 
-                      onTap: () => _showThemeDialog(context, ref),
+                        _showThemeDialog(context, ref);
+                      },
                     ),
                   ]),
                 ],
@@ -109,34 +155,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // ============================================
+            // ==================================================
             // PREFERENSI
-            // ============================================
+            // ==================================================
             ScrollReveal(
               delay: const Duration(milliseconds: 120),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-
                 children: [
                   ThemeHelper.buildSectionHeader(
                     context,
                     translations.t('preferences'),
                     themeMode,
                   ),
-
                   const SizedBox(height: 8),
-
                   ThemeHelper.buildSectionGroup(themeMode, [
-                    // -----------------------------------
-                    // VOLUME
-                    // -----------------------------------
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-
                         children: [
                           Row(
                             children: [
@@ -145,76 +182,73 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 color: colors.primary,
                                 size: 22,
                               ),
-
                               const SizedBox(width: 12),
-
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-
                                   children: [
                                     Text(
                                       translations.t('sound_volume'),
-
                                       style: theme.textTheme.titleMedium,
                                     ),
-
                                     const SizedBox(height: 2),
-
                                     Text(
                                       '${(_volume * 100).toInt()}%',
-
                                       style: theme.textTheme.labelLarge,
                                     ),
                                   ],
                                 ),
                               ),
-
                               IconButton(
                                 tooltip: _volume == 0
                                     ? translations.t('enable_sound')
                                     : translations.t('mute_sound'),
-
                                 icon: Icon(
                                   _volume == 0
                                       ? Icons.volume_off_outlined
                                       : Icons.volume_up_outlined,
-
                                   color: colors.primary,
                                 ),
+                                onPressed: () async {
+                                  final oldVolume = _volume;
 
-                                onPressed: () {
-                                  final newVolume = _volume == 0 ? 1.0 : 0.0;
+                                  final newVolume = oldVolume == 0 ? 1.0 : 0.0;
+
+                                  // Mainkan click dengan volume lama
+                                  // supaya saat mute suara tetap terdengar.
+                                  if (oldVolume > 0) {
+                                    await SoundHelper().playClick();
+                                  }
 
                                   setState(() => _volume = newVolume);
 
-                                  SoundHelper().setVolume(newVolume);
+                                  await SoundHelper().setVolume(newVolume);
 
-                                  SoundHelper().playClick();
+                                  // Jika sebelumnya mute, volume sekarang
+                                  // sudah aktif sehingga click bisa terdengar.
+                                  if (oldVolume == 0) {
+                                    await SoundHelper().playClick();
+                                  }
                                 },
                               ),
                             ],
                           ),
-
                           const SizedBox(height: 4),
-
                           Slider(
                             value: _volume,
-
                             min: 0,
-
                             max: 1,
-
                             divisions: 10,
-
                             label: '${(_volume * 100).toInt()}%',
-
                             onChanged: (value) {
                               setState(() => _volume = value);
 
                               SoundHelper().setVolume(value);
-
-                              SoundHelper().playClick();
+                            },
+                            onChangeEnd: (_) {
+                              // Slider bukan tombol, tetapi tetap
+                              // diberi feedback suara ketika selesai digeser.
+                              _playClick();
                             },
                           ),
                         ],
@@ -223,66 +257,50 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     Divider(
                       height: 1,
-
                       color: ThemeHelper.dividerColor(themeMode),
                     ),
 
-                    // -----------------------------------
-                    // NOTIFICATIONS
-                    // -----------------------------------
                     SwitchListTile(
                       secondary: Icon(
                         Icons.notifications_none_outlined,
                         color: colors.primary,
                       ),
-
                       title: Text(translations.t('notifications')),
-
                       subtitle: Text(translations.t('enable_notifications')),
-
                       value: _notificationsEnabled,
-
                       onChanged: (value) {
+                        _playClick();
+
                         setState(() => _notificationsEnabled = value);
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              translations.t('feature_unavailable'),
-                            ),
-
-                            duration: const Duration(seconds: 2),
-                          ),
+                        _showThemedSnackBar(
+                          translations.t('feature_unavailable'),
                         );
                       },
                     ),
 
                     Divider(
                       height: 1,
-
                       color: ThemeHelper.dividerColor(themeMode),
                     ),
 
-                    // -----------------------------------
-                    // LANGUAGE
-                    // -----------------------------------
                     ListTile(
                       leading: Icon(
                         Icons.language_outlined,
                         color: colors.primary,
                       ),
-
                       title: Text(translations.t('language')),
-
                       subtitle: Text(
                         currentLocale.languageCode == 'en'
                             ? translations.t('english')
                             : translations.t('indonesian'),
                       ),
-
                       trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        _playClick();
 
-                      onTap: () => _showLanguageDialog(context, ref),
+                        _showLanguageDialog(context, ref);
+                      },
                     ),
                   ]),
                 ],
@@ -291,38 +309,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // ============================================
+            // ==================================================
             // DATA
-            // ============================================
+            // ==================================================
             ScrollReveal(
               delay: const Duration(milliseconds: 190),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-
                 children: [
                   ThemeHelper.buildSectionHeader(
                     context,
                     translations.t('data'),
                     themeMode,
                   ),
-
                   const SizedBox(height: 8),
-
                   ThemeHelper.buildSectionGroup(themeMode, [
                     ListTile(
                       leading: Icon(
                         Icons.cloud_upload_outlined,
                         color: colors.primary,
                       ),
-
                       title: Text(translations.t('backup_data')),
-
                       subtitle: Text(translations.t('backup_subtitle')),
-
                       trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        _playClick();
 
-                      onTap: () => _handleBackupTap(context, ref),
+                        _handleBackupTap(context, ref);
+                      },
                     ),
 
                     if (_easterEggActivated) ...[
@@ -330,17 +344,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         height: 1,
                         color: ThemeHelper.dividerColor(themeMode),
                       ),
-
                       SwitchListTile(
                         secondary: const Icon(Icons.egg_outlined),
-
                         title: Text(translations.t('show_easter_egg')),
-
                         subtitle: Text(translations.t('easter_egg_subtitle')),
-
                         value: _easterEggFooterEnabled,
-
                         onChanged: (value) {
+                          _playClick();
+
                           setState(() => _easterEggFooterEnabled = value);
                         },
                       ),
@@ -352,50 +363,41 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // ============================================
+            // ==================================================
             // TENTANG
-            // ============================================
+            // ==================================================
             ScrollReveal(
               delay: const Duration(milliseconds: 260),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-
                 children: [
                   ThemeHelper.buildSectionHeader(
                     context,
                     translations.t('about'),
                     themeMode,
                   ),
-
                   const SizedBox(height: 8),
-
                   ThemeHelper.buildSectionGroup(themeMode, [
                     ListTile(
                       leading: Icon(Icons.info_outline, color: colors.primary),
-
                       title: Text(translations.t('about')),
-
                       subtitle: Text(translations.t('version')),
-
                       trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        _playClick();
 
-                      onTap: () => _showAboutDialog(context, ref),
+                        _showAboutDialog(context, ref);
+                      },
                     ),
                   ]),
                 ],
               ),
             ),
 
-            // ============================================
-            // EASTER EGG FOOTER
-            // ============================================
             if (_easterEggActivated && _easterEggFooterEnabled) ...[
               const SizedBox(height: 20),
-
               ScrollReveal(
                 delay: const Duration(milliseconds: 330),
-
                 child: _buildEasterEggFooter(
                   themeMode: themeMode,
                   colors: colors,
@@ -410,7 +412,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   // ==========================================================
-  // ================= EASTER EGG FOOTER ======================
+  // EASTER EGG FOOTER
   // ==========================================================
 
   Widget _buildEasterEggFooter({
@@ -418,29 +420,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     required ColorScheme colors,
     required Translations translations,
   }) {
-    // NEOMORPHISM
     if (ThemeHelper.isNeo(themeMode)) {
       return Container(
         width: double.infinity,
-
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
         decoration: neumorphismDecoration(borderRadius: 16, isPressed: false),
-
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
             const Text('🥚', style: TextStyle(fontSize: 22)),
-
             const SizedBox(width: 8),
-
             Flexible(
               child: Text(
                 translations.t('easter_egg_found'),
-
                 textAlign: TextAlign.center,
-
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -453,36 +446,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
-    // GLASSMORPHISM
     if (ThemeHelper.isGlass(themeMode)) {
       return Container(
         width: double.infinity,
-
         decoration: glassmorphismDecoration(borderRadius: 16),
-
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-
                 children: [
                   const Text('🥚', style: TextStyle(fontSize: 22)),
-
                   const SizedBox(width: 8),
-
                   Flexible(
                     child: Text(
                       translations.t('easter_egg_found'),
-
                       textAlign: TextAlign.center,
-
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -498,29 +480,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
-    // MODERN UI
     if (ThemeHelper.isModern(themeMode)) {
       return Container(
         width: double.infinity,
-
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
         decoration: modernDecoration(borderRadius: 16),
-
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
             const Text('🥚', style: TextStyle(fontSize: 22)),
-
             const SizedBox(width: 8),
-
             Flexible(
               child: Text(
                 translations.t('easter_egg_found'),
-
                 textAlign: TextAlign.center,
-
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -533,29 +506,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
-    // AURORA UI
     if (ThemeHelper.isAurora(themeMode)) {
       return Container(
         width: double.infinity,
-
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
         decoration: auroraDecoration(borderRadius: 16),
-
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
             const Text('🥚', style: TextStyle(fontSize: 22)),
-
             const SizedBox(width: 8),
-
             Flexible(
               child: Text(
                 translations.t('easter_egg_found'),
-
                 textAlign: TextAlign.center,
-
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -568,29 +532,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
-    // CYBERPUNK
     if (ThemeHelper.isCyber(themeMode)) {
       return Container(
         width: double.infinity,
-
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
         decoration: cyberpunkDecoration(borderRadius: 12),
-
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
             const Text('🥚', style: TextStyle(fontSize: 22)),
-
             const SizedBox(width: 8),
-
             Flexible(
               child: Text(
                 translations.t('easter_egg_found'),
-
                 textAlign: TextAlign.center,
-
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -603,32 +558,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
-    // DEFAULT LIGHT / DARK
     return Container(
       width: double.infinity,
-
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest,
-
         borderRadius: BorderRadius.circular(16),
       ),
-
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-
         children: [
           const Text('🥚', style: TextStyle(fontSize: 22)),
-
           const SizedBox(width: 8),
-
           Flexible(
             child: Text(
               translations.t('easter_egg_found'),
-
               textAlign: TextAlign.center,
-
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -642,7 +587,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   // ==========================================================
-  // ==================== THEME DIALOG ========================
+  // THEME DIALOG
   // ==========================================================
 
   void _showThemeDialog(BuildContext context, WidgetRef ref) {
@@ -650,42 +595,57 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     final translations = ref.read(translationsProvider);
 
+    final themeMode = ref.read(themeModeProvider);
+
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
+    final colors = Theme.of(context).colorScheme;
+
     showDialog<void>(
       context: context,
-
       builder: (ctx) {
         return AlertDialog(
+          backgroundColor: isGlass ? AppColors.glassBg1 : null,
+          titleTextStyle: isGlass
+              ? const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                )
+              : null,
+          contentTextStyle: isGlass
+              ? const TextStyle(color: Colors.white)
+              : null,
           title: Text(translations.t('select_theme')),
-
           content: SizedBox(
             width: double.maxFinite,
-
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-
                 children: AppThemeMode.values.map((mode) {
                   return RadioListTile<AppThemeMode>(
                     title: Row(
                       children: [
                         _buildThemeIcon(mode),
-
                         const SizedBox(width: 12),
-
-                        Text(_getThemeLabel(mode, translations)),
+                        Text(
+                          _getThemeLabel(mode, translations),
+                          style: isGlass
+                              ? const TextStyle(color: Colors.white)
+                              : null,
+                        ),
                       ],
                     ),
-
                     value: mode,
-
                     groupValue: current,
-
                     contentPadding: EdgeInsets.zero,
-
+                    activeColor: isGlass ? Colors.white : colors.primary,
                     onChanged: (value) {
                       if (value == null) {
                         return;
                       }
+
+                      _playClick();
 
                       ref.read(themeModeProvider.notifier).setTheme(value);
 
@@ -696,11 +656,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
           ),
-
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                _playClick();
 
+                Navigator.pop(ctx);
+              },
               child: Text(translations.t('close')),
             ),
           ],
@@ -710,33 +672,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   // ==========================================================
-  // ================ THEME ICON PREVIEW =====================
+  // THEME ICON
   // ==========================================================
 
   Widget _buildThemeIcon(AppThemeMode mode) {
     final icon = switch (mode) {
       AppThemeMode.light => Icons.light_mode_outlined,
-
       AppThemeMode.dark => Icons.dark_mode_outlined,
-
       AppThemeMode.neumorphism => Icons.blur_on,
-
       AppThemeMode.glassmorphism => Icons.water_drop_outlined,
-
       AppThemeMode.modern => Icons.widgets_outlined,
-
       AppThemeMode.aurora => Icons.auto_awesome,
-
       AppThemeMode.cyberpunk => Icons.bolt,
-
       AppThemeMode.system => Icons.settings_suggest_outlined,
     };
 
-    return Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary);
+    final themeMode = ref.read(themeModeProvider);
+
+    final color = ThemeHelper.isGlass(themeMode)
+        ? Colors.white
+        : Theme.of(context).colorScheme.primary;
+
+    return Icon(icon, size: 20, color: color);
   }
 
   // ==========================================================
-  // ====================== THEME LABEL =======================
+  // THEME LABEL
   // ==========================================================
 
   String _getThemeLabel(AppThemeMode mode, Translations translations) {
@@ -768,42 +729,58 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   // ==========================================================
-  // ================= BACKUP / EASTER EGG ====================
+  // BACKUP / EASTER EGG
   // ==========================================================
 
   void _handleBackupTap(BuildContext context, WidgetRef ref) {
     final translations = ref.read(translationsProvider);
+
+    final themeMode = ref.read(themeModeProvider);
+
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
 
     setState(() => _backupClickCount++);
 
     debugPrint('[SettingsPage] Backup tile tapped. Count: $_backupClickCount');
 
     if (_backupClickCount == 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(translations.t('easter_egg_hint')),
-
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showThemedSnackBar(translations.t('easter_egg_hint'));
 
       debugPrint('[SettingsPage] Easter egg hint shown at count 3.');
     } else if (_backupClickCount == 5) {
       debugPrint('[SettingsPage] Easter egg dialog shown at count 5.');
 
+      // AwesomeDialog = notification.mp3
+      _playNotification();
+
       AwesomeDialog(
         context: context,
-
         dialogType: DialogType.info,
-
         animType: AnimType.bottomSlide,
-
+        headerAnimationLoop: false,
         title: translations.t('easter_egg_title'),
-
         desc: translations.t('easter_egg_desc'),
-
-        btnOkOnPress: () {},
-
+        dialogBackgroundColor: isGlass ? AppColors.glassBg1 : null,
+        titleTextStyle: isGlass
+            ? const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              )
+            : null,
+        descTextStyle: isGlass
+            ? const TextStyle(color: Colors.white, fontSize: 14)
+            : null,
+        buttonsTextStyle: isGlass
+            ? const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              )
+            : null,
+        btnOkOnPress: () {
+          _playClick();
+        },
         btnOkText: translations.t('ok'),
       ).show();
     } else if (_backupClickCount >= 7) {
@@ -821,18 +798,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
       _launchWhatsApp(context);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(translations.t('backup_not_ready')),
-
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showThemedSnackBar(translations.t('backup_not_ready'));
     }
   }
 
   // ==========================================================
-  // ===================== WHATSAPP ===========================
+  // WHATSAPP
   // ==========================================================
 
   Future<void> _launchWhatsApp(BuildContext context) async {
@@ -897,84 +868,97 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   // ==========================================================
-  // ================= WHATSAPP ERROR =========================
+  // WHATSAPP ERROR
   // ==========================================================
 
   void _showWhatsAppErrorDialog(BuildContext context) {
     final translations = ref.read(translationsProvider);
 
+    final themeMode = ref.read(themeModeProvider);
+
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     debugPrint('[SettingsPage] Showing WhatsApp error dialog.');
+
+    // AwesomeDialog = notification.mp3
+    _playNotification();
 
     AwesomeDialog(
       context: context,
-
       dialogType: DialogType.warning,
-
       animType: AnimType.bottomSlide,
-
       title: translations.t('whatsapp_error_title'),
-
       desc: translations.t('whatsapp_error_desc'),
-
-      btnOkOnPress: () {},
-
+      dialogBackgroundColor: isGlass ? AppColors.glassBg1 : null,
+      titleTextStyle: isGlass
+          ? const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            )
+          : null,
+      descTextStyle: isGlass
+          ? const TextStyle(color: Colors.white, fontSize: 14)
+          : null,
+      btnOkOnPress: () {
+        _playClick();
+      },
       btnOkText: translations.t('ok'),
     ).show();
   }
 
   // ==========================================================
-  // ==================== LANGUAGE ============================
+  // LANGUAGE
   // ==========================================================
 
   void _showLanguageDialog(BuildContext context, WidgetRef ref) {
     final currentLocale = ref.read(localeProvider);
 
+    final themeMode = ref.read(themeModeProvider);
+
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     showDialog<void>(
       context: context,
-
       builder: (ctx) {
         final translations = ref.read(translationsProvider);
 
         return AlertDialog(
+          backgroundColor: isGlass ? AppColors.glassBg1 : null,
           title: Text(translations.t('select_language')),
-
           content: Column(
             mainAxisSize: MainAxisSize.min,
-
             children: [
               RadioListTile<Locale>(
                 title: Text(translations.t('indonesian')),
-
                 value: const Locale('id'),
-
                 groupValue: currentLocale,
-
                 contentPadding: EdgeInsets.zero,
-
+                activeColor: isGlass ? Colors.white : null,
                 onChanged: (value) {
                   if (value == null) {
                     return;
                   }
+
+                  _playClick();
 
                   ref.read(localeProvider.notifier).setLocale(value);
 
                   Navigator.pop(ctx);
                 },
               ),
-
               RadioListTile<Locale>(
                 title: Text(translations.t('english')),
-
                 value: const Locale('en'),
-
                 groupValue: currentLocale,
-
                 contentPadding: EdgeInsets.zero,
-
+                activeColor: isGlass ? Colors.white : null,
                 onChanged: (value) {
                   if (value == null) {
                     return;
                   }
+
+                  _playClick();
 
                   ref.read(localeProvider.notifier).setLocale(value);
 
@@ -983,11 +967,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ],
           ),
-
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                _playClick();
 
+                Navigator.pop(ctx);
+              },
               child: Text(translations.t('close')),
             ),
           ],
@@ -997,49 +983,46 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   // ==========================================================
-  // ======================= ABOUT =============================
+  // ABOUT
   // ==========================================================
 
   void _showAboutDialog(BuildContext context, WidgetRef ref) {
     final translations = ref.read(translationsProvider);
 
+    final themeMode = ref.read(themeModeProvider);
+
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     showDialog<void>(
       context: context,
-
       builder: (ctx) {
         return AlertDialog(
+          backgroundColor: isGlass ? AppColors.glassBg1 : null,
           title: Text(translations.t('about')),
-
           content: Column(
             mainAxisSize: MainAxisSize.min,
-
             crossAxisAlignment: CrossAxisAlignment.start,
-
             children: [
               Text(
                 translations.t('app_title'),
-
                 style: const TextStyle(
                   fontSize: 18,
-
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Text(translations.t('version')),
-
               const SizedBox(height: 8),
-
               Text(translations.t('about_description')),
             ],
           ),
-
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                _playClick();
 
+                Navigator.pop(ctx);
+              },
               child: Text(translations.t('close')),
             ),
           ],

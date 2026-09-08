@@ -9,8 +9,8 @@ import '../firebase/firestore_service.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/theme_helper.dart';
 import '../l10n/translations.dart';
-import '../templates/custom_animation.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/custom_animation.dart';
+import '../helpers/sound_helper.dart';
 
 // ============================================================
 // FUNGSI BANTU UNTUK PROGRES

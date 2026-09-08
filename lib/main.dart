@@ -8,7 +8,7 @@ import 'addon/splash_screen.dart';
 import 'constants/appearance.dart';
 import 'firebase_options.dart';
 import 'l10n/translations.dart';
-import 'templates/sound_helper.dart';
+import 'helpers/sound_helper.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

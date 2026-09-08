@@ -7,8 +7,8 @@ import '../constants/appearance.dart';
 import '../data.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/theme_helper.dart';
-import '../templates/custom_animation.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/custom_animation.dart';
+import '../helpers/sound_helper.dart';
 
 class ReportsPage extends ConsumerWidget {
   const ReportsPage({super.key});
@@ -51,12 +51,36 @@ class ReportsPage extends ConsumerWidget {
 
     final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
 
+    // =========================================================
+    // BACKGROUND SCAFFOLD
+    // =========================================================
+    //
+    // Neumorphism:
+    // menggunakan AppColors.neoBase melalui ThemeHelper
+    //
+    // Glass / Aurora / Cyberpunk:
+    // tetap transparent karena background gradient ditangani
+    // oleh buildThemedBackground().
+    //
+    // Light / Dark / Modern:
+    // menggunakan warna surface theme masing-masing.
+    //
+
+    final scaffoldBackgroundColor =
+        ThemeHelper.getScaffoldBackgroundColor(
+      themeMode,
+      colors,
+    );
+
     return ThemeHelper.buildThemedBackground(
       themeMode,
       DefaultTabController(
         length: 3,
         child: Scaffold(
-          backgroundColor: Colors.transparent,
+          // FIX:
+          // Jangan selalu menggunakan Colors.transparent.
+          // Untuk Neumorphism harus menggunakan neoBase.
+          backgroundColor: scaffoldBackgroundColor,
 
           appBar: AppBar(
             title: const Text('Laporan'),
@@ -67,11 +91,18 @@ class ReportsPage extends ConsumerWidget {
                   SoundHelper().playClick();
 
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Export $value dalam pengembangan')),
+                    SnackBar(
+                      content: Text(
+                        'Export $value dalam pengembangan',
+                      ),
+                    ),
                   );
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'PDF', child: Text('Export PDF')),
+                  const PopupMenuItem(
+                    value: 'PDF',
+                    child: Text('Export PDF'),
+                  ),
                   const PopupMenuItem(
                     value: 'Excel',
                     child: Text('Export Excel'),
@@ -95,9 +126,21 @@ class ReportsPage extends ConsumerWidget {
 
           body: TabBarView(
             children: [
-              _buildMonthlyReport(context, grouped, keys),
-              _buildYearlyReport(context, grouped, keys),
-              _buildAllReport(context, grouped, keys),
+              _buildMonthlyReport(
+                context,
+                grouped,
+                keys,
+              ),
+              _buildYearlyReport(
+                context,
+                grouped,
+                keys,
+              ),
+              _buildAllReport(
+                context,
+                grouped,
+                keys,
+              ),
             ],
           ),
         ),
@@ -119,7 +162,9 @@ class ReportsPage extends ConsumerWidget {
     // =======================================================
 
     if (keys.isEmpty) {
-      return const LottieError(message: 'Belum ada data laporan.');
+      return const LottieError(
+        message: 'Belum ada data laporan.',
+      );
     }
 
     return ListView.builder(
@@ -133,29 +178,48 @@ class ReportsPage extends ConsumerWidget {
         final list = grouped[key]!;
 
         final totalIncome = list
-            .where((transaction) => transaction.type == TransType.pemasukan)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+            .where(
+              (transaction) =>
+                  transaction.type == TransType.pemasukan,
+            )
+            .fold<double>(
+              0,
+              (sum, transaction) => sum + transaction.amount,
+            );
 
         final totalExpense = list
-            .where((transaction) => transaction.type == TransType.pengeluaran)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+            .where(
+              (transaction) =>
+                  transaction.type == TransType.pengeluaran,
+            )
+            .fold<double>(
+              0,
+              (sum, transaction) => sum + transaction.amount,
+            );
 
         final net = totalIncome - totalExpense;
 
         final parts = key.split('-');
 
-        final monthName = _getMonthName(int.parse(parts[1]));
+        final monthName = _getMonthName(
+          int.parse(parts[1]),
+        );
 
         final year = parts[0];
 
         final label = '$monthName $year';
 
-        final delayMs = (index * 50).clamp(0, 400).toInt();
+        final delayMs =
+            (index * 50).clamp(0, 400).toInt();
 
         return ScrollReveal(
-          delay: Duration(milliseconds: delayMs),
+          delay: Duration(
+            milliseconds: delayMs,
+          ),
           child: Card(
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(
+              bottom: 8,
+            ),
             child: ListTile(
               title: Text(label),
               subtitle: Text(
@@ -166,13 +230,19 @@ class ReportsPage extends ConsumerWidget {
                 'Rp ${formatCurrency(net)}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: net >= 0 ? AppColors.success : AppColors.error,
+                  color: net >= 0
+                      ? AppColors.success
+                      : AppColors.error,
                 ),
               ),
               onTap: () {
                 SoundHelper().playClick();
 
-                _showDetailDialog(context, label, list);
+                _showDetailDialog(
+                  context,
+                  label,
+                  list,
+                );
               },
             ),
           ),
@@ -197,17 +267,24 @@ class ReportsPage extends ConsumerWidget {
 
       yearly.putIfAbsent(year, () => []);
 
-      yearly[year]!.addAll(grouped[key]!);
+      yearly[year]!.addAll(
+        grouped[key]!,
+      );
     }
 
-    final yearKeys = yearly.keys.toList()..sort((a, b) => b.compareTo(a));
+    final yearKeys = yearly.keys.toList()
+      ..sort(
+        (a, b) => b.compareTo(a),
+      );
 
     // =======================================================
     // DATA KOSONG
     // =======================================================
 
     if (yearKeys.isEmpty) {
-      return const LottieError(message: 'Belum ada data laporan tahunan.');
+      return const LottieError(
+        message: 'Belum ada data laporan tahunan.',
+      );
     }
 
     return ListView.builder(
@@ -221,23 +298,42 @@ class ReportsPage extends ConsumerWidget {
         final list = yearly[year]!;
 
         final totalIncome = list
-            .where((transaction) => transaction.type == TransType.pemasukan)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+            .where(
+              (transaction) =>
+                  transaction.type == TransType.pemasukan,
+            )
+            .fold<double>(
+              0,
+              (sum, transaction) => sum + transaction.amount,
+            );
 
         final totalExpense = list
-            .where((transaction) => transaction.type == TransType.pengeluaran)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+            .where(
+              (transaction) =>
+                  transaction.type == TransType.pengeluaran,
+            )
+            .fold<double>(
+              0,
+              (sum, transaction) => sum + transaction.amount,
+            );
 
         final net = totalIncome - totalExpense;
 
-        final delayMs = (index * 50).clamp(0, 400).toInt();
+        final delayMs =
+            (index * 50).clamp(0, 400).toInt();
 
         return ScrollReveal(
-          delay: Duration(milliseconds: delayMs),
+          delay: Duration(
+            milliseconds: delayMs,
+          ),
           child: Card(
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(
+              bottom: 8,
+            ),
             child: ListTile(
-              title: Text('Tahun $year'),
+              title: Text(
+                'Tahun $year',
+              ),
               subtitle: Text(
                 'Pemasukan: Rp ${formatCurrency(totalIncome)} • '
                 'Pengeluaran: Rp ${formatCurrency(totalExpense)}',
@@ -246,7 +342,9 @@ class ReportsPage extends ConsumerWidget {
                 'Rp ${formatCurrency(net)}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: net >= 0 ? AppColors.success : AppColors.error,
+                  color: net >= 0
+                      ? AppColors.success
+                      : AppColors.error,
                 ),
               ),
             ),
@@ -276,16 +374,30 @@ class ReportsPage extends ConsumerWidget {
     // =======================================================
 
     if (all.isEmpty) {
-      return const LottieError(message: 'Belum ada data laporan.');
+      return const LottieError(
+        message: 'Belum ada data laporan.',
+      );
     }
 
     final totalIncome = all
-        .where((transaction) => transaction.type == TransType.pemasukan)
-        .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+        .where(
+          (transaction) =>
+              transaction.type == TransType.pemasukan,
+        )
+        .fold<double>(
+          0,
+          (sum, transaction) => sum + transaction.amount,
+        );
 
     final totalExpense = all
-        .where((transaction) => transaction.type == TransType.pengeluaran)
-        .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+        .where(
+          (transaction) =>
+              transaction.type == TransType.pengeluaran,
+        )
+        .fold<double>(
+          0,
+          (sum, transaction) => sum + transaction.amount,
+        );
 
     final net = totalIncome - totalExpense;
 
@@ -303,7 +415,9 @@ class ReportsPage extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface,
                   ),
                 ),
 
@@ -330,7 +444,9 @@ class ReportsPage extends ConsumerWidget {
                   'Saldo Akhir',
                   formatCurrency(net),
                   net >= 0
-                      ? Theme.of(context).colorScheme.primary
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.primary
                       : AppColors.error,
                 ),
               ],
@@ -351,16 +467,24 @@ class ReportsPage extends ConsumerWidget {
     String value,
     Color color,
   ) {
-    final colors = Theme.of(context).colorScheme;
+    final colors = Theme.of(
+      context,
+    ).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        vertical: 4,
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment:
+            MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 16, color: colors.onSurfaceVariant),
+            style: TextStyle(
+              fontSize: 16,
+              color: colors.onSurfaceVariant,
+            ),
           ),
           Text(
             'Rp $value',
@@ -387,7 +511,9 @@ class ReportsPage extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Detail Transaksi - $title'),
+        title: Text(
+          'Detail Transaksi - $title',
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.builder(
@@ -399,14 +525,19 @@ class ReportsPage extends ConsumerWidget {
               return ListTile(
                 dense: true,
 
-                title: Text(transaction.description),
+                title: Text(
+                  transaction.description,
+                ),
 
-                subtitle: Text(transaction.category),
+                subtitle: Text(
+                  transaction.category,
+                ),
 
                 trailing: Text(
                   'Rp ${formatCurrency(transaction.amount)}',
                   style: TextStyle(
-                    color: transaction.type == TransType.pemasukan
+                    color: transaction.type ==
+                            TransType.pemasukan
                         ? AppColors.success
                         : AppColors.error,
                   ),

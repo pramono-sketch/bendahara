@@ -8,7 +8,7 @@ import 'package:lottie/lottie.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../env/api_key.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/sound_helper.dart';
 import '../constants/appearance.dart';
 
 // ===================== FIRESTORE HELPERS =====================

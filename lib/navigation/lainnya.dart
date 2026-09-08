@@ -13,7 +13,7 @@ import '../features/gaji_guru.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/theme_helper.dart';
 import '../l10n/translations.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/sound_helper.dart';
 import '../simulation/lottie_prev.dart';
 import '../auth/auth_page.dart';
 

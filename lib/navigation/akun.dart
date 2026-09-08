@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/appearance.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/theme_helper.dart';
-import '../templates/sound_helper.dart';
+import '../helpers/sound_helper.dart';
 
 // ============================================================
 // HEART CLIPPER
@@ -29,10 +29,24 @@ class HeartClipper extends CustomClipper<Path> {
     path.moveTo(w * 0.5, h * 0.25);
 
     // Lengkungan kiri
-    path.cubicTo(w * 0.15, h * 0.00, w * -0.05, h * 0.45, w * 0.5, h * 0.95);
+    path.cubicTo(
+      w * 0.15,
+      h * 0.00,
+      w * -0.05,
+      h * 0.45,
+      w * 0.5,
+      h * 0.95,
+    );
 
     // Lengkungan kanan
-    path.cubicTo(w * 1.05, h * 0.45, w * 0.85, h * 0.00, w * 0.5, h * 0.25);
+    path.cubicTo(
+      w * 1.05,
+      h * 0.45,
+      w * 0.85,
+      h * 0.00,
+      w * 0.5,
+      h * 0.25,
+    );
 
     path.close();
 
@@ -149,7 +163,10 @@ class _AkunPageState extends ConsumerState<AkunPage> {
       await prefs.setBool('isHeartShape', _isHeartShape);
 
       if (_profileImagePath != null) {
-        await prefs.setString('profileImagePath', _profileImagePath!);
+        await prefs.setString(
+          'profileImagePath',
+          _profileImagePath!,
+        );
       } else {
         await prefs.remove('profileImagePath');
       }
@@ -169,7 +186,9 @@ class _AkunPageState extends ConsumerState<AkunPage> {
       final String fileName =
           'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      final File newFile = await imageFile.copy('${dir.path}/$fileName');
+      final File newFile = await imageFile.copy(
+        '${dir.path}/$fileName',
+      );
 
       return newFile.path;
     } catch (e) {
@@ -187,36 +206,68 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
 
+    final colors = Theme.of(context).colorScheme;
+
+    // ==========================================================
+    // SCAFFOLD BACKGROUND
+    // ==========================================================
+    //
+    // Jangan selalu menggunakan Colors.transparent.
+    //
+    // Neumorphism membutuhkan AppColors.neoBase.
+    // Glassmorphism / Aurora / Cyberpunk tetap transparent
+    // agar gradient dari ThemeHelper tetap terlihat.
+    //
+
+    final scaffoldBackgroundColor =
+        ThemeHelper.getScaffoldBackgroundColor(
+      themeMode,
+      colors,
+    );
+
     return ThemeHelper.buildThemedBackground(
       themeMode,
       Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: scaffoldBackgroundColor,
+
         appBar: AppBar(
           title: const Text('Profil Saya'),
+
           centerTitle: true,
+
           actions: [
             IconButton(
               icon: const Icon(Icons.edit_outlined),
+
               onPressed: () {
                 SoundHelper().playClick();
 
                 _showEditProfileDialog();
               },
+
               tooltip: 'Edit Profil',
             ),
           ],
         ),
+
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: CircularProgressIndicator(),
+              )
             : SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
+
                 child: Column(
                   children: [
                     // ==================================================
                     // PROFILE HEADER
                     // ==================================================
+
                     ScrollReveal(
-                      delay: const Duration(milliseconds: 50),
+                      delay: const Duration(
+                        milliseconds: 50,
+                      ),
+
                       child: _buildProfileHeader(),
                     ),
 
@@ -225,8 +276,12 @@ class _AkunPageState extends ConsumerState<AkunPage> {
                     // ==================================================
                     // USER INFO
                     // ==================================================
+
                     ScrollReveal(
-                      delay: const Duration(milliseconds: 120),
+                      delay: const Duration(
+                        milliseconds: 120,
+                      ),
+
                       child: _buildInfoCard(),
                     ),
 
@@ -235,8 +290,12 @@ class _AkunPageState extends ConsumerState<AkunPage> {
                     // ==================================================
                     // ACCOUNT MENU
                     // ==================================================
+
                     ScrollReveal(
-                      delay: const Duration(milliseconds: 190),
+                      delay: const Duration(
+                        milliseconds: 190,
+                      ),
+
                       child: _buildMenuCard(),
                     ),
 
@@ -259,20 +318,35 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
     final themeMode = ref.read(themeModeProvider);
 
-    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    final accentColor =
+        ThemeHelper.getAccentColor(
+      themeMode,
+      colors,
+    );
 
     Widget avatar = CircleAvatar(
       radius: 60,
+
       backgroundImage: _profileImagePath != null
-          ? FileImage(File(_profileImagePath!))
+          ? FileImage(
+              File(_profileImagePath!),
+            )
           : null,
-      backgroundColor: colors.surfaceContainerHighest,
+
+      backgroundColor:
+          colors.surfaceContainerHighest,
+
       child: _profileImagePath == null
           ? Text(
-              _username.isNotEmpty ? _username[0].toUpperCase() : 'A',
+              _username.isNotEmpty
+                  ? _username[0].toUpperCase()
+                  : 'A',
+
               style: TextStyle(
                 fontSize: 48,
+
                 fontWeight: FontWeight.bold,
+
                 color: accentColor,
               ),
             )
@@ -280,12 +354,16 @@ class _AkunPageState extends ConsumerState<AkunPage> {
     );
 
     if (_isHeartShape) {
-      avatar = ClipPath(clipper: HeartClipper(), child: avatar);
+      avatar = ClipPath(
+        clipper: HeartClipper(),
+        child: avatar,
+      );
     }
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
+
         child: Column(
           children: [
             GestureDetector(
@@ -294,21 +372,28 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
                 _showImagePickerDialog();
               },
+
               child: Stack(
                 children: [
                   avatar,
+
                   Positioned(
                     bottom: 0,
                     right: 0,
+
                     child: Container(
                       padding: const EdgeInsets.all(4),
+
                       decoration: BoxDecoration(
                         color: accentColor,
                         shape: BoxShape.circle,
                       ),
+
                       child: Icon(
                         Icons.camera_alt,
+
                         color: colors.onPrimary,
+
                         size: 20,
                       ),
                     ),
@@ -321,6 +406,7 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
             Text(
               _username,
+
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colors.onSurface,
@@ -330,15 +416,23 @@ class _AkunPageState extends ConsumerState<AkunPage> {
             const SizedBox(height: 4),
 
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
+              ),
+
               decoration: BoxDecoration(
                 color: accentColor.withOpacity(0.1),
+
                 borderRadius: BorderRadius.circular(12),
               ),
+
               child: Text(
                 _role,
+
                 style: TextStyle(
                   color: accentColor,
+
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -348,7 +442,11 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
             Text(
               _email,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 14),
+
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -368,11 +466,14 @@ class _AkunPageState extends ConsumerState<AkunPage> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+
           children: [
             Text(
               'Informasi Pengguna',
+
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colors.onSurface,
@@ -381,17 +482,35 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
             const SizedBox(height: 16),
 
-            _buildInfoRow(Icons.badge, 'NIS/NIK', _nis),
+            _buildInfoRow(
+              Icons.badge,
+              'NIS/NIK',
+              _nis,
+            ),
 
-            Divider(color: _getDividerColor()),
+            Divider(
+              color: _getDividerColor(),
+            ),
 
-            _buildInfoRow(Icons.phone, 'No. Telepon', _phone),
+            _buildInfoRow(
+              Icons.phone,
+              'No. Telepon',
+              _phone,
+            ),
 
-            Divider(color: _getDividerColor()),
+            Divider(
+              color: _getDividerColor(),
+            ),
 
-            _buildInfoRow(Icons.location_on, 'Alamat', _address),
+            _buildInfoRow(
+              Icons.location_on,
+              'Alamat',
+              _address,
+            ),
 
-            Divider(color: _getDividerColor()),
+            Divider(
+              color: _getDividerColor(),
+            ),
 
             _buildInfoRow(
               Icons.calendar_today,
@@ -408,31 +527,49 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   // INFO ROW
   // ============================================================
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value,
+  ) {
     final theme = Theme.of(context);
 
     final colors = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        vertical: 6,
+      ),
+
       child: Row(
         children: [
-          Icon(icon, color: colors.onSurfaceVariant, size: 20),
+          Icon(
+            icon,
+            color: colors.onSurfaceVariant,
+            size: 20,
+          ),
 
           const SizedBox(width: 12),
 
           Expanded(
             flex: 2,
+
             child: Text(
               label,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
           ),
 
           Expanded(
             flex: 3,
+
             child: Text(
               value,
+
               style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
@@ -455,8 +592,11 @@ class _AkunPageState extends ConsumerState<AkunPage> {
         children: [
           _buildMenuItem(
             icon: Icons.edit_outlined,
+
             title: 'Edit Profil',
+
             subtitle: 'Ubah informasi pribadi',
+
             onTap: () {
               SoundHelper().playClick();
 
@@ -464,12 +604,18 @@ class _AkunPageState extends ConsumerState<AkunPage> {
             },
           ),
 
-          Divider(height: 1, color: _getDividerColor()),
+          Divider(
+            height: 1,
+            color: _getDividerColor(),
+          ),
 
           _buildMenuItem(
             icon: Icons.lock_outline,
+
             title: 'Ganti Password',
+
             subtitle: 'Perbarui kata sandi akun',
+
             onTap: () {
               SoundHelper().playClick();
 
@@ -477,17 +623,24 @@ class _AkunPageState extends ConsumerState<AkunPage> {
             },
           ),
 
-          Divider(height: 1, color: _getDividerColor()),
+          Divider(
+            height: 1,
+            color: _getDividerColor(),
+          ),
 
           _buildMenuItem(
             icon: Icons.logout,
+
             title: 'Logout',
+
             subtitle: 'Keluar dari aplikasi',
+
             onTap: () {
               SoundHelper().playClick();
 
               _showLogoutDialog();
             },
+
             isLogout: true,
           ),
         ],
@@ -512,23 +665,51 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
     final themeMode = ref.read(themeModeProvider);
 
-    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    final accentColor =
+        ThemeHelper.getAccentColor(
+      themeMode,
+      colors,
+    );
 
-    final iconColor = isLogout ? colors.error : accentColor;
+    final iconColor =
+        isLogout
+            ? colors.error
+            : accentColor;
 
-    final titleColor = isLogout ? colors.error : colors.onSurface;
+    final titleColor =
+        isLogout
+            ? colors.error
+            : colors.onSurface;
 
     return ListTile(
-      leading: Icon(icon, color: iconColor),
+      leading: Icon(
+        icon,
+        color: iconColor,
+      ),
+
       title: Text(
         title,
-        style: TextStyle(color: titleColor, fontWeight: FontWeight.w500),
+
+        style: TextStyle(
+          color: titleColor,
+          fontWeight: FontWeight.w500,
+        ),
       ),
+
       subtitle: Text(
         subtitle,
-        style: TextStyle(color: colors.onSurfaceVariant),
+
+        style: TextStyle(
+          color: colors.onSurfaceVariant,
+        ),
       ),
-      trailing: Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+
+      trailing: Icon(
+        Icons.chevron_right,
+
+        color: colors.onSurfaceVariant,
+      ),
+
       onTap: onTap,
     );
   }
@@ -538,9 +719,13 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   // ============================================================
 
   Color _getDividerColor() {
-    final themeMode = ref.read(themeModeProvider);
+    final themeMode = ref.read(
+      themeModeProvider,
+    );
 
-    return ThemeHelper.dividerColor(themeMode);
+    return ThemeHelper.dividerColor(
+      themeMode,
+    );
   }
 
   // ============================================================
@@ -548,39 +733,77 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   // ============================================================
 
   void _showImagePickerDialog() {
+    final themeMode = ref.read(
+      themeModeProvider,
+    );
+
     final colors = Theme.of(context).colorScheme;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+
+      backgroundColor:
+          ThemeHelper.getScaffoldBackgroundColor(
+        themeMode,
+        colors,
       ),
+
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+
           children: [
             ListTile(
-              leading: Icon(Icons.photo_library, color: colors.primary),
-              title: const Text('Pilih dari Galeri'),
+              leading: Icon(
+                Icons.photo_library,
+                color: ThemeHelper.getAccentColor(
+                  themeMode,
+                  colors,
+                ),
+              ),
+
+              title: const Text(
+                'Pilih dari Galeri',
+              ),
+
               onTap: () {
                 SoundHelper().playClick();
 
                 Navigator.pop(ctx);
 
-                _pickImage(ImageSource.gallery);
+                _pickImage(
+                  ImageSource.gallery,
+                );
               },
             ),
 
             ListTile(
-              leading: Icon(Icons.photo_camera, color: colors.primary),
-              title: const Text('Ambil Foto'),
+              leading: Icon(
+                Icons.photo_camera,
+                color: ThemeHelper.getAccentColor(
+                  themeMode,
+                  colors,
+                ),
+              ),
+
+              title: const Text(
+                'Ambil Foto',
+              ),
+
               onTap: () {
                 SoundHelper().playClick();
 
                 Navigator.pop(ctx);
 
-                _pickImage(ImageSource.camera);
+                _pickImage(
+                  ImageSource.camera,
+                );
               },
             ),
           ],
@@ -593,36 +816,56 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   // PICK IMAGE
   // ============================================================
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _pickImage(
+    ImageSource source,
+  ) async {
     try {
-      final XFile? image = await _picker.pickImage(
+      final XFile? image =
+          await _picker.pickImage(
         source: source,
         imageQuality: 80,
       );
 
       if (image != null) {
-        final File imageFile = File(image.path);
+        final File imageFile =
+            File(image.path);
 
-        final String? permanentPath = await _copyImageToPermanentDir(imageFile);
+        final String? permanentPath =
+            await _copyImageToPermanentDir(
+          imageFile,
+        );
 
         if (permanentPath != null) {
           setState(() {
-            _profileImagePath = permanentPath;
+            _profileImagePath =
+                permanentPath;
           });
 
           await _saveProfileData();
 
           if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Foto profil berhasil diubah')),
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Foto profil berhasil diubah',
+              ),
+            ),
           );
         } else {
           if (!mounted) return;
 
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Gagal menyimpan foto')));
+          ).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Gagal menyimpan foto',
+              ),
+            ),
+          );
         }
       }
     } catch (e) {
@@ -630,7 +873,13 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat gambar: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Gagal memuat gambar: $e',
+          ),
+        ),
+      );
     }
   }
 
@@ -639,24 +888,45 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   // ============================================================
 
   void _showEditProfileDialog() {
-    _nameController.text = _username;
+    _nameController.text =
+        _username;
 
-    _emailController.text = _email;
+    _emailController.text =
+        _email;
 
-    _phoneController.text = _phone;
+    _phoneController.text =
+        _phone;
 
-    _addressController.text = _address;
+    _addressController.text =
+        _address;
 
-    bool localHeartShape = _isHeartShape;
+    bool localHeartShape =
+        _isHeartShape;
 
     showDialog(
       context: context,
+
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) {
-          final colors = Theme.of(context).colorScheme;
+        builder: (
+          ctx,
+          setStateDialog,
+        ) {
+          final themeMode =
+              ref.read(themeModeProvider);
+
+          final colors =
+              Theme.of(context).colorScheme;
+
+          final accentColor =
+              ThemeHelper.getAccentColor(
+            themeMode,
+            colors,
+          );
 
           return AlertDialog(
-            title: const Text('Edit Profil'),
+            title: const Text(
+              'Edit Profil',
+            ),
 
             content: SizedBox(
               width: double.maxFinite,
@@ -666,79 +936,144 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
                 child: SingleChildScrollView(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize:
+                        MainAxisSize.min,
 
                     children: [
                       TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Nama Lengkap',
+                        controller:
+                            _nameController,
+
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'Nama Lengkap',
                         ),
+
                         validator: (v) =>
-                            v!.trim().isEmpty ? 'Nama wajib diisi' : null,
+                            v!.trim().isEmpty
+                                ? 'Nama wajib diisi'
+                                : null,
                       ),
 
-                      const SizedBox(height: 12),
-
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(labelText: 'Email'),
-                        validator: (v) =>
-                            v!.trim().isEmpty ? 'Email wajib diisi' : null,
+                      const SizedBox(
+                        height: 12,
                       ),
 
-                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller:
+                            _emailController,
+
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'Email',
+                        ),
+
+                        validator: (v) =>
+                            v!.trim().isEmpty
+                                ? 'Email wajib diisi'
+                                : null,
+                      ),
+
+                      const SizedBox(
+                        height: 12,
+                      ),
 
                       TextFormField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'No. Telepon',
+                        controller:
+                            _phoneController,
+
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'No. Telepon',
                         ),
                       ),
 
-                      const SizedBox(height: 12),
+                      const SizedBox(
+                        height: 12,
+                      ),
 
                       TextFormField(
-                        controller: _addressController,
-                        decoration: const InputDecoration(labelText: 'Alamat'),
+                        controller:
+                            _addressController,
+
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'Alamat',
+                        ),
+
                         maxLines: 2,
                       ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(
+                        height: 16,
+                      ),
 
                       SwitchListTile(
-                        title: const Text('Bentuk Avatar Hati'),
+                        title: const Text(
+                          'Bentuk Avatar Hati',
+                        ),
 
-                        subtitle: const Text('Ubah avatar menjadi bentuk love'),
+                        subtitle:
+                            const Text(
+                          'Ubah avatar menjadi bentuk love',
+                        ),
 
-                        value: localHeartShape,
+                        value:
+                            localHeartShape,
 
                         onChanged: (val) {
-                          SoundHelper().playNotification();
+                          SoundHelper()
+                              .playNotification();
 
-                          if (val && !localHeartShape) {
+                          if (val &&
+                              !localHeartShape) {
                             AwesomeDialog(
                               context: ctx,
-                              dialogType: DialogType.info,
-                              animType: AnimType.bottomSlide,
-                              headerAnimationLoop: false,
-                              title: '💖 Easter Egg!',
+
+                              dialogType:
+                                  DialogType.info,
+
+                              animType:
+                                  AnimType.bottomSlide,
+
+                              headerAnimationLoop:
+                                  false,
+
+                              title:
+                                  '💖 Easter Egg!',
+
                               desc:
                                   'Selamat! Anda mengaktifkan mode avatar hati.\nSemangat belajar dan berkarya! 🚀',
-                              btnOkOnPress: () {},
-                              btnOkIcon: Icons.favorite,
-                              btnOkColor: colors.primary,
-                              btnOkText: '❤️ Mantap!',
-                              useRootNavigator: false,
+
+                              btnOkOnPress:
+                                  () {},
+
+                              btnOkIcon:
+                                  Icons.favorite,
+
+                              btnOkColor:
+                                  accentColor,
+
+                              btnOkText:
+                                  '❤️ Mantap!',
+
+                              useRootNavigator:
+                                  false,
                             ).show();
                           }
 
                           setStateDialog(() {
-                            localHeartShape = val;
+                            localHeartShape =
+                                val;
                           });
                         },
 
-                        activeColor: colors.primary,
+                        activeColor:
+                            accentColor,
                       ),
                     ],
                   ),
@@ -749,44 +1084,72 @@ class _AkunPageState extends ConsumerState<AkunPage> {
             actions: [
               TextButton(
                 onPressed: () {
-                  SoundHelper().playClick();
+                  SoundHelper()
+                      .playClick();
 
                   Navigator.pop(ctx);
                 },
-                child: const Text('Batal'),
+
+                child: const Text(
+                  'Batal',
+                ),
               ),
 
               ElevatedButton(
                 onPressed: () async {
-                  SoundHelper().playClick();
+                  SoundHelper()
+                      .playClick();
 
-                  if (_formKey.currentState!.validate()) {
+                  if (_formKey
+                      .currentState!
+                      .validate()) {
                     setState(() {
-                      _username = _nameController.text.trim();
+                      _username =
+                          _nameController
+                              .text
+                              .trim();
 
-                      _email = _emailController.text.trim();
+                      _email =
+                          _emailController
+                              .text
+                              .trim();
 
-                      _phone = _phoneController.text.trim();
+                      _phone =
+                          _phoneController
+                              .text
+                              .trim();
 
-                      _address = _addressController.text.trim();
+                      _address =
+                          _addressController
+                              .text
+                              .trim();
 
-                      _isHeartShape = localHeartShape;
+                      _isHeartShape =
+                          localHeartShape;
                     });
 
                     await _saveProfileData();
 
-                    if (!mounted) return;
+                    if (!mounted)
+                      return;
 
                     Navigator.pop(ctx);
 
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(
                       const SnackBar(
-                        content: Text('Profil berhasil diperbarui'),
+                        content: Text(
+                          'Profil berhasil diperbarui',
+                        ),
                       ),
                     );
                   }
                 },
-                child: const Text('Simpan'),
+
+                child: const Text(
+                  'Simpan',
+                ),
               ),
             ],
           );
@@ -800,45 +1163,75 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   // ============================================================
 
   void _showChangePasswordDialog() {
-    final oldPasswordController = TextEditingController();
+    final oldPasswordController =
+        TextEditingController();
 
-    final newPasswordController = TextEditingController();
+    final newPasswordController =
+        TextEditingController();
 
-    final confirmPasswordController = TextEditingController();
+    final confirmPasswordController =
+        TextEditingController();
 
     showDialog(
       context: context,
+
       builder: (ctx) => AlertDialog(
-        title: const Text('Ganti Password'),
+        title: const Text(
+          'Ganti Password',
+        ),
 
         content: SizedBox(
           width: double.maxFinite,
 
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+                MainAxisSize.min,
 
             children: [
               TextField(
-                controller: oldPasswordController,
-                decoration: const InputDecoration(labelText: 'Password Lama'),
-                obscureText: true,
-              ),
+                controller:
+                    oldPasswordController,
 
-              const SizedBox(height: 12),
-
-              TextField(
-                controller: newPasswordController,
-                decoration: const InputDecoration(labelText: 'Password Baru'),
-                obscureText: true,
-              ),
-
-              const SizedBox(height: 12),
-
-              TextField(
-                controller: confirmPasswordController,
-                decoration: const InputDecoration(
-                  labelText: 'Konfirmasi Password Baru',
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'Password Lama',
                 ),
+
+                obscureText: true,
+              ),
+
+              const SizedBox(
+                height: 12,
+              ),
+
+              TextField(
+                controller:
+                    newPasswordController,
+
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'Password Baru',
+                ),
+
+                obscureText: true,
+              ),
+
+              const SizedBox(
+                height: 12,
+              ),
+
+              TextField(
+                controller:
+                    confirmPasswordController,
+
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'Konfirmasi Password Baru',
+                ),
+
                 obscureText: true,
               ),
             ],
@@ -848,29 +1241,50 @@ class _AkunPageState extends ConsumerState<AkunPage> {
         actions: [
           TextButton(
             onPressed: () {
-              SoundHelper().playClick();
+              SoundHelper()
+                  .playClick();
 
               Navigator.pop(ctx);
             },
-            child: const Text('Batal'),
+
+            child: const Text(
+              'Batal',
+            ),
           ),
 
           ElevatedButton(
             onPressed: () {
-              SoundHelper().playClick();
+              SoundHelper()
+                  .playClick();
 
-              if (newPasswordController.text !=
-                  confirmPasswordController.text) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password baru tidak cocok')),
+              if (newPasswordController
+                      .text !=
+                  confirmPasswordController
+                      .text) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Password baru tidak cocok',
+                    ),
+                  ),
                 );
 
                 return;
               }
 
-              if (newPasswordController.text.length < 6) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password minimal 6 karakter')),
+              if (newPasswordController
+                      .text.length <
+                  6) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Password minimal 6 karakter',
+                    ),
+                  ),
                 );
 
                 return;
@@ -878,11 +1292,20 @@ class _AkunPageState extends ConsumerState<AkunPage> {
 
               Navigator.pop(ctx);
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Password berhasil diubah')),
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Password berhasil diubah',
+                  ),
+                ),
               );
             },
-            child: const Text('Simpan'),
+
+            child: const Text(
+              'Simpan',
+            ),
           ),
         ],
       ),
@@ -894,39 +1317,62 @@ class _AkunPageState extends ConsumerState<AkunPage> {
   // ============================================================
 
   void _showLogoutDialog() {
-    final colors = Theme.of(context).colorScheme;
+    final colors =
+        Theme.of(context).colorScheme;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Konfirmasi Logout'),
 
-        content: const Text('Apakah Anda yakin ingin keluar?'),
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Konfirmasi Logout',
+        ),
+
+        content: const Text(
+          'Apakah Anda yakin ingin keluar?',
+        ),
 
         actions: [
           TextButton(
             onPressed: () {
-              SoundHelper().playClick();
+              SoundHelper()
+                  .playClick();
 
               Navigator.pop(ctx);
             },
-            child: const Text('Batal'),
+
+            child: const Text(
+              'Batal',
+            ),
           ),
 
           ElevatedButton(
             onPressed: () {
-              SoundHelper().playClick();
+              SoundHelper()
+                  .playClick();
 
               Navigator.pop(ctx);
 
               ScaffoldMessenger.of(
                 context,
-              ).showSnackBar(const SnackBar(content: Text('Berhasil logout')));
+              ).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Berhasil logout',
+                  ),
+                ),
+              );
             },
 
-            style: ElevatedButton.styleFrom(backgroundColor: colors.error),
+            style:
+                ElevatedButton.styleFrom(
+              backgroundColor:
+                  colors.error,
+            ),
 
-            child: const Text('Logout'),
+            child: const Text(
+              'Logout',
+            ),
           ),
         ],
       ),
