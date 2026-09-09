@@ -1,17 +1,18 @@
-// lib/pages/auth_page.dart
+// lib/auth/auth_page.dart
 
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import '../env/api_key.dart';
 import '../firebase/firestore_service.dart';
+import '../helpers/custom_animation.dart'; // Import Lottie animations
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key, this.onAuthSuccess});
@@ -26,178 +27,78 @@ class _AuthPageState extends State<AuthPage> {
   // ============================================================
   // FIREBASE AUTH
   // ============================================================
-
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
   // ============================================================
   // GOOGLE SIGN IN
   // ============================================================
-
   static Future<void>? _googleInitialization;
 
   Future<void> _initializeGoogle() {
-    return _googleInitialization ??=
-        GoogleSignIn.instance.initialize();
+    return _googleInitialization ??= GoogleSignIn.instance.initialize();
   }
 
   // ============================================================
   // EMAIL ADMIN SEKOLAH
   // ============================================================
-
-  static const String _adminApprovalEmail =
-      'newpramono79@gmail.com';
+  static const String _adminApprovalEmail = 'newpramono79@gmail.com';
 
   // ============================================================
-  // FORM
+  // FORM CONTROLLERS
   // ============================================================
-
-  final TextEditingController _namaController =
-      TextEditingController();
+  final TextEditingController _namaController = TextEditingController();
+  final TextEditingController _nisController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
 
   bool _isLoading = false;
-
   bool _isLoginMode = true;
-
-  // ============================================================
-  // DEBUG LOG
-  // ============================================================
-
-  void _debugLog(String message) {
-    final String text =
-        '[AUTH ${DateTime.now().toIso8601String()}] $message';
-
-    debugPrint(text);
-  }
 
   // ============================================================
   // VALIDASI URL
   // ============================================================
-
   void _validateOtpServiceUrl() {
     final String url = otpServiceUrl.trim();
-
-    if (url.isEmpty) {
+    if (url.isEmpty) throw Exception('otpServiceUrl kosong.');
+    if (url.startsWith('GANTI_')) throw Exception('otpServiceUrl belum diisi.');
+    if (!url.startsWith('https://'))
+      throw Exception('URL OTP harus menggunakan HTTPS.');
+    if (!url.contains('/exec'))
       throw Exception(
-        'otpServiceUrl kosong.',
+        'URL OTP harus merupakan URL Web App Google Apps Script dan berakhiran /exec.',
       );
-    }
-
-    if (url.startsWith('GANTI_')) {
-      throw Exception(
-        'otpServiceUrl belum diisi.',
-      );
-    }
-
-    if (!url.startsWith('https://')) {
-      throw Exception(
-        'URL OTP harus menggunakan HTTPS.',
-      );
-    }
-
-    if (!url.contains('/exec')) {
-      throw Exception(
-        'URL OTP harus merupakan URL Web App '
-        'Google Apps Script dan berakhiran /exec.',
-      );
-    }
-
-    _debugLog(
-      'OTP service URL valid: $url',
-    );
   }
 
   // ============================================================
   // HTTP GET + MANUAL REDIRECT
   // ============================================================
-  //
-  // Google Apps Script Web App dapat mengembalikan redirect.
-  //
-  // Kita sengaja tidak menganggap HTTP 302 sebagai error.
-  // Flutter akan mengikuti Location sampai mendapatkan
-  // response final.
-  // ============================================================
-
-  Future<http.Response> _getFollowingRedirects(
-    Uri initialUri,
-  ) async {
+  Future<http.Response> _getFollowingRedirects(Uri initialUri) async {
     final http.Client client = http.Client();
-
     Uri currentUri = initialUri;
-
     try {
       const int maxRedirects = 8;
-
-      for (int attempt = 0;
-          attempt <= maxRedirects;
-          attempt++) {
-        _debugLog(
-          'GET attempt ${attempt + 1}: $currentUri',
-        );
-
-        final http.Request request =
-            http.Request(
-          'GET',
-          currentUri,
-        )..followRedirects = false;
-
-        final http.StreamedResponse streamedResponse =
-            await client
-                .send(request)
-                .timeout(
-                  const Duration(seconds: 30),
-                );
-
-        final http.Response response =
-            await http.Response.fromStream(
+      for (int attempt = 0; attempt <= maxRedirects; attempt++) {
+        final http.Request request = http.Request('GET', currentUri)
+          ..followRedirects = false;
+        final http.StreamedResponse streamedResponse = await client
+            .send(request)
+            .timeout(const Duration(seconds: 30));
+        final http.Response response = await http.Response.fromStream(
           streamedResponse,
         );
 
-        _debugLog(
-          'HTTP ${response.statusCode} '
-          'from $currentUri',
-        );
+        if (!_isRedirectStatus(response.statusCode)) return response;
 
-        // --------------------------------------------------------
-        // RESPONSE FINAL
-        // --------------------------------------------------------
-
-        if (!_isRedirectStatus(
-          response.statusCode,
-        )) {
-          return response;
-        }
-
-        // --------------------------------------------------------
-        // REDIRECT
-        // --------------------------------------------------------
-
-        final String? location =
-            response.headers['location'];
-
-        if (location == null ||
-            location.trim().isEmpty) {
+        final String? location = response.headers['location'];
+        if (location == null || location.trim().isEmpty) {
           throw Exception(
-            'Server mengembalikan HTTP '
-            '${response.statusCode}, tetapi header '
-            'Location tidak tersedia.\n\n'
-            'Response:\n'
-            '${_preview(response.body, 1200)}',
+            'Server mengembalikan HTTP ${response.statusCode}, tetapi header Location tidak tersedia.\n\nResponse:\n${_preview(response.body, 1200)}',
           );
         }
-
-        final Uri nextUri =
-            currentUri.resolve(location);
-
-        _debugLog(
-          'Redirect ${response.statusCode} → $nextUri',
-        );
-
-        currentUri = nextUri;
+        currentUri = currentUri.resolve(location);
       }
-
       throw Exception(
-        'Redirect server terlalu banyak '
-        '(${maxRedirects + 1} kali).',
+        'Redirect server terlalu banyak (${maxRedirects + 1} kali).',
       );
     } finally {
       client.close();
@@ -212,175 +113,68 @@ class _AuthPageState extends State<AuthPage> {
         statusCode == 308;
   }
 
-  // ============================================================
-  // PREVIEW RESPONSE
-  // ============================================================
-
-  String _preview(
-    String body,
-    int maxLength,
-  ) {
+  String _preview(String body, int maxLength) {
     final String value = body.trim();
-
-    if (value.length <= maxLength) {
-      return value;
-    }
-
+    if (value.length <= maxLength) return value;
     return '${value.substring(0, maxLength)}...';
   }
 
-  // ============================================================
-  // PARSE JSON
-  // ============================================================
-
-  Map<String, dynamic> _parseOtpResponse(
-    http.Response response,
-  ) {
+  Map<String, dynamic> _parseOtpResponse(http.Response response) {
     final String body = response.body.trim();
-
-    if (body.isEmpty) {
+    if (body.isEmpty)
       throw Exception(
-        'Response OTP kosong.\n\n'
-        'HTTP: ${response.statusCode}\n'
-        'URL: ${response.request?.url}',
+        'Response OTP kosong.\n\nHTTP: ${response.statusCode}\nURL: ${response.request?.url}',
       );
-    }
 
     dynamic decoded;
-
     try {
       decoded = jsonDecode(body);
     } catch (_) {
       throw Exception(
-        'Response OTP bukan JSON.\n\n'
-        'HTTP: ${response.statusCode}\n'
-        'Content-Type: '
-        '${response.headers['content-type'] ?? '-'}\n\n'
-        'Response server:\n'
-        '${_preview(body, 1600)}',
+        'Response OTP bukan JSON.\n\nHTTP: ${response.statusCode}\nContent-Type: ${response.headers['content-type'] ?? '-'}\n\nResponse server:\n${_preview(body, 1600)}',
       );
     }
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception(
-        'Format JSON dari server OTP tidak sesuai.\n\n'
-        'HTTP: ${response.statusCode}\n\n'
-        'Response:\n'
-        '${_preview(body, 1600)}',
+        'Format JSON dari server OTP tidak sesuai.\n\nHTTP: ${response.statusCode}\n\nResponse:\n${_preview(body, 1600)}',
       );
     }
-
     return decoded;
   }
 
-  // ============================================================
-  // HTTP ERROR DETAIL
-  // ============================================================
-
-  Exception _otpHttpError(
-    http.Response response,
-  ) {
+  Exception _otpHttpError(http.Response response) {
     return Exception(
-      'Server OTP mengembalikan HTTP '
-      '${response.statusCode}.\n\n'
-      'URL akhir:\n'
-      '${response.request?.url}\n\n'
-      'Content-Type:\n'
-      '${response.headers['content-type'] ?? '-'}\n\n'
-      'Location:\n'
-      '${response.headers['location'] ?? '-'}\n\n'
-      'Response server:\n'
-      '${_preview(response.body, 1600)}',
+      'Server OTP mengembalikan HTTP ${response.statusCode}.\n\nURL akhir:\n${response.request?.url}\n\nContent-Type:\n${response.headers['content-type'] ?? '-'}\n\nLocation:\n${response.headers['location'] ?? '-'}\n\nResponse server:\n${_preview(response.body, 1600)}',
     );
   }
-
-  // ============================================================
-  // HEALTH CHECK
-  // ============================================================
-  //
-  // Digunakan untuk memastikan Flutter benar-benar dapat
-  // mencapai deployment Apps Script.
-  // ============================================================
 
   Future<Map<String, dynamic>> _checkOtpService() async {
     _validateOtpServiceUrl();
+    final String requestId = 'health-${DateTime.now().millisecondsSinceEpoch}';
+    final Uri uri = Uri.parse(
+      otpServiceUrl,
+    ).replace(queryParameters: {'action': 'health', 'requestId': requestId});
+    final http.Response response = await _getFollowingRedirects(uri);
 
-    final String requestId =
-        'health-${DateTime.now().millisecondsSinceEpoch}';
-
-    final Uri uri =
-        Uri.parse(otpServiceUrl).replace(
-      queryParameters: {
-        'action': 'health',
-        'requestId': requestId,
-      },
-    );
-
-    _debugLog(
-      'Health check dimulai. requestId=$requestId',
-    );
-
-    final http.Response response =
-        await _getFollowingRedirects(uri);
-
-    _debugLog(
-      'Health final HTTP ${response.statusCode}. '
-      'requestId=$requestId',
-    );
-
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300) {
+    if (response.statusCode < 200 || response.statusCode >= 300)
       throw _otpHttpError(response);
-    }
-
-    final Map<String, dynamic> decoded =
-        _parseOtpResponse(response);
-
-    if (decoded['ok'] != true) {
+    final Map<String, dynamic> decoded = _parseOtpResponse(response);
+    if (decoded['ok'] != true)
       throw Exception(
-        decoded['message']?.toString() ??
-            'Health check OTP gagal.',
+        decoded['message']?.toString() ?? 'Health check OTP gagal.',
       );
-    }
-
-    _debugLog(
-      'Health check berhasil. '
-      'service=${decoded['service']}',
-    );
-
     return decoded;
   }
 
-  // ============================================================
-  // SEND REGISTRATION OTP
-  // ============================================================
-
-  Future<Map<String, dynamic>>
-      _sendRegistrationOtp({
+  Future<Map<String, dynamic>> _sendRegistrationOtp({
     required String applicantEmail,
     required String applicantName,
   }) async {
     _validateOtpServiceUrl();
-
-    // ----------------------------------------------------------
-    // HEALTH CHECK
-    // ----------------------------------------------------------
-
     await _checkOtpService();
-
-    // ----------------------------------------------------------
-    // REQUEST ID
-    // ----------------------------------------------------------
-
-    final String requestId =
-        'send-${DateTime.now().millisecondsSinceEpoch}';
-
-    // ----------------------------------------------------------
-    // URL
-    // ----------------------------------------------------------
-
-    final Uri uri =
-        Uri.parse(otpServiceUrl).replace(
+    final String requestId = 'send-${DateTime.now().millisecondsSinceEpoch}';
+    final Uri uri = Uri.parse(otpServiceUrl).replace(
       queryParameters: {
         'action': 'sendOtp',
         'email': applicantEmail,
@@ -388,74 +182,25 @@ class _AuthPageState extends State<AuthPage> {
         'requestId': requestId,
       },
     );
+    final http.Response response = await _getFollowingRedirects(uri);
 
-    _debugLog(
-      'Mengirim request OTP. '
-      'requestId=$requestId '
-      'email=$applicantEmail',
-    );
-
-    // ----------------------------------------------------------
-    // GET
-    // ----------------------------------------------------------
-
-    final http.Response response =
-        await _getFollowingRedirects(uri);
-
-    _debugLog(
-      'Response sendOtp: '
-      'HTTP ${response.statusCode} '
-      'requestId=$requestId',
-    );
-
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300) {
+    if (response.statusCode < 200 || response.statusCode >= 300)
       throw _otpHttpError(response);
-    }
-
-    // ----------------------------------------------------------
-    // PARSE
-    // ----------------------------------------------------------
-
-    final Map<String, dynamic> decoded =
-        _parseOtpResponse(response);
-
-    _debugLog(
-      'JSON sendOtp: '
-      '${_preview(jsonEncode(decoded), 1200)}',
-    );
-
-    if (decoded['ok'] != true) {
+    final Map<String, dynamic> decoded = _parseOtpResponse(response);
+    if (decoded['ok'] != true)
       throw Exception(
-        decoded['message']?.toString() ??
-            'Server gagal mengirim OTP.',
+        decoded['message']?.toString() ?? 'Server gagal mengirim OTP.',
       );
-    }
-
-    _debugLog(
-      'OTP berhasil diproses oleh server. '
-      'requestId=${decoded['requestId'] ?? requestId}',
-    );
-
     return decoded;
   }
 
-  // ============================================================
-  // VERIFY REGISTRATION OTP
-  // ============================================================
-
-  Future<Map<String, dynamic>>
-      _verifyRegistrationOtp({
+  Future<Map<String, dynamic>> _verifyRegistrationOtp({
     required String applicantEmail,
     required String code,
   }) async {
     _validateOtpServiceUrl();
-
-    final String requestId =
-        'verify-${DateTime.now().millisecondsSinceEpoch}';
-
-    final Uri uri =
-        Uri.parse(otpServiceUrl).replace(
+    final String requestId = 'verify-${DateTime.now().millisecondsSinceEpoch}';
+    final Uri uri = Uri.parse(otpServiceUrl).replace(
       queryParameters: {
         'action': 'verifyOtp',
         'email': applicantEmail,
@@ -463,515 +208,270 @@ class _AuthPageState extends State<AuthPage> {
         'requestId': requestId,
       },
     );
+    final http.Response response = await _getFollowingRedirects(uri);
 
-    _debugLog(
-      'Verifikasi OTP dimulai. '
-      'requestId=$requestId '
-      'email=$applicantEmail',
-    );
-
-    final http.Response response =
-        await _getFollowingRedirects(uri);
-
-    _debugLog(
-      'Response verifyOtp: '
-      'HTTP ${response.statusCode} '
-      'requestId=$requestId',
-    );
-
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300) {
+    if (response.statusCode < 200 || response.statusCode >= 300)
       throw _otpHttpError(response);
-    }
-
-    final Map<String, dynamic> decoded =
-        _parseOtpResponse(response);
-
-    _debugLog(
-      'JSON verifyOtp: '
-      '${_preview(jsonEncode(decoded), 1200)}',
-    );
-
-    return decoded;
+    return _parseOtpResponse(response);
   }
 
   // ============================================================
   // GOOGLE AUTH
   // ============================================================
-
   Future<UserCredential> _signInWithGoogle() async {
-    _debugLog(
-      'Google Sign-In dimulai.',
-    );
-
     await _initializeGoogle();
-
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}
+    if (!GoogleSignIn.instance.supportsAuthenticate())
+      throw Exception('Google Sign-In tidak tersedia pada platform ini.');
 
-    if (!GoogleSignIn.instance.supportsAuthenticate()) {
-      throw Exception(
-        'Google Sign-In tidak tersedia pada platform ini.',
-      );
-    }
+    final GoogleSignInAccount googleUser = await GoogleSignIn.instance
+        .authenticate();
+    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+    final String? idToken = googleAuth.idToken;
+    if (idToken == null || idToken.isEmpty)
+      throw Exception('Google tidak memberikan ID Token.');
 
-    final GoogleSignInAccount googleUser =
-        await GoogleSignIn.instance.authenticate();
-
-    _debugLog(
-      'Google account dipilih: '
-      '${googleUser.email}',
-    );
-
-    final GoogleSignInAuthentication googleAuth =
-        googleUser.authentication;
-
-    final String? idToken =
-        googleAuth.idToken;
-
-    if (idToken == null ||
-        idToken.isEmpty) {
-      throw Exception(
-        'Google tidak memberikan ID Token.',
-      );
-    }
-
-    final AuthCredential credential =
-        GoogleAuthProvider.credential(
+    final AuthCredential credential = GoogleAuthProvider.credential(
       idToken: idToken,
     );
-
-    final UserCredential credentialResult =
-        await _firebaseAuth.signInWithCredential(
-      credential,
-    );
-
-    _debugLog(
-      'Firebase Google Sign-In berhasil. '
-      'uid=${credentialResult.user?.uid}',
-    );
-
-    return credentialResult;
+    return await _firebaseAuth.signInWithCredential(credential);
   }
 
   // ============================================================
   // LOGIN
   // ============================================================
-
   Future<void> _login() async {
     if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     bool sessionOpened = false;
 
     try {
-      final UserCredential credential =
-          await _signInWithGoogle();
-
+      final UserCredential credential = await _signInWithGoogle();
       sessionOpened = true;
+      final User? user = credential.user;
+      if (user == null) throw Exception('User Firebase tidak ditemukan.');
 
-      final User? user =
-          credential.user;
-
-      if (user == null) {
-        throw Exception(
-          'User Firebase tidak ditemukan.',
-        );
-      }
-
-      _debugLog(
-        'Memeriksa akun Firestore untuk login.',
-      );
-
-      final bool registered =
-          await isUserAccountRegistered(
-        user.uid,
-      );
-
+      final bool registered = await isUserAccountRegistered(user.uid);
       if (!registered) {
         await _signOut();
-
         sessionOpened = false;
-
         if (!mounted) return;
-
         _showError(
-          'Akun Google ini belum terdaftar.\n\n'
-          'Silakan gunakan menu Daftar terlebih dahulu.',
+          'Akun Google ini belum terdaftar.\n\nSilakan gunakan menu Daftar terlebih dahulu.',
         );
-
         return;
       }
 
-      final DocumentSnapshot<
-          Map<String, dynamic>> account =
-          await fetchUserAccount(
-        user.uid,
-      );
-
+      final DocumentSnapshot<Map<String, dynamic>> account =
+          await fetchUserAccount(user.uid);
       if (!account.exists) {
         await _signOut();
-
         sessionOpened = false;
-
         if (!mounted) return;
-
-        _showError(
-          'Data akun tidak ditemukan di Firestore.',
-        );
-
+        _showError('Data akun tidak ditemukan di Firestore.');
         return;
       }
 
-      final Map<String, dynamic> data =
-          account.data() ?? {};
-
+      final Map<String, dynamic> data = account.data() ?? {};
       final String nama =
-          data['nama'] as String? ??
-              user.displayName ??
-              'Pengguna';
-
-      final String role =
-          data['role'] as String? ??
-              'guru';
-
-      _debugLog(
-        'Login berhasil untuk $nama. role=$role',
-      );
+          data['nama'] as String? ?? user.displayName ?? 'Pengguna';
+      final String role = data['role'] as String? ?? 'guru';
 
       if (!mounted) return;
-
-      await _showLoginSuccess(
-        nama: nama,
-        role: role,
-      );
-
-      if (!mounted) return;
-
-      widget.onAuthSuccess?.call();
+      
+      // Tampilkan AwesomeDialog dan navigasi langsung dari tombol OK
+      await _showLoginSuccess(nama: nama, role: role);
+      
     } on FirebaseAuthException catch (e) {
-      if (sessionOpened) {
-        await _signOut();
-      }
-
+      if (sessionOpened) await _signOut();
       if (!mounted) return;
-
-      _showError(
-        _firebaseAuthErrorMessage(e),
-      );
+      _showError(_firebaseAuthErrorMessage(e));
     } on GoogleSignInException catch (e) {
-      if (sessionOpened) {
-        await _signOut();
-      }
-
+      if (sessionOpened) await _signOut();
       if (!mounted) return;
-
-      _showError(
-        _googleSignInErrorMessage(e),
-      );
+      _showError(_googleSignInErrorMessage(e));
     } catch (e) {
-      if (sessionOpened) {
-        await _signOut();
-      }
-
+      if (sessionOpened) await _signOut();
       if (!mounted) return;
-
-      _showError(
-        'Login gagal.\n\n$e',
-      );
+      _showError('Login gagal.\n\n$e');
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   // ============================================================
   // REGISTER
   // ============================================================
-
   Future<void> _register() async {
     if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     bool sessionOpened = false;
 
     try {
-      final UserCredential credential =
-          await _signInWithGoogle();
-
+      final UserCredential credential = await _signInWithGoogle();
       sessionOpened = true;
+      final User? user = credential.user;
+      if (user == null) throw Exception('User Firebase tidak ditemukan.');
 
-      final User? user =
-          credential.user;
+      final String email = user.email?.trim() ?? '';
+      if (email.isEmpty)
+        throw Exception('Akun Google tidak memiliki alamat email.');
 
-      if (user == null) {
-        throw Exception(
-          'User Firebase tidak ditemukan.',
-        );
-      }
-
-      final String email =
-          user.email?.trim() ?? '';
-
-      if (email.isEmpty) {
-        throw Exception(
-          'Akun Google tidak memiliki alamat email.',
-        );
-      }
-
-      _debugLog(
-        'Pendaftaran dimulai untuk $email.',
-      );
-
-      // --------------------------------------------------------
-      // CEK SUDAH TERDAFTAR
-      // --------------------------------------------------------
-
-      final bool registered =
-          await isUserAccountRegistered(
-        user.uid,
-      );
-
+      final bool registered = await isUserAccountRegistered(user.uid);
       if (registered) {
         await _signOut();
-
         sessionOpened = false;
-
         if (!mounted) return;
-
         _showError(
-          'Akun Google ini sudah terdaftar.\n\n'
-          'Silakan gunakan Login.',
+          'Akun Google ini sudah terdaftar.\n\nSilakan gunakan Login.',
         );
-
         return;
       }
 
-      // --------------------------------------------------------
-      // DEFAULT NAMA
-      // --------------------------------------------------------
+      _namaController.text = user.displayName?.trim() ?? '';
+      if (_namaController.text.isEmpty)
+        _namaController.text = email.split('@').first;
 
-      _namaController.text =
-          user.displayName?.trim() ?? '';
-
-      if (_namaController.text.isEmpty) {
-        _namaController.text =
-            email.split('@').first;
-      }
+      _nisController.clear();
+      _phoneController.clear();
+      _addressController.clear();
 
       if (!mounted) return;
 
-      // --------------------------------------------------------
-      // FORM REGISTRASI
-      // --------------------------------------------------------
-
-      final Map<String, dynamic>?
-          registrationData =
-          await _showRegisterDialog(user);
-
+      final Map<String, dynamic>? registrationData = await _showRegisterDialog(
+        user,
+      );
       if (registrationData == null) {
         await _signOut();
-
         sessionOpened = false;
-
         return;
       }
 
-      final String nama =
-          registrationData['nama'] as String;
+      final String nama = registrationData['nama'] as String;
+      final String nis = registrationData['nis'] as String;
+      final String nomorTelepon = registrationData['nomorTelepon'] as String;
+      final String alamat = registrationData['alamat'] as String;
 
-      _debugLog(
-        'Form pendaftaran diterima. '
-        'nama=$nama',
-      );
-
-      // --------------------------------------------------------
-      // MASUK HALAMAN OTP
-      // --------------------------------------------------------
-
-      _debugLog(
-        'Navigasi ke halaman OTP.',
-      );
-
-      final bool? result =
-          await Navigator.of(context).push<bool>(
+      final bool? result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (_) =>
-              _AdminOtpVerificationPage(
+          builder: (_) => _AdminOtpVerificationPage(
             user: user,
             nama: nama,
-            adminEmail:
-                _adminApprovalEmail,
-            sendOtp:
-                _sendRegistrationOtp,
-            verifyOtp:
-                _verifyRegistrationOtp,
-            debugLog: _debugLog,
+            nis: nis,
+            nomorTelepon: nomorTelepon,
+            alamat: alamat,
+            adminEmail: _adminApprovalEmail,
+            sendOtp: _sendRegistrationOtp,
+            verifyOtp: _verifyRegistrationOtp,
           ),
         ),
       );
 
-      _debugLog(
-        'Halaman OTP selesai. result=$result',
-      );
-
       if (!mounted) return;
-
-      // --------------------------------------------------------
-      // OTP BERHASIL
-      // --------------------------------------------------------
 
       if (result == true) {
         sessionOpened = false;
-
+        // Tampilkan AwesomeDialog dan navigasi langsung dari tombol OK
         await _showRegisterSuccess();
-
-        if (!mounted) return;
-
-        widget.onAuthSuccess?.call();
       } else {
         await _signOut();
-
         sessionOpened = false;
       }
     } on FirebaseAuthException catch (e) {
-      if (sessionOpened) {
-        await _signOut();
-      }
-
+      if (sessionOpened) await _signOut();
       if (!mounted) return;
-
-      _showError(
-        _firebaseAuthErrorMessage(e),
-      );
+      _showError(_firebaseAuthErrorMessage(e));
     } on GoogleSignInException catch (e) {
-      if (sessionOpened) {
-        await _signOut();
-      }
-
+      if (sessionOpened) await _signOut();
       if (!mounted) return;
-
-      _showError(
-        _googleSignInErrorMessage(e),
-      );
+      _showError(_googleSignInErrorMessage(e));
     } catch (e) {
-      if (sessionOpened) {
-        await _signOut();
-      }
-
+      if (sessionOpened) await _signOut();
       if (!mounted) return;
-
-      _showError(
-        'Pendaftaran gagal.\n\n$e',
-      );
+      _showError('Pendaftaran gagal.\n\n$e');
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   // ============================================================
-  // REGISTER DIALOG
+  // REGISTER DIALOG (MODERN UI)
   // ============================================================
+  Future<Map<String, dynamic>?> _showRegisterDialog(User user) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-  Future<Map<String, dynamic>?>
-      _showRegisterDialog(
-    User user,
-  ) async {
     return showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return AlertDialog(
+        return Dialog(
+          backgroundColor: colorScheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(28),
           ),
-          title: const Text(
-            'Daftar sebagai Guru',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: SingleChildScrollView(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundImage:
-                      user.photoURL != null
-                          ? NetworkImage(
-                              user.photoURL!,
-                            )
-                          : null,
-                  child: user.photoURL == null
-                      ? const Icon(
-                          Icons.person,
-                          size: 32,
-                        )
-                      : null,
+                Center(
+                  child: CircleAvatar(
+                    radius: 40,
+                    backgroundColor: colorScheme.primaryContainer,
+                    backgroundImage: user.photoURL != null
+                        ? NetworkImage(user.photoURL!)
+                        : null,
+                    child: user.photoURL == null
+                        ? Icon(
+                            Icons.person,
+                            size: 40,
+                            color: colorScheme.primary,
+                          )
+                        : null,
+                  ),
                 ),
-
                 const SizedBox(height: 16),
-
+                Text(
+                  'Lengkapi Profil Guru',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Text(
                   user.email ?? '-',
-                  textAlign:
-                      TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.black54,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
-
-                const SizedBox(height: 14),
+                const SizedBox(height: 20),
 
                 Container(
-                  padding:
-                      const EdgeInsets.all(12),
-                  decoration:
-                      BoxDecoration(
-                    color: Colors.blue
-                        .withValues(
-                      alpha: 0.07,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      14,
-                    ),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        Icons
-                            .admin_panel_settings_outlined,
-                        color: Colors.blue,
+                        Icons.info_outline,
+                        color: colorScheme.primary,
                         size: 20,
                       ),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Setelah dilanjutkan, '
-                          'sistem akan mengirim OTP '
-                          'persetujuan ke email admin sekolah.',
-                          style: TextStyle(
-                            fontSize: 13,
+                          'Lengkapi data berikut. Data ini akan digunakan sebagai informasi profil akun guru.',
+                          style: theme.textTheme.bodySmall?.copyWith(
                             height: 1.4,
                           ),
                         ),
@@ -979,83 +479,68 @@ class _AuthPageState extends State<AuthPage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
 
-                const SizedBox(height: 22),
-
-                TextField(
-                  controller:
-                      _namaController,
-                  textCapitalization:
-                      TextCapitalization.words,
-                  decoration:
-                      InputDecoration(
-                    labelText: 'Nama Guru',
-                    hintText:
-                        'Masukkan nama',
-                    prefixIcon:
-                        const Icon(
-                      Icons.person_outline,
-                    ),
-                    border:
-                        OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(
-                        16,
-                      ),
-                    ),
-                  ),
+                _buildTextField(
+                  dialogContext,
+                  controller: _namaController,
+                  label: 'Nama Lengkap',
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  dialogContext,
+                  controller: _nisController,
+                  label: 'NIS/NIK',
+                  icon: Icons.badge_outlined,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  dialogContext,
+                  controller: _phoneController,
+                  label: 'Nomor Telepon',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  dialogContext,
+                  controller: _addressController,
+                  label: 'Alamat',
+                  icon: Icons.location_on_outlined,
+                  maxLines: 3,
                 ),
 
                 const SizedBox(height: 16),
 
                 Container(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
+                  padding: const EdgeInsets.symmetric(
                     vertical: 14,
                     horizontal: 14,
                   ),
-                  decoration:
-                      BoxDecoration(
-                    border: Border.all(
-                      color: Colors.grey
-                          .shade300,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      16,
-                    ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.school_outlined,
-                        color: Colors.blue,
-                      ),
-                      SizedBox(width: 12),
+                      Icon(Icons.school_outlined, color: colorScheme.primary),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Role',
-                              style:
-                                  TextStyle(
-                                fontSize: 12,
-                                color: Colors
-                                    .black54,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
-                            SizedBox(height: 3),
+                            const SizedBox(height: 3),
                             Text(
                               'Guru',
-                              style:
-                                  TextStyle(
-                                fontWeight:
-                                    FontWeight
-                                        .w600,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -1065,42 +550,27 @@ class _AuthPageState extends State<AuthPage> {
                   ),
                 ),
 
-                const SizedBox(height: 18),
+                const SizedBox(height: 20),
 
                 Container(
-                  padding:
-                      const EdgeInsets.all(
-                    14,
-                  ),
-                  decoration:
-                      BoxDecoration(
-                    color: Colors.orange
-                        .withValues(
-                      alpha: 0.08,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      16,
-                    ),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: colorScheme.tertiaryContainer.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.schedule_outlined,
-                        color: Colors.orange,
+                        color: colorScheme.tertiary,
                         size: 20,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'OTP akan dikirim ke:\n'
-                          '$_adminApprovalEmail\n\n'
-                          'Masa berlaku OTP: 3 menit.',
-                          style:
-                              const TextStyle(
-                            fontSize: 13,
+                          'Kode OTP akan dikirim ke:\n$_adminApprovalEmail\n\nMasa berlaku OTP: 3 menit.',
+                          style: theme.textTheme.bodySmall?.copyWith(
                             height: 1.45,
                           ),
                         ),
@@ -1108,240 +578,211 @@ class _AuthPageState extends State<AuthPage> {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, null),
+                        child: const Text('Batal'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          final String nama = _namaController.text.trim();
+                          final String nis = _nisController.text.trim();
+                          final String nomorTelepon = _phoneController.text
+                              .trim();
+                          final String alamat = _addressController.text.trim();
+
+                          if (nama.isEmpty || nama.length < 3) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Nama lengkap wajib diisi (min 3 karakter).',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          if (nis.isEmpty) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('NIS/NIK wajib diisi.'),
+                              ),
+                            );
+                            return;
+                          }
+                          if (nomorTelepon
+                                  .replaceAll(RegExp(r'[^0-9+]'), '')
+                                  .length <
+                              8) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Nomor telepon tidak valid.'),
+                              ),
+                            );
+                            return;
+                          }
+                          if (alamat.isEmpty) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Alamat wajib diisi.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.pop(dialogContext, {
+                            'nama': nama,
+                            'nis': nis,
+                            'nomorTelepon': nomorTelepon,
+                            'alamat': alamat,
+                          });
+                        },
+                        child: const Text('Lanjutkan'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  null,
-                );
-              },
-              child:
-                  const Text('Batal'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final String nama =
-                    _namaController.text
-                        .trim();
-
-                if (nama.isEmpty) {
-                  ScaffoldMessenger.of(
-                    dialogContext,
-                  ).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Nama tidak boleh kosong.',
-                      ),
-                    ),
-                  );
-
-                  return;
-                }
-
-                Navigator.pop(
-                  dialogContext,
-                  {
-                    'nama': nama,
-                  },
-                );
-              },
-              child:
-                  const Text('Kirim OTP'),
-            ),
-          ],
         );
       },
+    );
+  }
+
+  // Helper TextField for Dialog
+  Widget _buildTextField(
+    BuildContext context, {
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+  }) {
+    final theme = Theme.of(context);
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: maxLines == 1
+            ? Icon(icon)
+            : Padding(
+                padding: const EdgeInsets.only(bottom: 42),
+                child: Icon(icon),
+              ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        filled: true,
+        fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+      ),
     );
   }
 
   // ============================================================
   // SIGN OUT
   // ============================================================
-
   Future<void> _signOut() async {
-    _debugLog(
-      'Sign out Firebase + Google.',
-    );
-
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}
-
     try {
       await _firebaseAuth.signOut();
     } catch (_) {}
   }
 
   // ============================================================
-  // LOGIN SUCCESS
+  // LOGIN SUCCESS (AWESOME DIALOG)
   // ============================================================
-
   Future<void> _showLoginSuccess({
     required String nama,
     required String role,
   }) async {
-    await showDialog<void>(
+    await AwesomeDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(22),
-          ),
-          title: const Row(
-            children: [
-              Icon(
-                Icons.check_circle,
-                color: Colors.green,
-              ),
-              SizedBox(width: 10),
-              Text('Login Berhasil'),
-            ],
-          ),
-          content: Text(
-            'Selamat datang, $nama.\n\n'
-            'Role: ${role.toUpperCase()}',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child:
-                  const Text('Masuk'),
-            ),
-          ],
-        );
+      dialogType: DialogType.success,
+      animType: AnimType.rightSlide,
+      title: 'Login Berhasil',
+      desc: 'Selamat datang, $nama.\n\nRole: ${role.toUpperCase()}',
+      btnOkText: 'Masuk',
+      btnOkOnPress: () {
+        widget.onAuthSuccess?.call();
       },
-    );
+      dismissOnTouchOutside: false,
+      dismissOnBackKeyPress: false,
+    ).show();
   }
 
   // ============================================================
-  // REGISTER SUCCESS
+  // REGISTER SUCCESS (AWESOME DIALOG)
   // ============================================================
-
   Future<void> _showRegisterSuccess() async {
-    await showDialog<void>(
+    await AwesomeDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(22),
-          ),
-          title: const Row(
-            children: [
-              Icon(
-                Icons.verified,
-                color: Colors.green,
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child:
-                    Text(
-                  'Pendaftaran Berhasil',
-                ),
-              ),
-            ],
-          ),
-          content:
-              const Text(
-            'Akun guru berhasil dibuat.\n\n'
-            'Persetujuan admin berhasil '
-            'diverifikasi melalui OTP.\n\n'
-            'Data akun telah disimpan ke '
-            'collection manajemen account.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child:
-                  const Text('Selesai'),
-            ),
-          ],
-        );
+      dialogType: DialogType.success,
+      animType: AnimType.rightSlide,
+      title: 'Pendaftaran Berhasil',
+      desc: 'Akun guru berhasil dibuat.\n\nPersetujuan admin berhasil diverifikasi melalui OTP.\n\nData profil telah disimpan ke akun Firebase.',
+      btnOkText: 'Selesai',
+      btnOkOnPress: () {
+        widget.onAuthSuccess?.call();
       },
-    );
+      dismissOnTouchOutside: false,
+      dismissOnBackKeyPress: false,
+    ).show();
   }
 
   // ============================================================
-  // GOOGLE ERROR
+  // ERROR HANDLERS
   // ============================================================
-
-  String _googleSignInErrorMessage(
-    GoogleSignInException e,
-  ) {
+  String _googleSignInErrorMessage(GoogleSignInException e) {
     switch (e.code) {
-      case GoogleSignInExceptionCode
-            .clientConfigurationError:
-        return 'Konfigurasi Google Sign-In '
-            'Android belum benar.';
-
+      case GoogleSignInExceptionCode.clientConfigurationError:
+        return 'Konfigurasi Google Sign-In Android belum benar.';
       case GoogleSignInExceptionCode.canceled:
         return 'Login Google dibatalkan.';
-
       default:
-        return e.description ??
-            'Terjadi kesalahan Google Sign-In.';
+        return e.description ?? 'Terjadi kesalahan Google Sign-In.';
     }
   }
 
-  // ============================================================
-  // FIREBASE AUTH ERROR
-  // ============================================================
-
-  String _firebaseAuthErrorMessage(
-    FirebaseAuthException e,
-  ) {
+  String _firebaseAuthErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'network-request-failed':
         return 'Tidak ada koneksi internet.';
-
       case 'too-many-requests':
-        return 'Terlalu banyak percobaan. '
-            'Coba lagi beberapa saat.';
-
+        return 'Terlalu banyak percobaan. Coba lagi beberapa saat.';
       case 'operation-not-allowed':
         return 'Provider Firebase belum diaktifkan.';
-
       case 'invalid-credential':
         return 'Credential Google tidak valid.';
-
       case 'account-exists-with-different-credential':
-        return 'Email tersebut sudah digunakan '
-            'oleh provider lain.';
-
+        return 'Email tersebut sudah digunakan oleh provider lain.';
       case 'email-already-in-use':
         return 'Email tersebut sudah digunakan.';
-
       case 'invalid-email':
         return 'Alamat email tidak valid.';
-
       default:
-        return e.message ??
-            'Terjadi kesalahan autentikasi.';
+        return e.message ?? 'Terjadi kesalahan autentikasi.';
     }
   }
-
-  // ============================================================
-  // GENERAL ERROR
-  // ============================================================
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        behavior:
-            SnackBarBehavior.floating,
-        duration:
-            const Duration(seconds: 8),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 8),
       ),
     );
   }
@@ -1349,220 +790,139 @@ class _AuthPageState extends State<AuthPage> {
   // ============================================================
   // MAIN UI
   // ============================================================
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFF6F7FB),
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24.0),
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(
-                maxWidth: 430,
-              ),
+              constraints: const BoxConstraints(maxWidth: 450),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
-
-                  Container(
-                    width: 86,
-                    height: 86,
-                    decoration:
-                        BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius:
-                          BorderRadius.circular(
-                        26,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons
-                          .account_balance_wallet_rounded,
-                      color: Colors.white,
-                      size: 44,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    'Manajemen Bendahara',
-                    textAlign:
-                        TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
+                  // Lottie Animation Header
+                  LottieDashboard(size: 180.0),
+                  const SizedBox(height: 24),
 
                   Text(
-                    _isLoginMode
-                        ? 'Masuk menggunakan akun Google'
-                        : 'Daftarkan akun guru dengan persetujuan admin',
-                    textAlign:
-                        TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.black54,
-                      fontSize: 15,
+                    'Manajemen Bendahara',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
                     ),
                   ),
-
-                  const SizedBox(height: 30),
-
-                  Container(
-                    padding:
-                        const EdgeInsets.all(6),
-                    decoration:
-                        BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                          BorderRadius.circular(
-                        16,
+                  const SizedBox(height: 8),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Text(
+                      _isLoginMode
+                          ? 'Masuk menggunakan akun Google'
+                          : 'Daftarkan akun guru dengan persetujuan admin',
+                      key: ValueKey(_isLoginMode),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Login / Register Toggle
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withOpacity(
+                        0.5,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       children: [
                         Expanded(
-                          child:
-                              _ModeButton(
+                          child: _ModeButton(
                             text: 'Login',
-                            selected:
-                                _isLoginMode,
-                            onTap:
-                                _isLoading
-                                    ? null
-                                    : () {
-                                        setState(
-                                          () {
-                                            _isLoginMode =
-                                                true;
-                                          },
-                                        );
-                                      },
+                            selected: _isLoginMode,
+                            onTap: _isLoading
+                                ? null
+                                : () => setState(() => _isLoginMode = true),
                           ),
                         ),
                         Expanded(
-                          child:
-                              _ModeButton(
+                          child: _ModeButton(
                             text: 'Daftar',
-                            selected:
-                                !_isLoginMode,
-                            onTap:
-                                _isLoading
-                                    ? null
-                                    : () {
-                                        setState(
-                                          () {
-                                            _isLoginMode =
-                                                false;
-                                          },
-                                        );
-                                      },
+                            selected: !_isLoginMode,
+                            onTap: _isLoading
+                                ? null
+                                : () => setState(() => _isLoginMode = false),
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
 
-                  const SizedBox(height: 18),
-
-                  Card(
-                    elevation: 0,
-                    color: Colors.white,
-                    shape:
-                        RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(
-                        26,
+                  // Main Card Content
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withOpacity(0.5),
                       ),
                     ),
-                    child: Padding(
-                      padding:
-                          const EdgeInsets.all(
-                        24,
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .stretch,
-                        children: [
-                          Text(
-                            _isLoginMode
-                                ? 'Selamat datang kembali'
-                                : 'Daftar sebagai Guru',
-                            style:
-                                const TextStyle(
-                              fontSize: 22,
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _isLoginMode
+                              ? 'Selamat datang kembali'
+                              : 'Daftar sebagai Guru',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-
-                          const SizedBox(height: 8),
-
-                          Text(
-                            _isLoginMode
-                                ? 'Gunakan akun Google yang sudah '
-                                      'terdaftar di aplikasi.'
-                                : 'Gunakan akun Google kamu. '
-                                      'Pendaftaran harus disetujui '
-                                      'admin melalui OTP email.',
-                            style:
-                                const TextStyle(
-                              color:
-                                  Colors.black54,
-                            ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isLoginMode
+                              ? 'Gunakan akun Google yang sudah terdaftar di aplikasi.'
+                              : 'Gunakan akun Google kamu dan lengkapi data profil sebelum melanjutkan persetujuan admin.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
+                        ),
+                        const SizedBox(height: 20),
 
-                          const SizedBox(height: 20),
-
+                        if (!_isLoginMode) ...[
                           Container(
-                            padding:
-                                const EdgeInsets.all(
-                              14,
-                            ),
-                            decoration:
-                                BoxDecoration(
-                              color: Colors.blue
-                                  .withValues(
-                                alpha: 0.07,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withOpacity(
+                                0.3,
                               ),
-                              borderRadius:
-                                  BorderRadius.circular(
-                                16,
-                              ),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            child:
-                                const Row(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment
-                                      .start,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Icon(
-                                  Icons
-                                      .admin_panel_settings_outlined,
-                                  color:
-                                      Colors.blue,
+                                  Icons.admin_panel_settings_outlined,
+                                  color: colorScheme.primary,
                                   size: 22,
                                 ),
-                                SizedBox(
-                                  width: 10,
-                                ),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Pendaftaran guru '
-                                    'memerlukan persetujuan '
-                                    'admin melalui kode OTP.',
-                                    style: TextStyle(
-                                      fontSize: 13,
+                                    'Pendaftaran guru memerlukan persetujuan admin melalui kode OTP.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
                                       height: 1.4,
                                     ),
                                   ),
@@ -1570,123 +930,81 @@ class _AuthPageState extends State<AuthPage> {
                               ],
                             ),
                           ),
-
                           const SizedBox(height: 20),
+                        ],
 
-                          SizedBox(
-                            height: 56,
-                            child:
-                                OutlinedButton.icon(
-                              onPressed:
-                                  _isLoading
-                                      ? null
-                                      : _isLoginMode
-                                          ? _login
-                                          : _register,
-                              icon: _isLoading
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child:
-                                          CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'G',
-                                      style:
-                                          TextStyle(
-                                        fontSize: 22,
-                                        fontWeight:
-                                            FontWeight
-                                                .bold,
-                                      ),
-                                    ),
-                              label: Text(
-                                _isLoading
-                                    ? 'Memproses...'
-                                    : _isLoginMode
-                                        ? 'Masuk dengan Google'
-                                        : 'Daftar dengan Google',
+                        // Google Button
+                        SizedBox(
+                          height: 56,
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading
+                                ? null
+                                : (_isLoginMode ? _login : _register),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: colorScheme.surface,
+                              side: BorderSide(color: colorScheme.outline),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              style:
-                                  OutlinedButton
-                                      .styleFrom(
-                                shape:
-                                    RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(
-                                    16,
+                            ),
+                            icon: _isLoading
+                                ? LottieLoadingCircle(size: 24)
+                                : const Text(
+                                    'G',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red,
+                                    ),
                                   ),
-                                ),
-                                textStyle:
-                                    const TextStyle(
-                                  fontWeight:
-                                      FontWeight.w600,
-                                ),
+                            label: Text(
+                              _isLoading
+                                  ? 'Memproses...'
+                                  : (_isLoginMode
+                                      ? 'Masuk dengan Google'
+                                      : 'Daftar dengan Google'),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
                               ),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 16),
 
-                          const SizedBox(height: 22),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child:
-                                    Divider(
-                                  color:
-                                      Colors.grey
-                                          .shade300,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Divider(color: colorScheme.outlineVariant),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Text(
+                                'Google Account',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets
-                                        .symmetric(
-                                  horizontal: 12,
-                                ),
-                                child:
-                                    Text(
-                                  'Google Account',
-                                  style:
-                                      TextStyle(
-                                    color:
-                                        Colors.grey
-                                            .shade500,
-                                    fontSize:
-                                        12,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child:
-                                    Divider(
-                                  color:
-                                      Colors.grey
-                                          .shade300,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                            Expanded(
+                              child: Divider(color: colorScheme.outlineVariant),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   Text(
                     _isLoginMode
                         ? 'Login hanya berhasil jika akun sudah terdaftar.'
-                        : 'OTP persetujuan dikirim ke email admin sekolah.',
-                    textAlign:
-                        TextAlign.center,
-                    style:
-                        const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black45,
+                        : 'Data profil akan disimpan setelah OTP admin berhasil diverifikasi.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -1701,55 +1019,56 @@ class _AuthPageState extends State<AuthPage> {
   @override
   void dispose() {
     _namaController.dispose();
+    _nisController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 }
 
 // ============================================================
-// MODE BUTTON
+// MODE BUTTON WIDGET
 // ============================================================
-
 class _ModeButton extends StatelessWidget {
   const _ModeButton({
     required this.text,
     required this.selected,
     required this.onTap,
   });
-
   final String text;
   final bool selected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration:
-            const Duration(milliseconds: 220),
-        padding:
-            const EdgeInsets.symmetric(
-          vertical: 13,
-        ),
-        decoration:
-            BoxDecoration(
-          color: selected
-              ? Colors.blue
-              : Colors.transparent,
-          borderRadius:
-              BorderRadius.circular(12),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
         ),
         child: Text(
           text,
-          textAlign:
-              TextAlign.center,
-          style:
-              TextStyle(
-            fontWeight:
-                FontWeight.w600,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
             color: selected
-                ? Colors.white
-                : Colors.black54,
+                ? colorScheme.onPrimary
+                : colorScheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -1758,137 +1077,63 @@ class _ModeButton extends StatelessWidget {
 }
 
 // ============================================================
-// ADMIN OTP PAGE
+// ADMIN OTP VERIFICATION PAGE (MODERN UI)
 // ============================================================
-
-class _AdminOtpVerificationPage
-    extends StatefulWidget {
+class _AdminOtpVerificationPage extends StatefulWidget {
   const _AdminOtpVerificationPage({
     required this.user,
     required this.nama,
+    required this.nis,
+    required this.nomorTelepon,
+    required this.alamat,
     required this.adminEmail,
     required this.sendOtp,
     required this.verifyOtp,
-    required this.debugLog,
   });
 
   final User user;
   final String nama;
+  final String nis;
+  final String nomorTelepon;
+  final String alamat;
   final String adminEmail;
 
   final Future<Map<String, dynamic>> Function({
     required String applicantEmail,
     required String applicantName,
   }) sendOtp;
-
   final Future<Map<String, dynamic>> Function({
     required String applicantEmail,
     required String code,
   }) verifyOtp;
-
-  final void Function(String message) debugLog;
 
   @override
   State<_AdminOtpVerificationPage> createState() =>
       _AdminOtpVerificationPageState();
 }
 
-class _AdminOtpVerificationPageState
-    extends State<_AdminOtpVerificationPage> {
-  // ============================================================
-  // OTP
-  // ============================================================
-
-  static const int otpDurationSeconds =
-      3 * 60;
-
-  static const int maxVisibleLogs = 15;
+class _AdminOtpVerificationPageState extends State<_AdminOtpVerificationPage> {
+  static const String _accountCollection = 'manajemen account';
+  static const int otpDurationSeconds = 3 * 60;
 
   Timer? _timer;
+  final TextEditingController _otpController = TextEditingController();
 
-  final TextEditingController
-      _otpController =
-      TextEditingController();
-
-  int _remainingSeconds =
-      otpDurationSeconds;
-
+  int _remainingSeconds = otpDurationSeconds;
   bool _isSendingOtp = false;
   bool _isVerifying = false;
   bool _otpSent = false;
   bool _expired = false;
-
   String? _errorMessage;
-
-  final List<String> _logs = [];
-
-  // ============================================================
-  // LOCAL LOG
-  // ============================================================
-
-  void _addLog(String message) {
-    final String line =
-        '${_timeNow()}  $message';
-
-    widget.debugLog(message);
-
-    if (!mounted) return;
-
-    setState(() {
-      _logs.insert(0, line);
-
-      if (_logs.length >
-          maxVisibleLogs) {
-        _logs.removeLast();
-      }
-    });
-  }
-
-  String _timeNow() {
-    final DateTime now =
-        DateTime.now();
-
-    final String h =
-        now.hour.toString().padLeft(2, '0');
-
-    final String m =
-        now.minute.toString().padLeft(2, '0');
-
-    final String s =
-        now.second.toString().padLeft(2, '0');
-
-    return '$h:$m:$s';
-  }
 
   @override
   void initState() {
     super.initState();
-
-    _addLog(
-      'HALAMAN OTP BERHASIL DIBUKA.',
-    );
-
-    _addLog(
-      'Pendaftar: ${widget.user.email}',
-    );
-
-    _addLog(
-      'OTP akan dikirim ke ${widget.adminEmail}',
-    );
-
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) {
-      _sendOtp();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sendOtp());
   }
-
-  // ============================================================
-  // SEND OTP
-  // ============================================================
 
   Future<void> _sendOtp() async {
     if (_isSendingOtp) return;
-
     if (!mounted) return;
 
     setState(() {
@@ -1896,215 +1141,96 @@ class _AdminOtpVerificationPageState
       _otpSent = false;
       _expired = false;
       _errorMessage = null;
-      _remainingSeconds =
-          otpDurationSeconds;
+      _remainingSeconds = otpDurationSeconds;
       _otpController.clear();
     });
 
     _timer?.cancel();
 
-    _addLog(
-      'Memulai pengiriman OTP...',
-    );
-
     try {
-      final Map<String, dynamic> result =
-          await widget.sendOtp(
-        applicantEmail:
-            widget.user.email!,
-        applicantName:
-            widget.nama,
+      final Map<String, dynamic> result = await widget.sendOtp(
+        applicantEmail: widget.user.email!,
+        applicantName: widget.nama,
       );
-
       if (!mounted) return;
 
-      final bool alreadyActive =
-          result['alreadyActive'] == true;
-
       final int expiresIn =
-          int.tryParse(
-                result['expiresInSeconds']
-                    ?.toString() ??
-                    '',
-              ) ??
+          int.tryParse(result['expiresInSeconds']?.toString() ?? '') ??
               otpDurationSeconds;
 
       setState(() {
         _isSendingOtp = false;
         _otpSent = true;
         _expired = false;
-        _remainingSeconds =
-            expiresIn.clamp(
-          1,
-          otpDurationSeconds,
-        );
+        _remainingSeconds = expiresIn.clamp(1, otpDurationSeconds);
       });
-
-      if (alreadyActive) {
-        _addLog(
-          'OTP lama masih aktif. '
-          'Tidak membuat OTP baru.',
-        );
-      } else {
-        _addLog(
-          'Server menyatakan OTP berhasil dikirim.',
-        );
-      }
-
-      _addLog(
-        'Halaman input OTP siap.',
-      );
-
       _startTimer();
     } catch (e) {
       if (!mounted) return;
-
-      final String message =
-          e.toString()
-              .replaceFirst(
-                'Exception: ',
-                '',
-              );
-
+      final String message = e.toString().replaceFirst('Exception: ', '');
       setState(() {
         _isSendingOtp = false;
         _errorMessage = message;
       });
-
-      _addLog(
-        'GAGAL SEND OTP: $message',
-      );
     }
   }
-
-  // ============================================================
-  // TIMER
-  // ============================================================
 
   void _startTimer() {
     _timer?.cancel();
-
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
-
-        if (_remainingSeconds <= 1) {
-          timer.cancel();
-
-          setState(() {
-            _remainingSeconds = 0;
-            _expired = true;
-          });
-
-          _addLog(
-            'Timer OTP habis.',
-          );
-
-          return;
-        }
-
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_remainingSeconds <= 1) {
+        timer.cancel();
         setState(() {
-          _remainingSeconds--;
+          _remainingSeconds = 0;
+          _expired = true;
         });
-      },
-    );
+        return;
+      }
+      setState(() => _remainingSeconds--);
+    });
   }
-
-  // ============================================================
-  // VERIFY OTP
-  // ============================================================
 
   Future<void> _verifyOtp() async {
     if (_isVerifying) return;
-
     if (_expired) {
-      _showError(
-        'OTP sudah kedaluwarsa. '
-        'Kirim OTP baru.',
-      );
-
-      _addLog(
-        'Percobaan verifikasi ditolak karena OTP expired.',
-      );
-
+      _showError('OTP sudah kedaluwarsa. Kirim OTP baru.');
       return;
     }
 
-    final String code =
-        _otpController.text.trim();
-
-    if (!RegExp(
-      r'^\d{6}$',
-    ).hasMatch(code)) {
-      _showError(
-        'OTP harus terdiri dari 6 angka.',
-      );
-
-      _addLog(
-        'Format OTP tidak valid.',
-      );
-
+    final String code = _otpController.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      _showError('OTP harus terdiri dari 6 angka.');
       return;
     }
 
     if (!mounted) return;
-
     setState(() {
       _isVerifying = true;
       _errorMessage = null;
     });
 
-    _addLog(
-      'Mengirim kode OTP ke server untuk verifikasi...',
-    );
-
     try {
-      final Map<String, dynamic> result =
-          await widget.verifyOtp(
-        applicantEmail:
-            widget.user.email!,
+      final Map<String, dynamic> result = await widget.verifyOtp(
+        applicantEmail: widget.user.email!,
         code: code,
       );
-
       if (!mounted) return;
 
-      final bool verified =
-          result['verified'] == true;
+      final bool verified = result['verified'] == true;
 
-      if (result['ok'] != true ||
-          !verified) {
+      if (result['ok'] != true || !verified) {
         final String message =
-            result['message']
-                    ?.toString() ??
-                'OTP tidak valid.';
-
+            result['message']?.toString() ?? 'OTP tidak valid.';
         setState(() {
           _isVerifying = false;
           _errorMessage = message;
         });
-
-        _addLog(
-          'OTP DITOLAK SERVER: $message',
-        );
-
         return;
       }
-
-      // ========================================================
-      // OTP BENAR
-      // ========================================================
-
-      _addLog(
-        'OTP DITERIMA SERVER.',
-      );
-
-      _addLog(
-        'Membuat akun guru di Firestore...',
-      );
 
       await createUserAccount(
         uid: widget.user.uid,
@@ -2112,572 +1238,305 @@ class _AdminOtpVerificationPageState
         email: widget.user.email,
         photoUrl: widget.user.photoURL,
         role: 'guru',
-        nomorTelepon: '',
+        nomorTelepon: widget.nomorTelepon,
         nomorTerverifikasi: false,
         provider: 'google.com',
       );
 
+      await FirebaseFirestore.instance
+          .collection(_accountCollection)
+          .doc(widget.user.uid)
+          .set({
+        'nis': widget.nis,
+        'nomorTelepon': widget.nomorTelepon,
+        'alamat': widget.alamat,
+        'role': 'guru',
+        'provider': 'google.com',
+        'photoUrl': widget.user.photoURL,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'tanggalBergabung': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
       if (!mounted) return;
-
-      _addLog(
-        'AKUN BERHASIL DIBUAT DI FIRESTORE.',
-      );
-
       _timer?.cancel();
-
-      await Future<void>.delayed(
-        const Duration(milliseconds: 300),
-      );
-
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
 
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-
-      final String message =
-          e.toString()
-              .replaceFirst(
-                'Exception: ',
-                '',
-              );
-
+      final String message = e.toString().replaceFirst('Exception: ', '');
       setState(() {
         _isVerifying = false;
         _errorMessage = message;
       });
-
-      _addLog(
-        'GAGAL VERIFY OTP: $message',
-      );
     }
   }
-
-  // ============================================================
-  // TIMER FORMAT
-  // ============================================================
 
   String _formatTimer() {
-    final int minutes =
-        _remainingSeconds ~/ 60;
-
-    final int seconds =
-        _remainingSeconds % 60;
-
-    return '${minutes.toString().padLeft(2, '0')}:'
-        '${seconds.toString().padLeft(2, '0')}';
+    final int minutes = _remainingSeconds ~/ 60;
+    final int seconds = _remainingSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
-
-  // ============================================================
-  // MASK EMAIL
-  // ============================================================
 
   String _maskedAdminEmail() {
-    final String email =
-        widget.adminEmail;
-
-    final int at =
-        email.indexOf('@');
-
-    if (at <= 2) {
-      return email;
-    }
-
-    final String name =
-        email.substring(0, at);
-
-    final String domain =
-        email.substring(at);
-
-    final int maskLength =
-        name.length - 2;
-
-    final String mask =
-        List<String>.filled(
-          maskLength,
-          '*',
-        ).join();
-
-    return '${name.substring(0, 2)}'
-        '$mask'
-        '$domain';
+    final String email = widget.adminEmail;
+    final int at = email.indexOf('@');
+    if (at <= 2) return email;
+    final String name = email.substring(0, at);
+    final String domain = email.substring(at);
+    final int maskLength = name.length - 2;
+    final String mask = List<String>.filled(maskLength, '*').join();
+    return '${name.substring(0, 2)}$mask$domain';
   }
-
-  // ============================================================
-  // ERROR
-  // ============================================================
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior:
-            SnackBarBehavior.floating,
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
-
-  // ============================================================
-  // DEBUG LOG CARD
-  // ============================================================
-
-  Widget _buildDebugLogCard() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius:
-            BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding:
-            const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
-          children: [
-            const Row(
-              children: [
-                Icon(
-                  Icons.terminal,
-                  color: Colors.white,
-                  size: 19,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Log Pengujian',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            if (_logs.isEmpty)
-              const Text(
-                'Belum ada log.',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              )
-            else
-              ..._logs.map(
-                (log) => Padding(
-                  padding:
-                      const EdgeInsets.only(
-                    bottom: 6,
-                  ),
-                  child: Text(
-                    log,
-                    style:
-                        const TextStyle(
-                      color:
-                          Colors.white70,
-                      fontSize: 11,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // UI
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFF6F7FB),
-
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title:
-            const Text(
-          'Persetujuan Admin',
-        ),
-        backgroundColor:
-            Colors.transparent,
+        title: const Text('Persetujuan Admin'),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        foregroundColor: colorScheme.onSurface,
       ),
-
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24.0),
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(
-                maxWidth: 430,
-              ),
-              child: Card(
-                elevation: 0,
-                color:
-                    Colors.white,
-                shape:
-                    RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(
-                    26,
+              constraints: const BoxConstraints(maxWidth: 450),
+              child: Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withOpacity(0.5),
                   ),
                 ),
-                child:
-                    Padding(
-                  padding:
-                      const EdgeInsets.all(
-                    24,
-                  ),
-                  child:
-                      Column(
-                    children: [
+                child: Column(
+                  children: [
+                    if (_isSendingOtp) ...[
+                      const LottieLoading(size: 120),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Mengirim OTP ke email admin...',
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ] else if (!_otpSent) ...[
+                      Icon(
+                        Icons.error_outline,
+                        size: 60,
+                        color: colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'OTP belum tersedia.',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ] else ...[
                       Container(
-                        width: 80,
-                        height: 80,
-                        decoration:
-                            BoxDecoration(
-                          color:
-                              Colors.orange,
-                          borderRadius:
-                              BorderRadius.circular(
-                            24,
-                          ),
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          color: colorScheme.tertiaryContainer,
+                          shape: BoxShape.circle,
                         ),
-                        child:
-                            const Icon(
-                          Icons
-                              .admin_panel_settings_outlined,
-                          color:
-                              Colors.white,
-                          size: 40,
+                        child: Icon(
+                          Icons.admin_panel_settings_outlined,
+                          color: colorScheme.tertiary,
+                          size: 35,
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 22,
-                      ),
-
-                      const Text(
+                      const SizedBox(height: 22),
+                      Text(
                         'Masukkan OTP Admin',
-                        textAlign:
-                            TextAlign.center,
-                        style:
-                            TextStyle(
-                          fontSize: 26,
-                          fontWeight:
-                              FontWeight.bold,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 10,
-                      ),
-
-                      const Text(
-                        'Kode OTP dikirim ke email '
-                        'admin sekolah:',
-                        textAlign:
-                            TextAlign.center,
-                        style:
-                            TextStyle(
-                          color:
-                              Colors.black54,
+                      const SizedBox(height: 8),
+                      Text(
+                        'Kode OTP dikirim ke email admin sekolah:',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 8,
-                      ),
-
+                      const SizedBox(height: 4),
                       Text(
                         _maskedAdminEmail(),
-                        textAlign:
-                            TextAlign.center,
-                        style:
-                            const TextStyle(
-                          fontSize: 15,
-                          fontWeight:
-                              FontWeight.bold,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 22,
-                      ),
+                      const SizedBox(height: 24),
 
                       Container(
-                        width:
-                            double.infinity,
-                        padding:
-                            const EdgeInsets
-                                .all(15),
-                        decoration:
-                            BoxDecoration(
-                          color: Colors.blue
-                              .withValues(
-                            alpha: 0.07,
-                          ),
-                          borderRadius:
-                              BorderRadius.circular(
-                            16,
-                          ),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child:
-                            Text(
-                          'Akun yang mendaftar:\n'
-                          '${widget.user.email}\n\n'
+                        child: Text(
+                          'Data Pendaftar:\n\n'
+                          '${widget.user.email}\n'
                           'Nama: ${widget.nama}\n'
+                          'NIS/NIK: ${widget.nis}\n'
+                          'Telepon: ${widget.nomorTelepon}\n'
+                          'Alamat: ${widget.alamat}\n'
                           'Role: Guru',
-                          textAlign:
-                              TextAlign.center,
-                          style:
-                              const TextStyle(
-                            fontSize: 13,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
                             height: 1.5,
                           ),
                         ),
                       ),
+                      const SizedBox(height: 24),
 
-                      const SizedBox(
-                        height: 22,
-                      ),
-
-                      if (_isSendingOtp)
-                        const Column(
+                      // Timer Indicator
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _expired
+                              ? colorScheme.errorContainer.withOpacity(0.5)
+                              : colorScheme.tertiaryContainer.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            CircularProgressIndicator(),
-                            SizedBox(
-                              height: 12,
+                            Icon(
+                              _expired
+                                  ? Icons.timer_off_outlined
+                                  : Icons.timer_outlined,
+                              size: 20,
+                              color: _expired
+                                  ? colorScheme.error
+                                  : colorScheme.tertiary,
                             ),
+                            const SizedBox(width: 8),
                             Text(
-                              'Mengirim OTP ke email admin...',
+                              _expired
+                                  ? 'OTP Kedaluwarsa'
+                                  : 'Sisa waktu: ${_formatTimer()}',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: _expired
+                                    ? colorScheme.error
+                                    : colorScheme.tertiary,
+                              ),
                             ),
                           ],
-                        )
-                      else if (!_otpSent)
-                        const Text(
-                          'OTP belum tersedia.',
-                        )
-                      else ...[
-                        Container(
-                          width:
-                              double.infinity,
-                          padding:
-                              const EdgeInsets
-                                  .symmetric(
-                            vertical: 15,
-                            horizontal: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // OTP Input Field
+                      TextField(
+                        controller: _otpController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        maxLength: 6,
+                        enabled: !_expired && !_isVerifying,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 8,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '------',
+                          counterText: '',
+                          filled: true,
+                          fillColor: colorScheme.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: colorScheme.outline),
                           ),
-                          decoration:
-                              BoxDecoration(
-                            color: _expired
-                                ? Colors.red
-                                    .withValues(
-                                    alpha:
-                                        0.07,
-                                  )
-                                : Colors.orange
-                                    .withValues(
-                                    alpha:
-                                        0.07,
-                                  ),
-                            borderRadius:
-                                BorderRadius.circular(
-                              16,
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: colorScheme.primary,
+                              width: 2,
                             ),
                           ),
-                          child:
-                              Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment
-                                    .center,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Verify Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: FilledButton.icon(
+                          onPressed: _expired || _isVerifying ? null : _verifyOtp,
+                          icon: _isVerifying
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle_outline),
+                          label: Text(
+                            _isVerifying
+                                ? 'Memverifikasi...'
+                                : 'Verifikasi OTP',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Resend Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: _expired && !_isSendingOtp ? _sendOtp : null,
+                          child: const Text('Kirim OTP Baru'),
+                        ),
+                      ),
+
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 20),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.errorContainer.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Icon(
-                                _expired
-                                    ? Icons
-                                        .timer_off_outlined
-                                    : Icons
-                                        .timer_outlined,
-                                size: 21,
-                                color: _expired
-                                    ? Colors.red
-                                    : Colors.orange,
+                                Icons.error_outline,
+                                color: colorScheme.error,
+                                size: 20,
                               ),
-                              const SizedBox(
-                                width: 8,
-                              ),
-                              Text(
-                                _expired
-                                    ? 'OTP Kedaluwarsa'
-                                    : 'Sisa waktu: ${_formatTimer()}',
-                                style:
-                                    TextStyle(
-                                  fontWeight:
-                                      FontWeight
-                                          .w600,
-                                  color:
-                                      _expired
-                                          ? Colors.red
-                                          : Colors.orange,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(
-                          height: 24,
-                        ),
-
-                        TextField(
-                          controller:
-                              _otpController,
-                          keyboardType:
-                              TextInputType.number,
-                          textAlign:
-                              TextAlign.center,
-                          maxLength: 6,
-                          enabled:
-                              !_expired &&
-                                  !_isVerifying,
-                          style:
-                              const TextStyle(
-                            fontSize: 28,
-                            fontWeight:
-                                FontWeight.bold,
-                            letterSpacing: 8,
-                          ),
-                          decoration:
-                              InputDecoration(
-                            hintText:
-                                '000000',
-                            counterText:
-                                '',
-                            border:
-                                OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(
-                                16,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(
-                          height: 18,
-                        ),
-
-                        SizedBox(
-                          width:
-                              double.infinity,
-                          height: 54,
-                          child:
-                              FilledButton(
-                            onPressed:
-                                _expired ||
-                                        _isVerifying
-                                    ? null
-                                    : _verifyOtp,
-                            child:
-                                _isVerifying
-                                    ? const SizedBox(
-                                        width: 23,
-                                        height: 23,
-                                        child:
-                                            CircularProgressIndicator(
-                                          strokeWidth:
-                                              2,
-                                          color:
-                                              Colors.white,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Verifikasi OTP',
-                                      ),
-                          ),
-                        ),
-
-                        const SizedBox(
-                          height: 12,
-                        ),
-
-                        SizedBox(
-                          width:
-                              double.infinity,
-                          height: 48,
-                          child:
-                              OutlinedButton(
-                            onPressed:
-                                _expired &&
-                                        !_isSendingOtp
-                                    ? _sendOtp
-                                    : null,
-                            child:
-                                const Text(
-                              'Kirim OTP Baru',
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      if (_errorMessage !=
-                          null) ...[
-                        const SizedBox(
-                          height: 18,
-                        ),
-
-                        Container(
-                          width:
-                              double.infinity,
-                          padding:
-                              const EdgeInsets
-                                  .all(13),
-                          decoration:
-                              BoxDecoration(
-                            color: Colors.red
-                                .withValues(
-                              alpha: 0.07,
-                            ),
-                            borderRadius:
-                                BorderRadius.circular(
-                              14,
-                            ),
-                          ),
-                          child:
-                              Row(
-                            crossAxisAlignment:
-                                CrossAxisAlignment
-                                    .start,
-                            children: [
-                              const Icon(
-                                Icons
-                                    .error_outline,
-                                color:
-                                    Colors.red,
-                              ),
-                              const SizedBox(
-                                width: 10,
-                              ),
+                              const SizedBox(width: 10),
                               Expanded(
-                                child:
-                                    Text(
+                                child: Text(
                                   _errorMessage!,
-                                  style:
-                                      const TextStyle(
-                                    color:
-                                        Colors.red,
-                                    fontSize:
-                                        13,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.error,
                                   ),
                                 ),
                               ),
@@ -2685,51 +1544,29 @@ class _AdminOtpVerificationPageState
                           ),
                         ),
                       ],
-
-                      const SizedBox(
-                        height: 20,
-                      ),
-
-                      _buildDebugLogCard(),
-
-                      const SizedBox(
-                        height: 20,
-                      ),
-
-                      const Divider(),
-
-                      const SizedBox(
-                        height: 16,
-                      ),
-
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons
-                                .security_outlined,
-                            size: 20,
-                            color:
-                                Colors.green,
-                          ),
-                          SizedBox(
-                            width: 10,
-                          ),
-                          Expanded(
-                            child: Text(
-                              'OTP berlaku 3 menit dan '
-                              'hanya dapat digunakan satu kali.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color:
-                                    Colors.black54,
-                                height: 1.4,
-                              ),
+                    ],
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.security_outlined,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'OTP berlaku 3 menit dan hanya dapat digunakan satu kali.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              height: 1.4,
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),

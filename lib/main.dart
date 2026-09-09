@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'addon/navigation.dart';
+import '../auth/auth_gate.dart'; // Import AuthGate
 import 'addon/splash_screen.dart';
 import 'constants/appearance.dart';
 import 'firebase_options.dart';
@@ -96,8 +96,9 @@ class _EduvestAppState extends ConsumerState<EduvestApp>
         Locale('id'),
         Locale('en'),
       ],
+      // Ubah nextPage dari HomePage() menjadi AuthGate()
       home: SimpleSplashScreen(
-        nextPage: const HomePage(),
+        nextPage: const AuthGate(),
         startupTask: initializeApplication,
       ),
     );
