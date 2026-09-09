@@ -44,7 +44,7 @@ class _AuthPageState extends State<AuthPage> {
   static const String _adminApprovalEmail = 'newpramono79@gmail.com';
 
   // ============================================================
-  // FORM CONTROLLERS
+  // FORM CONTROLLERS & STATE
   // ============================================================
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _nisController = TextEditingController();
@@ -53,6 +53,9 @@ class _AuthPageState extends State<AuthPage> {
 
   bool _isLoading = false;
   bool _isLoginMode = true;
+  
+  // Default role saat pertama kali buka form pendaftaran
+  String _selectedRole = 'guru'; 
 
   // ============================================================
   // VALIDASI URL
@@ -330,6 +333,7 @@ class _AuthPageState extends State<AuthPage> {
         return;
       }
 
+      // Set default values untuk form pendaftaran
       _namaController.text = user.displayName?.trim() ?? '';
       if (_namaController.text.isEmpty)
         _namaController.text = email.split('@').first;
@@ -337,6 +341,7 @@ class _AuthPageState extends State<AuthPage> {
       _nisController.clear();
       _phoneController.clear();
       _addressController.clear();
+      _selectedRole = 'guru'; // Reset role ke default setiap kali buka form
 
       if (!mounted) return;
 
@@ -353,6 +358,7 @@ class _AuthPageState extends State<AuthPage> {
       final String nis = registrationData['nis'] as String;
       final String nomorTelepon = registrationData['nomorTelepon'] as String;
       final String alamat = registrationData['alamat'] as String;
+      final String role = registrationData['role'] as String; // Ambil role dari form
 
       final bool? result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
@@ -362,6 +368,7 @@ class _AuthPageState extends State<AuthPage> {
             nis: nis,
             nomorTelepon: nomorTelepon,
             alamat: alamat,
+            role: role, // Kirim role ke halaman OTP
             adminEmail: _adminApprovalEmail,
             sendOtp: _sendRegistrationOtp,
             verifyOtp: _verifyRegistrationOtp,
@@ -374,7 +381,7 @@ class _AuthPageState extends State<AuthPage> {
       if (result == true) {
         sessionOpened = false;
         // Tampilkan AwesomeDialog dan navigasi langsung dari tombol OK
-        await _showRegisterSuccess();
+        await _showRegisterSuccess(role);
       } else {
         await _signOut();
         sessionOpened = false;
@@ -436,7 +443,7 @@ class _AuthPageState extends State<AuthPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Lengkapi Profil Guru',
+                  'Lengkapi Profil',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -470,7 +477,7 @@ class _AuthPageState extends State<AuthPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Lengkapi data berikut. Data ini akan digunakan sebagai informasi profil akun guru.',
+                          'Lengkapi data berikut. Data ini akan digunakan sebagai informasi profil akun Anda.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             height: 1.4,
                           ),
@@ -495,6 +502,11 @@ class _AuthPageState extends State<AuthPage> {
                   icon: Icons.badge_outlined,
                 ),
                 const SizedBox(height: 16),
+                
+                // DROPDOWN PILIHAN ROLE (GURU / BENDAHARA)
+                _buildRoleDropdown(dialogContext),
+                
+                const SizedBox(height: 16),
                 _buildTextField(
                   dialogContext,
                   controller: _phoneController,
@@ -509,45 +521,6 @@ class _AuthPageState extends State<AuthPage> {
                   label: 'Alamat',
                   icon: Icons.location_on_outlined,
                   maxLines: 3,
-                ),
-
-                const SizedBox(height: 16),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 14,
-                    horizontal: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: colorScheme.outlineVariant),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.school_outlined, color: colorScheme.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Role',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Guru',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
 
                 const SizedBox(height: 20),
@@ -595,8 +568,7 @@ class _AuthPageState extends State<AuthPage> {
                         onPressed: () {
                           final String nama = _namaController.text.trim();
                           final String nis = _nisController.text.trim();
-                          final String nomorTelepon = _phoneController.text
-                              .trim();
+                          final String nomorTelepon = _phoneController.text.trim();
                           final String alamat = _addressController.text.trim();
 
                           if (nama.isEmpty || nama.length < 3) {
@@ -642,6 +614,7 @@ class _AuthPageState extends State<AuthPage> {
                             'nis': nis,
                             'nomorTelepon': nomorTelepon,
                             'alamat': alamat,
+                            'role': _selectedRole, // Sertakan role yang dipilih
                           });
                         },
                         child: const Text('Lanjutkan'),
@@ -689,6 +662,33 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
+  // Helper Dropdown Role for Dialog
+  Widget _buildRoleDropdown(BuildContext context) {
+    final theme = Theme.of(context);
+    return DropdownButtonFormField<String>(
+      value: _selectedRole,
+      decoration: InputDecoration(
+        labelText: 'Role / Jabatan',
+        prefixIcon: Icon(Icons.school_outlined, color: theme.colorScheme.primary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        filled: true,
+        fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+      ),
+      items: const [
+        DropdownMenuItem(value: 'guru', child: Text('Guru')),
+        DropdownMenuItem(value: 'bendahara', child: Text('Bendahara')),
+      ],
+      onChanged: (val) {
+        if (val != null) {
+          _selectedRole = val;
+        }
+      },
+    );
+  }
+
   // ============================================================
   // SIGN OUT
   // ============================================================
@@ -726,13 +726,13 @@ class _AuthPageState extends State<AuthPage> {
   // ============================================================
   // REGISTER SUCCESS (AWESOME DIALOG)
   // ============================================================
-  Future<void> _showRegisterSuccess() async {
+  Future<void> _showRegisterSuccess(String role) async {
     await AwesomeDialog(
       context: context,
       dialogType: DialogType.success,
       animType: AnimType.rightSlide,
       title: 'Pendaftaran Berhasil',
-      desc: 'Akun guru berhasil dibuat.\n\nPersetujuan admin berhasil diverifikasi melalui OTP.\n\nData profil telah disimpan ke akun Firebase.',
+      desc: 'Akun $role berhasil dibuat.\n\nPersetujuan admin berhasil diverifikasi melalui OTP.\n\nData profil telah disimpan ke akun Firebase.',
       btnOkText: 'Selesai',
       btnOkOnPress: () {
         widget.onAuthSuccess?.call();
@@ -825,7 +825,7 @@ class _AuthPageState extends State<AuthPage> {
                     child: Text(
                       _isLoginMode
                           ? 'Masuk menggunakan akun Google'
-                          : 'Daftarkan akun guru dengan persetujuan admin',
+                          : 'Daftarkan akun dengan persetujuan admin',
                       key: ValueKey(_isLoginMode),
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyLarge?.copyWith(
@@ -885,7 +885,7 @@ class _AuthPageState extends State<AuthPage> {
                         Text(
                           _isLoginMode
                               ? 'Selamat datang kembali'
-                              : 'Daftar sebagai Guru',
+                              : 'Daftar Akun Baru',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -921,7 +921,7 @@ class _AuthPageState extends State<AuthPage> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Pendaftaran guru memerlukan persetujuan admin melalui kode OTP.',
+                                    'Pendaftaran akun memerlukan persetujuan admin melalui kode OTP.',
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       height: 1.4,
                                     ),
@@ -1086,6 +1086,7 @@ class _AdminOtpVerificationPage extends StatefulWidget {
     required this.nis,
     required this.nomorTelepon,
     required this.alamat,
+    required this.role, // Tambahan parameter role
     required this.adminEmail,
     required this.sendOtp,
     required this.verifyOtp,
@@ -1096,6 +1097,7 @@ class _AdminOtpVerificationPage extends StatefulWidget {
   final String nis;
   final String nomorTelepon;
   final String alamat;
+  final String role; // Role dinamis (guru / bendahara)
   final String adminEmail;
 
   final Future<Map<String, dynamic>> Function({
@@ -1232,12 +1234,13 @@ class _AdminOtpVerificationPageState extends State<_AdminOtpVerificationPage> {
         return;
       }
 
+      // Simpan akun dengan role yang dipilih dari form
       await createUserAccount(
         uid: widget.user.uid,
         nama: widget.nama,
         email: widget.user.email,
         photoUrl: widget.user.photoURL,
-        role: 'guru',
+        role: widget.role, // Gunakan widget.role
         nomorTelepon: widget.nomorTelepon,
         nomorTerverifikasi: false,
         provider: 'google.com',
@@ -1250,7 +1253,7 @@ class _AdminOtpVerificationPageState extends State<_AdminOtpVerificationPage> {
         'nis': widget.nis,
         'nomorTelepon': widget.nomorTelepon,
         'alamat': widget.alamat,
-        'role': 'guru',
+        'role': widget.role, // Simpan role dinamis ke Firestore
         'provider': 'google.com',
         'photoUrl': widget.user.photoURL,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -1398,7 +1401,7 @@ class _AdminOtpVerificationPageState extends State<_AdminOtpVerificationPage> {
                           'NIS/NIK: ${widget.nis}\n'
                           'Telepon: ${widget.nomorTelepon}\n'
                           'Alamat: ${widget.alamat}\n'
-                          'Role: Guru',
+                          'Role: ${widget.role.toUpperCase()}', // Tampilkan role secara dinamis
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             height: 1.5,
