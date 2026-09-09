@@ -41,6 +41,7 @@ app.*.map.json
 
 # API Key
 lib/env/api_key.dart
+lib/env/gradlew signingReport.md
 
 # Android Studio will place build artifacts here
 /android/app/debug

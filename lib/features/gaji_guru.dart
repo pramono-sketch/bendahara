@@ -5,7 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../helpers/sound_helper.dart';
 import '../service/export_gaji_guru.dart';
 import '../simulation/cheat_guru.dart';
-import '../firebase/firestore_service.dart'; // Import Firebase
+import '../firebase/firestore_service.dart';
 
 // ================== KOMPONEN GAJI ==================
 class KomponenGaji {
@@ -62,7 +62,7 @@ class GajiGuru {
   String? metodeBayar;
   String? catatan;
   bool isArchived;
-  String role; // 'guru' atau 'karyawan'
+  String role;
   String? keterangan;
 
   GajiGuru({
@@ -178,7 +178,7 @@ class GajiGuruPage extends StatefulWidget {
 
 class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderStateMixin {
   // ===== State Data =====
-  List<Teacher> teacherList = []; // Ubah dari List<String> ke List<Teacher>
+  List<Teacher> teacherList = [];
   List<GajiGuru> gajiGuruList = [];
   int currentBulan = DateTime.now().month;
   int currentTahun = DateTime.now().year;
@@ -197,19 +197,6 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
   // ===== Controllers =====
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
-
-  // ===== Data dummy guru (untuk seed awal jika firebase kosong) =====
-  final List<String> _defaultTeachers = [
-    'Ali Faesol, S.Pd.I.', 'Susi Wulandari, S.Pd', 'Kris Setyowati, S.Pd',
-    'Eko Ardhiyanto, S. Kom.', 'Aris Khoirun Ma\'dum, S.E', 'Khoirul Ihsan Z. R, S. Sos.',
-    'Didin Arif Setiawan, S. Pd. I', 'Ust. Ahmad Sholeh, S.Pd.I', 'Farid Fahmi, S. T.',
-    'Rizki Safitri, S. Pd.', 'Shyecha Syaidatun Nisa\', S. E.', 'Ali Muhlisin, S. Pd.',
-    'Windi Kusumowardani, S. Pd.', 'Wiendha Kurnia Pranata, S. Pd.',
-    'Ustz. Afivatun Nadliyah, Al Hafidzah, M.Pd', 'Nike Izza Elfana, S.Pd',
-    'Novita Nur Farida, S. Pd.', 'Dwi Luvi Nur Ahmad, S. Kom.', 'Vera Artanti, S. Kom.',
-    'Hikmah Lailatul Kamalia, S. Pd.', 'Niken Octevani Army, S. T.', 'Imam Syibawech, S. Kom',
-    'Alfida Zumaroh, S. Kom.', 'Nur Khamim', 'Mustagfirrin',
-  ];
 
   @override
   void initState() {
@@ -237,19 +224,57 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     setState(() => _isLoading = true);
     try {
       final fetched = await fetchTeachers();
-      if (fetched.isEmpty) {
-        // Seed awal ke Firebase jika kosong
-        for (int i = 0; i < _defaultTeachers.length; i++) {
-          final t = Teacher(id: 'TCH_SEED_$i', nama: _defaultTeachers[i], role: 'guru');
-          await saveTeacher(t);
-          fetched.add(t);
-        }
-      }
       setState(() {
         teacherList = fetched;
       });
     } catch (e) {
       debugPrint("Error loading teachers: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // ==================== FUNGSI SEED DEFAULT TEACHERS (VIA MODE DEVELOPER) ====================
+  Future<void> seedDefaultTeachers() async {
+    setState(() => _isLoading = true);
+    try {
+      final existing = await fetchTeachers();
+      final existingNames = existing.map((t) => t.nama).toSet();
+
+      int addedCount = 0;
+      for (int i = 0; i < defaultTeachers.length; i++) {
+        if (!existingNames.contains(defaultTeachers[i])) {
+          final t = Teacher(
+            id: 'TCH_SEED_${DateTime.now().millisecondsSinceEpoch}_$i',
+            nama: defaultTeachers[i],
+            role: 'guru',
+          );
+          await saveTeacher(t);
+          addedCount++;
+        }
+      }
+      await _loadTeachers();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(addedCount > 0
+                ? '$addedCount data guru baru ditambahkan ke Firebase!'
+                : 'Semua data guru default sudah ada di Firebase.'),
+            backgroundColor: addedCount > 0 ? Colors.indigo : Colors.grey,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error seeding default teachers: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menambahkan data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -279,7 +304,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
       bulan: bulan,
       tahun: tahun,
       isPaid: false,
-      role: role, // Ambil role dari Manajemen Guru
+      role: role,
     );
     setState(() {
       gajiGuruList.add(baru);
@@ -376,7 +401,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
             else if (j == 1) { kategori = 'Kehadiran'; namaKomponen = 'Kehadiran'; tunjangan = true; }
             else if (j == 2) { kategori = 'Absen'; namaKomponen = 'Absen'; tunjangan = false; }
             else { kategori = 'Jabatan Tambahan'; namaKomponen = 'Jabatan'; tunjangan = true; }
-            
+
             double jumlah = (50 + (i * 10) + (j * 20) + (teacher.nama.length % 30)) * 1000.0;
             komp.add(KomponenGaji(nama: namaKomponen, jumlah: jumlah, isTunjangan: tunjangan, kategori: kategori));
           }
@@ -524,18 +549,17 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
   // ==================== DIALOG MANAJEMEN GURU (MODERN UI) ====================
   void _showManageTeachersDialog() {
     final TextEditingController _newTeacherController = TextEditingController();
-    String selectedRole = 'guru'; // Default 'guru'
+    String selectedRole = 'guru';
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setStateDialog) {
-          // Hitung jumlah guru & karyawan untuk header
           int countGuru = teacherList.where((t) => t.role == 'guru').length;
           int countKaryawan = teacherList.where((t) => t.role == 'karyawan').length;
 
           return Dialog(
-            backgroundColor: Colors.transparent, // Background transparent untuk Card custom
+            backgroundColor: Colors.transparent,
             insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Container(
               width: double.maxFinite,
@@ -607,14 +631,13 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                         ],
                       ),
                     ),
-                    
-                                        // ===== FORM TAMBAH DATA =====
+
+                    // ===== FORM TAMBAH DATA =====
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 1. Input Nama (Full Width)
                           TextField(
                             controller: _newTeacherController,
                             decoration: InputDecoration(
@@ -630,8 +653,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                             ),
                           ),
                           const SizedBox(height: 12),
-                          
-                          // 2. Pilihan Role (FilterChip agar tidak overflow & bebas crash)
+
                           Row(
                             children: [
                               const Text('Kategori: ', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black54)),
@@ -672,8 +694,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                             ],
                           ),
                           const SizedBox(height: 12),
-                          
-                          // 3. Tombol Tambah (Full Width agar mudah diklik)
+
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
@@ -709,7 +730,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                           ),
                         ],
                       ),
-                    ),                                
+                    ),
 
                     // ===== DAFTAR LIST GURU =====
                     Expanded(
@@ -722,7 +743,11 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                     children: [
                                       Icon(Icons.people_outline, size: 64, color: Colors.grey.shade300),
                                       const SizedBox(height: 12),
-                                               Text('Daftar masih kosong', style: TextStyle(color: Colors.grey.shade500)),
+                                      Text('Daftar masih kosong', style: TextStyle(color: Colors.grey.shade500)),
+                                      const SizedBox(height: 8),
+                                      Text('Gunakan Mode Developer (FAB) untuk tambah data default',
+                                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                                          textAlign: TextAlign.center),
                                     ],
                                   ),
                                 )
@@ -818,7 +843,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                   },
                                 ),
                     ),
-                    
+
                     // ===== FOOTER TOMBOL TUTUP =====
                     Container(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -851,7 +876,6 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  // Widget helper untuk counter di header
   Widget _buildHeaderCounter(String label, int count, Color color) {
     return Row(
       children: [
@@ -1480,6 +1504,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
         onGenerateRandomData: generateRandomData,
         onAutoLunas: autoLunas,
         onClearAllData: clearAllData,
+        onSeedDefaultTeachers: seedDefaultTeachers,
         currentBulan: currentBulan,
         currentTahun: currentTahun,
       ),
@@ -2957,7 +2982,7 @@ class ArchiveUnpaidPage extends StatelessWidget {
   }
 }
 
-// ==================== STAT CARD WIDGET ====================
+// ==================== STAT CARD WIDGET ==================
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;

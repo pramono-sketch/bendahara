@@ -1,6 +1,19 @@
-// lib/features/data/cheat.dart
+// lib/simulation/cheat_guru.dart
 import 'package:flutter/material.dart';
 import '../features/gaji_guru.dart';
+
+// Data dummy guru default - hanya ditambahkan ke Firebase via tombol developer FAB
+const List<String> defaultTeachers = [
+  'Ali Faesol, S.Pd.I.', 'Susi Wulandari, S.Pd', 'Kris Setyowati, S.Pd',
+  'Eko Ardhiyanto, S. Kom.', 'Aris Khoirun Ma\'dum, S.E', 'Khoirul Ihsan Z. R, S. Sos.',
+  'Didin Arif Setiawan, S. Pd. I', 'Ust. Ahmad Sholeh, S.Pd.I', 'Farid Fahmi, S. T.',
+  'Rizki Safitri, S. Pd.', 'Shyecha Syaidatun Nisa\', S. E.', 'Ali Muhlisin, S. Pd.',
+  'Windi Kusumowardani, S. Pd.', 'Wiendha Kurnia Pranata, S. Pd.',
+  'Ustz. Afivatun Nadliyah, Al Hafidzah, M.Pd', 'Nike Izza Elfana, S.Pd',
+  'Novita Nur Farida, S. Pd.', 'Dwi Luvi Nur Ahmad, S. Kom.', 'Vera Artanti, S. Kom.',
+  'Hikmah Lailatul Kamalia, S. Pd.', 'Niken Octevani Army, S. T.', 'Imam Syibawech, S. Kom',
+  'Alfida Zumaroh, S. Kom.', 'Nur Khamim', 'Mustagfirrin',
+];
 
 // Fungsi FAB yang menerima callback dan data
 FloatingActionButton FABcheat({
@@ -11,10 +24,10 @@ FloatingActionButton FABcheat({
   required VoidCallback onGenerateRandomData,
   required VoidCallback onAutoLunas,
   required VoidCallback onClearAllData,
+  required VoidCallback onSeedDefaultTeachers,
   required int currentBulan,
   required int currentTahun,
-}) 
-{
+}) {
   return FloatingActionButton(
     onPressed: () {
       showModalBottomSheet(
@@ -26,6 +39,23 @@ FloatingActionButton FABcheat({
           padding: const EdgeInsets.all(16.0),
           child: Wrap(
             children: [
+              // === TAMBAH DATA GURU DEFAULT KE FIREBASE ===
+              ListTile(
+                leading: const Icon(Icons.people_alt, color: Colors.indigo),
+                title: const Text('Tambah Data Guru Default'),
+                subtitle: const Text('Masukkan 25 data guru dummy ke Firebase'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onSeedDefaultTeachers();
+                  onRefreshUI();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Data guru default berhasil ditambahkan ke Firebase!'),
+                      backgroundColor: Colors.indigo,
+                    ),
+                  );
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.skip_next, color: Colors.orange),
                 title: const Text('Simulasi Pergantian Bulan'),

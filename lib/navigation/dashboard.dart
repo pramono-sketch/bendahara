@@ -1,4 +1,4 @@
-// navigation/dashboard.dart
+// lib/navigation/dashboard.dart
 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -11,6 +11,7 @@ import '../addon/aksi.dart';
 import '../helpers/theme_helper.dart';
 import '../helpers/custom_animation.dart';
 import '../helpers/scroll_reveal.dart';
+import '../l10n/translations.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -131,6 +132,9 @@ class _DashboardPageState
   }
 
   Future<String> _generateAIInsight() async {
+    final translations =
+        ref.read(translationsProvider);
+
     final totalIncome = _totalIncome;
     final totalExpense = _totalExpense;
     final balance =
@@ -182,21 +186,37 @@ class _DashboardPageState
                     100)
             : 0;
 
+    final percentText =
+        persentaseLunas.toStringAsFixed(0);
+
     List<String> insights = [];
 
     if (persentaseLunas >= 80) {
       insights.add(
-        '✅ ${persentaseLunas.toStringAsFixed(0)}% siswa sudah lunas. Bagus!',
+        translations
+            .t('insight_paid_good')
+            .replaceFirst(
+              '{percent}',
+              percentText,
+            ),
       );
     } else if (persentaseLunas >= 50) {
       insights.add(
-        '📊 ${persentaseLunas.toStringAsFixed(0)}% siswa lunas. '
-        'Masih ada PR menagih sisanya.',
+        translations
+            .t('insight_paid_medium')
+            .replaceFirst(
+              '{percent}',
+              percentText,
+            ),
       );
     } else {
       insights.add(
-        '⚠️ Hanya ${persentaseLunas.toStringAsFixed(0)}% siswa lunas. '
-        'Perlu strategi penagihan lebih agresif.',
+        translations
+            .t('insight_paid_low')
+            .replaceFirst(
+              '{percent}',
+              percentText,
+            ),
       );
     }
 
@@ -213,37 +233,64 @@ class _DashboardPageState
 
       if (persenChange > 0) {
         insights.add(
-          '📈 Pemasukan bulan ini naik '
-          '${persenChange.toStringAsFixed(1)}% dibanding bulan lalu.',
+          translations
+              .t('insight_income_up')
+              .replaceFirst(
+                '{percent}',
+                persenChange
+                    .toStringAsFixed(1),
+              ),
         );
       } else if (persenChange < 0) {
         insights.add(
-          '📉 Pemasukan bulan ini turun '
-          '${persenChange.abs().toStringAsFixed(1)}% dibanding bulan lalu.',
+          translations
+              .t('insight_income_down')
+              .replaceFirst(
+                '{percent}',
+                persenChange
+                    .abs()
+                    .toStringAsFixed(1),
+              ),
         );
       } else {
         insights.add(
-          '➖ Pemasukan bulan ini stabil.',
+          translations.t(
+            'insight_income_stable',
+          ),
         );
       }
     } else if (totalIncome > 0 &&
         lastMonthIncome == 0) {
       insights.add(
-        '💰 Bulan ini mulai ada pemasukan baru.',
+        translations.t(
+          'insight_income_new',
+        ),
       );
     }
 
     if (balance > 0) {
       insights.add(
-        '💚 Saldo positif: Rp ${formatCurrency(balance)}. Keuangan sehat.',
+        translations
+            .t('insight_balance_positive')
+            .replaceFirst(
+              '{amount}',
+              formatCurrency(balance),
+            ),
       );
     } else if (balance < 0) {
       insights.add(
-        '🔴 Saldo negatif: Rp ${formatCurrency(balance)}. Perhatikan pengeluaran.',
+        translations
+            .t('insight_balance_negative')
+            .replaceFirst(
+              '{amount}',
+              formatCurrency(balance),
+            ),
       );
     } else {
       insights.add(
-        '⚖️ Saldo impas.',
+        translations.t(
+          'insight_balance_even',
+        ),
       );
     }
 
@@ -283,9 +330,14 @@ class _DashboardPageState
       _hasError = true;
 
       if (mounted) {
+        final translations =
+            ref.read(translationsProvider);
+
         showTopNotification(
           context,
-          'Tidak ada koneksi internet. Coba lagi.',
+          translations.t(
+            'dashboard_loading_error',
+          ),
         );
       }
     } finally {
@@ -321,51 +373,63 @@ class _DashboardPageState
   // DATE / GREETING
   // =========================================================
 
-  String _getGreeting() {
+  String _getGreeting(
+    Translations translations,
+  ) {
     final hour =
         DateTime.now().hour;
 
     if (hour < 11) {
-      return 'Selamat Pagi';
+      return translations.t(
+        'greeting_morning',
+      );
     }
 
     if (hour < 15) {
-      return 'Selamat Siang';
+      return translations.t(
+        'greeting_afternoon',
+      );
     }
 
     if (hour < 18) {
-      return 'Selamat Sore';
+      return translations.t(
+        'greeting_evening',
+      );
     }
 
-    return 'Selamat Malam';
+    return translations.t(
+      'greeting_night',
+    );
   }
 
-  String _getCurrentDate() {
+  String _getCurrentDate(
+    Translations translations,
+  ) {
     final now = DateTime.now();
 
-    const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
+    final days = [
+      translations.t('day_monday'),
+      translations.t('day_tuesday'),
+      translations.t('day_wednesday'),
+      translations.t('day_thursday'),
+      translations.t('day_friday'),
+      translations.t('day_saturday'),
+      translations.t('day_sunday'),
     ];
 
-    const days = [
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-      'Minggu',
+    final months = [
+      translations.t('month_january'),
+      translations.t('month_february'),
+      translations.t('month_march'),
+      translations.t('month_april'),
+      translations.t('month_may'),
+      translations.t('month_june'),
+      translations.t('month_july'),
+      translations.t('month_august'),
+      translations.t('month_september'),
+      translations.t('month_october'),
+      translations.t('month_november'),
+      translations.t('month_december'),
     ];
 
     return '${days[now.weekday - 1]}, '
@@ -384,6 +448,9 @@ class _DashboardPageState
   ) {
     final themeMode =
         ref.watch(themeModeProvider);
+
+    final translations =
+        ref.watch(translationsProvider);
 
     final theme =
         Theme.of(context);
@@ -434,9 +501,11 @@ class _DashboardPageState
         body: _isLoading
             ? const LottieLoading()
             : _hasError
-                ? const LottieError(
+                ? LottieError(
                     message:
-                        'Gagal memuat data. Periksa koneksi internet Anda.',
+                        translations.t(
+                      'dashboard_loading_error',
+                    ),
                   )
                 : RefreshIndicator(
                     onRefresh:
@@ -517,7 +586,9 @@ class _DashboardPageState
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Eduvest Finance',
+                                        translations.t(
+                                          'app_title',
+                                        ),
                                         style: theme
                                             .textTheme
                                             .titleLarge
@@ -532,7 +603,7 @@ class _DashboardPageState
                                         height: 12,
                                       ),
                                       Text(
-                                        '${_getGreeting()}, Admin 👋',
+                                        '${_getGreeting(translations)}, Admin 👋',
                                         style: theme
                                             .textTheme
                                             .headlineSmall
@@ -547,7 +618,9 @@ class _DashboardPageState
                                         height: 4,
                                       ),
                                       Text(
-                                        _getCurrentDate(),
+                                        _getCurrentDate(
+                                          translations,
+                                        ),
                                         style: theme
                                             .textTheme
                                             .bodyMedium
@@ -591,7 +664,9 @@ class _DashboardPageState
                                         ),
                                         child:
                                             Text(
-                                          'RINGKASAN SALDO',
+                                          translations.t(
+                                            'balance_summary',
+                                          ),
                                           style:
                                               TextStyle(
                                             fontSize:
@@ -623,7 +698,9 @@ class _DashboardPageState
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  'Total Saldo Sekolah',
+                                                  translations.t(
+                                                    'total_school_balance',
+                                                  ),
                                                   style:
                                                       theme.textTheme.bodyMedium,
                                                 ),
@@ -654,7 +731,9 @@ class _DashboardPageState
                                                     Expanded(
                                                       child:
                                                           _buildBalanceItem(
-                                                        'Pemasukan',
+                                                        translations.t(
+                                                          'income',
+                                                        ),
                                                         _totalIncome,
                                                         AppColors.success,
                                                         Icons.arrow_upward,
@@ -680,7 +759,9 @@ class _DashboardPageState
                                                     Expanded(
                                                       child:
                                                           _buildBalanceItem(
-                                                        'Pengeluaran',
+                                                        translations.t(
+                                                          'expense',
+                                                        ),
                                                         _totalExpense,
                                                         AppColors.error,
                                                         Icons.arrow_downward,
@@ -725,7 +806,9 @@ class _DashboardPageState
                                       ThemeHelper
                                           .buildSectionHeader(
                                         context,
-                                        'Statistik Pemasukan (6 Bulan)',
+                                        translations.t(
+                                          'income_statistics_6_months',
+                                        ),
                                         themeMode,
                                       ),
 
@@ -755,7 +838,9 @@ class _DashboardPageState
                                                       200,
                                                   child:
                                                       _buildBarChart(
-                                                    _getLast6MonthsLabels(),
+                                                    _getLast6MonthsLabels(
+                                                      translations,
+                                                    ),
                                                     _getLast6MonthsValues(),
                                                     themeMode,
                                                   ),
@@ -788,7 +873,9 @@ class _DashboardPageState
                                       ThemeHelper
                                           .buildSectionHeader(
                                         context,
-                                        'Status Pembayaran Siswa',
+                                        translations.t(
+                                          'student_payment_status',
+                                        ),
                                         themeMode,
                                       ),
 
@@ -798,6 +885,7 @@ class _DashboardPageState
 
                                       _buildStudentPaymentCard(
                                         themeMode,
+                                        translations,
                                       ),
                                     ],
                                   ),
@@ -822,7 +910,9 @@ class _DashboardPageState
                                       ThemeHelper
                                           .buildSectionHeader(
                                         context,
-                                        'Insight Keuangan',
+                                        translations.t(
+                                          'financial_insight',
+                                        ),
                                         themeMode,
                                       ),
 
@@ -950,6 +1040,7 @@ class _DashboardPageState
 
   Widget _buildStudentPaymentCard(
     AppThemeMode themeMode,
+    Translations translations,
   ) {
     final theme =
         Theme.of(context);
@@ -974,6 +1065,9 @@ class _DashboardPageState
                     100)
             : 0;
 
+    final percentageText =
+        persentaseLunas.toStringAsFixed(0);
+
     return ThemeHelper
         .buildSectionGroup(
       themeMode,
@@ -993,7 +1087,9 @@ class _DashboardPageState
                       CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Siswa Lunas',
+                      translations.t(
+                        'students_paid',
+                      ),
                       style: theme
                           .textTheme
                           .bodyMedium,
@@ -1004,7 +1100,7 @@ class _DashboardPageState
                     ),
 
                     Text(
-                      '$paidStudents / $totalStudents Siswa',
+                      '$paidStudents / $totalStudents ${translations.t('students')}',
                       style: theme
                           .textTheme
                           .titleLarge
@@ -1047,7 +1143,14 @@ class _DashboardPageState
                     ),
 
                     Text(
-                      '${persentaseLunas.toStringAsFixed(0)}% dari total siswa aktif telah melunasi pembayaran.',
+                      translations
+                          .t(
+                            'payment_completion',
+                          )
+                          .replaceFirst(
+                            '{percent}',
+                            percentageText,
+                          ),
                       style: theme
                           .textTheme
                           .labelMedium,
@@ -1095,20 +1198,22 @@ class _DashboardPageState
   // =========================================================
 
   List<String>
-      _getLast6MonthsLabels() {
-    const monthLabels = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des',
+      _getLast6MonthsLabels(
+    Translations translations,
+  ) {
+    const monthKeys = [
+      'month_january',
+      'month_february',
+      'month_march',
+      'month_april',
+      'month_may',
+      'month_june',
+      'month_july',
+      'month_august',
+      'month_september',
+      'month_october',
+      'month_november',
+      'month_december',
     ];
 
     final now =
@@ -1126,13 +1231,91 @@ class _DashboardPageState
         month += 12;
       }
 
-      labels.add(
-        monthLabels[
+      final monthName =
+          translations.t(
+        monthKeys[
             month - 1],
+      );
+
+      labels.add(
+        _getShortMonthName(
+          monthName,
+          translations,
+        ),
       );
     }
 
     return labels;
+  }
+
+  // =========================================================
+  // SHORT MONTH NAME
+  // =========================================================
+
+  String _getShortMonthName(
+    String monthName,
+    Translations translations,
+  ) {
+    final languageCode =
+        translations.locale.languageCode;
+
+    if (languageCode == 'en') {
+      switch (monthName) {
+        case 'January':
+          return 'Jan';
+        case 'February':
+          return 'Feb';
+        case 'March':
+          return 'Mar';
+        case 'April':
+          return 'Apr';
+        case 'May':
+          return 'May';
+        case 'June':
+          return 'Jun';
+        case 'July':
+          return 'Jul';
+        case 'August':
+          return 'Aug';
+        case 'September':
+          return 'Sep';
+        case 'October':
+          return 'Oct';
+        case 'November':
+          return 'Nov';
+        case 'December':
+          return 'Dec';
+      }
+    }
+
+    switch (monthName) {
+      case 'Januari':
+        return 'Jan';
+      case 'Februari':
+        return 'Feb';
+      case 'Maret':
+        return 'Mar';
+      case 'April':
+        return 'Apr';
+      case 'Mei':
+        return 'Mei';
+      case 'Juni':
+        return 'Jun';
+      case 'Juli':
+        return 'Jul';
+      case 'Agustus':
+        return 'Agu';
+      case 'September':
+        return 'Sep';
+      case 'Oktober':
+        return 'Okt';
+      case 'November':
+        return 'Nov';
+      case 'Desember':
+        return 'Des';
+      default:
+        return monthName;
+    }
   }
 
   // =========================================================
