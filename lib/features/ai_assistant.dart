@@ -8,6 +8,7 @@ import '../env/api_key.dart';
 import '../helpers/sound_helper.dart';
 import '../constants/appearance.dart';
 import '../helpers/theme_helper.dart';
+import '../helpers/scroll_reveal.dart'; // IMPORT SCROLL REVEAL HELPER
 
 // ===================== FIRESTORE HELPERS =====================
 
@@ -146,19 +147,16 @@ class ChatSession {
     return ChatSession(
       id: map['id'] ?? '',
       title: map['title'] ?? 'Chat',
-      messages:
-          (map['messages'] as List<dynamic>?)
-                  ?.map(
-                    (e) => ChatMessage.fromMap(
-                      e as Map<String, dynamic>,
-                    ),
-                  )
-                  .toList() ??
-              [],
-      createdTime:
-          (map['createdTime'] as Timestamp?)
-                  ?.toDate() ??
-              DateTime.now(),
+      messages: (map['messages'] as List<dynamic>?)
+              ?.map(
+                (e) => ChatMessage.fromMap(
+                  e as Map<String, dynamic>,
+                ),
+              )
+              .toList() ??
+          [],
+      createdTime: (map['createdTime'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
     );
   }
 }
@@ -214,8 +212,7 @@ class AIChatState {
   }
 }
 
-class AIChatNotifier
-    extends StateNotifier<AIChatState> {
+class AIChatNotifier extends StateNotifier<AIChatState> {
   final Ref ref;
 
   AIChatNotifier(this.ref)
@@ -245,8 +242,7 @@ class AIChatNotifier
 
   Future<void> _loadSessionsFromFirestore() async {
     try {
-      final snapshot =
-          await chatHistoryCollection.get();
+      final snapshot = await chatHistoryCollection.get();
 
       final sessions = snapshot.docs
           .map(
@@ -279,9 +275,7 @@ class AIChatNotifier
     ChatSession session,
   ) async {
     try {
-      await chatHistoryCollection
-          .doc(session.id)
-          .set(
+      await chatHistoryCollection.doc(session.id).set(
             session.toMap(),
           );
     } catch (e) {
@@ -295,9 +289,7 @@ class AIChatNotifier
     String id,
   ) async {
     try {
-      await chatHistoryCollection
-          .doc(id)
-          .delete();
+      await chatHistoryCollection.doc(id).delete();
     } catch (e) {
       debugPrint(
         "Error deleting chat: $e",
@@ -322,8 +314,7 @@ class AIChatNotifier
   void _createNewSessionForMessage() {
     final now = DateTime.now();
 
-    final id =
-        'session_${now.millisecondsSinceEpoch}';
+    final id = 'session_${now.millisecondsSinceEpoch}';
 
     final newSession = ChatSession(
       id: id,
@@ -358,8 +349,7 @@ class AIChatNotifier
 
     if (session.messages.isNotEmpty &&
         session.title == 'Chat baru') {
-      final firstUserMsg =
-          session.messages.firstWhere(
+      final firstUserMsg = session.messages.firstWhere(
         (m) => m.isUser,
         orElse: () => ChatMessage(
           text: 'Percakapan',
@@ -368,16 +358,13 @@ class AIChatNotifier
       );
 
       if (firstUserMsg.isUser) {
-        String newTitle =
-            firstUserMsg.text;
+        String newTitle = firstUserMsg.text;
 
         if (newTitle.length > 30) {
-          newTitle =
-              '${newTitle.substring(0, 30)}...';
+          newTitle = '${newTitle.substring(0, 30)}...';
         }
 
-        sessions[index] =
-            session.copyWith(
+        sessions[index] = session.copyWith(
           title: newTitle,
         );
       }
@@ -391,16 +378,12 @@ class AIChatNotifier
       sessionId,
     );
 
-    final sessions = state.sessions
-        .where(
-          (s) => s.id != sessionId,
-        )
-        .toList();
+    final sessions =
+        state.sessions.where((s) => s.id != sessionId).toList();
 
     state = state.copyWith(
       sessions: sessions,
-      clearSessionId:
-          state.currentSessionId == sessionId,
+      clearSessionId: state.currentSessionId == sessionId,
     );
   }
 
@@ -422,35 +405,30 @@ class AIChatNotifier
       _createNewSessionForMessage();
     }
 
-    final currentId =
-        state.currentSessionId!;
+    final currentId = state.currentSessionId!;
 
     final userMsg = ChatMessage(
       text: prompt,
       isUser: true,
     );
 
-    List<ChatSession> updatedSessions =
-        List.from(
+    List<ChatSession> updatedSessions = List.from(
       state.sessions,
     );
 
-    int sessionIndex =
-        updatedSessions.indexWhere(
+    int sessionIndex = updatedSessions.indexWhere(
       (s) => s.id == currentId,
     );
 
     if (sessionIndex != -1) {
-      final targetSession =
-          updatedSessions[sessionIndex];
+      final targetSession = updatedSessions[sessionIndex];
 
       final newMessages = [
         ...targetSession.messages,
         userMsg,
       ];
 
-      updatedSessions[sessionIndex] =
-          targetSession.copyWith(
+      updatedSessions[sessionIndex] = targetSession.copyWith(
         messages: newMessages,
       );
 
@@ -458,8 +436,7 @@ class AIChatNotifier
         currentId,
       );
 
-      final activeSession =
-          updatedSessions.removeAt(
+      final activeSession = updatedSessions.removeAt(
         sessionIndex,
       );
 
@@ -479,33 +456,26 @@ class AIChatNotifier
     }
 
     try {
-      final gemini =
-          ref.read(geminiServiceProvider);
+      final gemini = ref.read(geminiServiceProvider);
 
-      final answer =
-          await gemini.ask(prompt);
+      final answer = await gemini.ask(prompt);
 
       final aiMsg = ChatMessage(
         text: answer,
         isUser: false,
       );
 
-      updatedSessions =
-          List.from(state.sessions);
+      updatedSessions = List.from(state.sessions);
 
-      sessionIndex =
-          updatedSessions.indexWhere(
+      sessionIndex = updatedSessions.indexWhere(
         (s) => s.id == currentId,
       );
 
       if (sessionIndex != -1) {
         updatedSessions[sessionIndex] =
-            updatedSessions[sessionIndex]
-                .copyWith(
+            updatedSessions[sessionIndex].copyWith(
           messages: [
-            ...updatedSessions[
-                    sessionIndex]
-                .messages,
+            ...updatedSessions[sessionIndex].messages,
             aiMsg,
           ],
         );
@@ -519,25 +489,19 @@ class AIChatNotifier
         );
       }
     } catch (e) {
-      updatedSessions =
-          List.from(state.sessions);
+      updatedSessions = List.from(state.sessions);
 
-      sessionIndex =
-          updatedSessions.indexWhere(
+      sessionIndex = updatedSessions.indexWhere(
         (s) => s.id == currentId,
       );
 
       if (sessionIndex != -1) {
         updatedSessions[sessionIndex] =
-            updatedSessions[sessionIndex]
-                .copyWith(
+            updatedSessions[sessionIndex].copyWith(
           messages: [
-            ...updatedSessions[
-                    sessionIndex]
-                .messages,
+            ...updatedSessions[sessionIndex].messages,
             ChatMessage(
-              text:
-                  '❌ Gagal menghubungi AI.\n$e',
+              text: '❌ Gagal menghubungi AI.\n$e',
               isUser: false,
             ),
           ],
@@ -559,10 +523,7 @@ class AIChatNotifier
   }
 }
 
-final aiChatProvider =
-    StateNotifierProvider<
-        AIChatNotifier,
-        AIChatState>(
+final aiChatProvider = StateNotifierProvider<AIChatNotifier, AIChatState>(
   (ref) {
     return AIChatNotifier(ref);
   },
@@ -570,31 +531,19 @@ final aiChatProvider =
 
 // ===================== MAIN PAGE =====================
 
-class AIAssistantPage
-    extends ConsumerStatefulWidget {
+class AIAssistantPage extends ConsumerStatefulWidget {
   const AIAssistantPage({
     super.key,
   });
 
   @override
-  ConsumerState<AIAssistantPage>
-      createState() =>
-          _AIAssistantPageState();
+  ConsumerState<AIAssistantPage> createState() => _AIAssistantPageState();
 }
 
-class _AIAssistantPageState
-    extends ConsumerState<AIAssistantPage> {
-  final TextEditingController
-      _controller =
-      TextEditingController();
-
-  final ScrollController
-      _scrollController =
-      ScrollController();
-
-  final GlobalKey<ScaffoldState>
-      _scaffoldKey =
-      GlobalKey<ScaffoldState>();
+class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   static const List<String> _suggestions = [
     'Prediksi pemasukan bulan depan',
@@ -611,23 +560,15 @@ class _AIAssistantPageState
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance
-        .addPostFrameCallback(
+    WidgetsBinding.instance.addPostFrameCallback(
       (_) {
-        if (!_scrollController
-            .hasClients) {
+        if (!_scrollController.hasClients) {
           return;
         }
 
         _scrollController.animateTo(
-          _scrollController
-                  .position
-                  .maxScrollExtent +
-              120,
-          duration:
-              const Duration(
-            milliseconds: 250,
-          ),
+          _scrollController.position.maxScrollExtent + 120,
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
       },
@@ -637,26 +578,17 @@ class _AIAssistantPageState
   Future<void> _sendMessage([
     String? quickPrompt,
   ]) async {
-    final prompt =
-        (quickPrompt ??
-                _controller.text)
-            .trim();
+    final prompt = (quickPrompt ?? _controller.text).trim();
 
     if (prompt.isEmpty) {
       return;
     }
 
-    FocusScope.of(
-      context,
-    ).unfocus();
+    FocusScope.of(context).unfocus();
 
     _controller.clear();
 
-    await ref
-        .read(
-          aiChatProvider.notifier,
-        )
-        .sendMessage(prompt);
+    await ref.read(aiChatProvider.notifier).sendMessage(prompt);
 
     _scrollToBottom();
   }
@@ -669,33 +601,23 @@ class _AIAssistantPageState
     AppThemeMode themeMode,
     ColorScheme colors,
   ) {
-    if (ThemeHelper.isNeo(
-      themeMode,
-    )) {
+    if (ThemeHelper.isNeo(themeMode)) {
       return AppColors.neoTextPrimary;
     }
 
-    if (ThemeHelper.isGlass(
-      themeMode,
-    )) {
+    if (ThemeHelper.isGlass(themeMode)) {
       return AppColors.glassTextPrimary;
     }
 
-    if (ThemeHelper.isModern(
-      themeMode,
-    )) {
+    if (ThemeHelper.isModern(themeMode)) {
       return AppColors.modernTextPrimary;
     }
 
-    if (ThemeHelper.isAurora(
-      themeMode,
-    )) {
+    if (ThemeHelper.isAurora(themeMode)) {
       return AppColors.auroraTextPrimary;
     }
 
-    if (ThemeHelper.isCyber(
-      themeMode,
-    )) {
+    if (ThemeHelper.isCyber(themeMode)) {
       return AppColors.cyberTextPrimary;
     }
 
@@ -706,33 +628,23 @@ class _AIAssistantPageState
     AppThemeMode themeMode,
     ColorScheme colors,
   ) {
-    if (ThemeHelper.isNeo(
-      themeMode,
-    )) {
+    if (ThemeHelper.isNeo(themeMode)) {
       return AppColors.neoTextSecondary;
     }
 
-    if (ThemeHelper.isGlass(
-      themeMode,
-    )) {
+    if (ThemeHelper.isGlass(themeMode)) {
       return AppColors.glassTextSecondary;
     }
 
-    if (ThemeHelper.isModern(
-      themeMode,
-    )) {
+    if (ThemeHelper.isModern(themeMode)) {
       return AppColors.modernTextSecondary;
     }
 
-    if (ThemeHelper.isAurora(
-      themeMode,
-    )) {
+    if (ThemeHelper.isAurora(themeMode)) {
       return AppColors.auroraTextSecondary;
     }
 
-    if (ThemeHelper.isCyber(
-      themeMode,
-    )) {
+    if (ThemeHelper.isCyber(themeMode)) {
       return AppColors.cyberTextSecondary;
     }
 
@@ -747,36 +659,16 @@ class _AIAssistantPageState
     AppThemeMode themeMode,
     ColorScheme colors,
   ) {
-    final accentColor =
-        ThemeHelper.getAccentColor(
+    final accentColor = ThemeHelper.getAccentColor(
       themeMode,
       colors,
     );
 
-    final isNeo =
-        ThemeHelper.isNeo(
-      themeMode,
-    );
-
-    final isGlass =
-        ThemeHelper.isGlass(
-      themeMode,
-    );
-
-    final isModern =
-        ThemeHelper.isModern(
-      themeMode,
-    );
-
-    final isAurora =
-        ThemeHelper.isAurora(
-      themeMode,
-    );
-
-    final isCyber =
-        ThemeHelper.isCyber(
-      themeMode,
-    );
+    final isNeo = ThemeHelper.isNeo(themeMode);
+    final isGlass = ThemeHelper.isGlass(themeMode);
+    final isModern = ThemeHelper.isModern(themeMode);
+    final isAurora = ThemeHelper.isAurora(themeMode);
+    final isCyber = ThemeHelper.isCyber(themeMode);
 
     Color baseColor;
 
@@ -795,23 +687,17 @@ class _AIAssistantPageState
     }
 
     final secondaryGlow =
-        isAurora || isCyber
-            ? colors.secondary
-            : accentColor;
+        isAurora || isCyber ? colors.secondary : accentColor;
 
-    final tertiaryGlow =
-        isAurora
-            ? colors.tertiary
-            : colors.primary;
+    final tertiaryGlow = isAurora ? colors.tertiary : colors.primary;
 
-    final glowOpacity =
-        isGlass
-            ? 0.14
-            : isCyber
-                ? 0.10
-                : isAurora
-                    ? 0.18
-                    : 0.08;
+    final glowOpacity = isGlass
+        ? 0.14
+        : isCyber
+            ? 0.10
+            : isAurora
+                ? 0.18
+                : 0.08;
 
     return IgnorePointer(
       child: Stack(
@@ -821,18 +707,14 @@ class _AIAssistantPageState
             decoration: BoxDecoration(
               color: baseColor,
               gradient: LinearGradient(
-                begin:
-                    Alignment.topLeft,
-                end:
-                    Alignment.bottomRight,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
                 colors: [
                   baseColor,
                   Color.lerp(
                         baseColor,
                         accentColor,
-                        isAurora
-                            ? 0.08
-                            : 0.035,
+                        isAurora ? 0.08 : 0.035,
                       ) ??
                       baseColor,
                   baseColor,
@@ -840,7 +722,6 @@ class _AIAssistantPageState
               ),
             ),
           ),
-
           Positioned(
             top: -150,
             left: -120,
@@ -850,56 +731,42 @@ class _AIAssistantPageState
               opacity: glowOpacity,
             ),
           ),
-
           Positioned(
             top: 70,
             right: -180,
             child: _buildGlow(
               size: 390,
               color: secondaryGlow,
-              opacity:
-                  glowOpacity * 0.85,
+              opacity: glowOpacity * 0.85,
             ),
           ),
-
           Positioned(
             bottom: -210,
             left: -150,
             child: _buildGlow(
               size: 420,
               color: tertiaryGlow,
-              opacity:
-                  glowOpacity * 0.70,
+              opacity: glowOpacity * 0.70,
             ),
           ),
-
           Positioned(
             bottom: -170,
             right: -120,
             child: _buildGlow(
               size: 360,
               color: accentColor,
-              opacity:
-                  glowOpacity * 0.65,
+              opacity: glowOpacity * 0.65,
             ),
           ),
-
           Positioned.fill(
             child: DecoratedBox(
-              decoration:
-                  BoxDecoration(
-                gradient:
-                    RadialGradient(
-                  center:
-                      Alignment.center,
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
                   radius: 1.15,
                   colors: [
-                    accentColor
-                        .withValues(
-                      alpha:
-                          isAurora
-                              ? 0.035
-                              : 0.018,
+                    accentColor.withValues(
+                      alpha: isAurora ? 0.035 : 0.018,
                     ),
                     Colors.transparent,
                   ],
@@ -907,15 +774,11 @@ class _AIAssistantPageState
               ),
             ),
           ),
-
           if (isCyber)
             Positioned.fill(
               child: CustomPaint(
-                painter:
-                    _CyberBackgroundPainter(
-                  lineColor:
-                      accentColor
-                          .withValues(
+                painter: _CyberBackgroundPainter(
+                  lineColor: accentColor.withValues(
                     alpha: 0.035,
                   ),
                 ),
@@ -934,19 +797,15 @@ class _AIAssistantPageState
     return Container(
       width: size,
       height: size,
-      decoration:
-          BoxDecoration(
-        shape:
-            BoxShape.circle,
-        gradient:
-            RadialGradient(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
           colors: [
             color.withValues(
               alpha: opacity,
             ),
             color.withValues(
-              alpha:
-                  opacity * 0.35,
+              alpha: opacity * 0.35,
             ),
             Colors.transparent,
           ],
@@ -966,74 +825,53 @@ class _AIAssistantPageState
           themeMode,
           colors,
         ),
-        borderRadius:
-            const BorderRadius.only(
-          topLeft:
-              Radius.circular(20),
-          topRight:
-              Radius.circular(20),
-          bottomLeft:
-              Radius.circular(20),
-          bottomRight:
-              Radius.circular(4),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(4),
         ),
       );
     }
 
-    if (ThemeHelper.isNeo(
-      themeMode,
-    )) {
+    if (ThemeHelper.isNeo(themeMode)) {
       return neumorphismDecoration(
         borderRadius: 20,
         isPressed: true,
       );
     }
 
-    if (ThemeHelper.isGlass(
-      themeMode,
-    )) {
+    if (ThemeHelper.isGlass(themeMode)) {
       return glassmorphismDecoration(
         borderRadius: 20,
       );
     }
 
-    if (ThemeHelper.isModern(
-      themeMode,
-    )) {
+    if (ThemeHelper.isModern(themeMode)) {
       return modernDecoration(
         borderRadius: 20,
       );
     }
 
-    if (ThemeHelper.isAurora(
-      themeMode,
-    )) {
+    if (ThemeHelper.isAurora(themeMode)) {
       return auroraDecoration(
         borderRadius: 20,
       );
     }
 
-    if (ThemeHelper.isCyber(
-      themeMode,
-    )) {
+    if (ThemeHelper.isCyber(themeMode)) {
       return cyberpunkDecoration(
         borderRadius: 12,
       );
     }
 
     return BoxDecoration(
-      color:
-          colors.surfaceContainerHighest,
-      borderRadius:
-          const BorderRadius.only(
-        topLeft:
-            Radius.circular(4),
-        topRight:
-            Radius.circular(20),
-        bottomLeft:
-            Radius.circular(20),
-        bottomRight:
-            Radius.circular(20),
+      color: colors.surfaceContainerHighest,
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(4),
+        topRight: Radius.circular(20),
+        bottomLeft: Radius.circular(20),
+        bottomRight: Radius.circular(20),
       ),
     );
   }
@@ -1046,30 +884,20 @@ class _AIAssistantPageState
   Widget build(
     BuildContext context,
   ) {
-    final themeMode =
-        ref.watch(themeModeProvider);
-
-    final colors =
-        Theme.of(context)
-            .colorScheme;
-
-    final chatState =
-        ref.watch(aiChatProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final chatState = ref.watch(aiChatProvider);
 
     ref.listen(
       aiChatProvider,
       (prev, next) {
-        if (prev?.currentMessages
-                .length !=
-            next.currentMessages
-                .length) {
+        if (prev?.currentMessages.length != next.currentMessages.length) {
           _scrollToBottom();
         }
       },
     );
 
-    final primaryText =
-        _getPrimaryTextColor(
+    final primaryText = _getPrimaryTextColor(
       themeMode,
       colors,
     );
@@ -1081,27 +909,19 @@ class _AIAssistantPageState
           themeMode,
           colors,
         ),
-
         Scaffold(
           key: _scaffoldKey,
-          backgroundColor:
-              Colors.transparent,
-
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
-            backgroundColor:
-                Colors.transparent,
+            backgroundColor: Colors.transparent,
             elevation: 0,
             scrolledUnderElevation: 0,
-            surfaceTintColor:
-                Colors.transparent,
-
+            surfaceTintColor: Colors.transparent,
             title: Row(
               children: [
                 Icon(
                   Icons.auto_awesome,
-                  color:
-                      ThemeHelper
-                          .getAccentColor(
+                  color: ThemeHelper.getAccentColor(
                     themeMode,
                     colors,
                   ),
@@ -1110,43 +930,32 @@ class _AIAssistantPageState
                 Text(
                   'AI Assistant',
                   style: TextStyle(
-                    color:
-                        primaryText,
+                    color: primaryText,
                   ),
                 ),
               ],
             ),
-
             leading: IconButton(
               icon: Icon(
                 Icons.menu,
-                color:
-                    primaryText,
+                color: primaryText,
               ),
               onPressed: () async {
-                await SoundHelper()
-                    .playClick();
-
-                _scaffoldKey.currentState
-                    ?.openDrawer();
+                await SoundHelper().playClick();
+                _scaffoldKey.currentState?.openDrawer();
               },
               tooltip: 'Riwayat Chat',
             ),
           ),
-
           drawer: _buildDrawer(
             themeMode,
             chatState,
           ),
-
           body: SafeArea(
             child: chatState.isFetching
                 ? Center(
-                    child:
-                        CircularProgressIndicator(
-                      color:
-                          ThemeHelper
-                              .getAccentColor(
+                    child: CircularProgressIndicator(
+                      color: ThemeHelper.getAccentColor(
                         themeMode,
                         colors,
                       ),
@@ -1155,57 +964,51 @@ class _AIAssistantPageState
                 : Column(
                     children: [
                       Expanded(
-                        child: chatState
-                                .currentMessages
-                                .isEmpty
-                            ? _buildEmptyState(
-                                themeMode,
+                        child: chatState.currentMessages.isEmpty
+                            ? ScrollReveal(
+                                child: _buildEmptyState(
+                                  themeMode,
+                                ),
                               )
                             : ListView.builder(
-                                controller:
-                                    _scrollController,
-                                padding:
-                                    const EdgeInsets
-                                        .fromLTRB(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.fromLTRB(
                                   16,
                                   16,
                                   16,
                                   24,
                                 ),
-                                itemCount:
-                                    chatState
-                                            .currentMessages
-                                            .length +
-                                        (chatState
-                                                .isLoading
-                                            ? 1
-                                            : 0),
-                                itemBuilder:
-                                    (
+                                itemCount: chatState.currentMessages.length +
+                                    (chatState.isLoading ? 1 : 0),
+                                itemBuilder: (
                                   context,
                                   index,
                                 ) {
                                   if (index <
-                                      chatState
-                                          .currentMessages
-                                          .length) {
-                                    return _buildMessageBubble(
-                                      chatState
-                                              .currentMessages[
-                                          index],
-                                      themeMode,
+                                      chatState.currentMessages.length) {
+                                    return ScrollReveal(
+                                      delay: Duration(milliseconds: 50 * (index % 4)),
+                                      child: _buildMessageBubble(
+                                        chatState.currentMessages[index],
+                                        themeMode,
+                                      ),
                                     );
                                   }
 
-                                  return _buildTypingIndicator(
-                                    themeMode,
+                                  return ScrollReveal(
+                                    child: _buildTypingIndicator(
+                                      themeMode,
+                                    ),
                                   );
                                 },
                               ),
                       ),
-
-                      _buildComposer(
-                        themeMode,
+                      ScrollReveal(
+                        delay: const Duration(milliseconds: 150),
+                        beginOffset: const Offset(0, 0.05),
+                        child: _buildComposer(
+                          themeMode,
+                        ),
                       ),
                     ],
                   ),
@@ -1223,68 +1026,33 @@ class _AIAssistantPageState
     AppThemeMode themeMode,
     AIChatState chatState,
   ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
 
-    final primaryText =
-        _getPrimaryTextColor(
-      themeMode,
-      colors,
-    );
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+    final bool isNeo = ThemeHelper.isNeo(themeMode);
 
-    final secondaryText =
-        _getSecondaryTextColor(
-      themeMode,
-      colors,
-    );
-
-    final accentColor =
-        ThemeHelper.getAccentColor(
-      themeMode,
-      colors,
-    );
-
-    final bool isGlass =
-        ThemeHelper.isGlass(
-      themeMode,
-    );
-
-    final bool isNeo =
-        ThemeHelper.isNeo(
-      themeMode,
-    );
-
-    final Widget drawerContent =
-        Column(
+    final Widget drawerContents = Column(
       children: [
         Container(
           padding: EdgeInsets.only(
-            top:
-                MediaQuery.of(context)
-                        .padding
-                        .top +
-                    16,
+            top: MediaQuery.of(context).padding.top + 16,
             bottom: 16,
             left: 16,
             right: 16,
           ),
           width: double.infinity,
-          decoration:
-              BoxDecoration(
+          decoration: BoxDecoration(
             color: isGlass
-                ? AppColors.glassBg1
-                    .withValues(
-                    alpha: 0.78,
-                  )
+                ? AppColors.glassBg1.withValues(alpha: 0.78)
                 : isNeo
                     ? AppColors.neoBaseAlt
                     : accentColor,
           ),
-          child:
-              Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Riwayat Chat',
@@ -1292,197 +1060,117 @@ class _AIAssistantPageState
                   color: isGlass
                       ? Colors.white
                       : isNeo
-                          ? AppColors
-                              .neoTextPrimary
+                          ? AppColors.neoTextPrimary
                           : colors.onPrimary,
                   fontSize: 20,
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(
-                height: 4,
-              ),
+              const SizedBox(height: 4),
               Text(
                 '${chatState.sessions.length} sesi tersimpan',
                 style: TextStyle(
                   color: isGlass
                       ? Colors.white70
                       : isNeo
-                          ? AppColors
-                              .neoTextSecondary
-                          : colors.onPrimary
-                              .withValues(
-                              alpha: 0.8,
-                            ),
+                          ? AppColors.neoTextSecondary
+                          : colors.onPrimary.withValues(alpha: 0.8),
                   fontSize: 14,
                 ),
               ),
             ],
           ),
         ),
-
         Expanded(
-          child: chatState
-                  .sessions.isEmpty
+          child: chatState.sessions.isEmpty
               ? Center(
                   child: Text(
                     'Belum ada history chat',
                     style: TextStyle(
-                      color:
-                          secondaryText,
+                      color: secondaryText,
                     ),
                   ),
                 )
               : ListView.builder(
-                  itemCount:
-                      chatState.sessions
-                          .length,
-                  itemBuilder:
-                      (
+                  itemCount: chatState.sessions.length,
+                  itemBuilder: (
                     context,
                     index,
                   ) {
-                    final session =
-                        chatState
-                            .sessions[
-                                index];
+                    final session = chatState.sessions[index];
 
                     final isActive =
-                        session.id ==
-                            chatState
-                                .currentSessionId;
+                        session.id == chatState.currentSessionId;
 
                     final activeColor =
-                        isGlass
-                            ? Colors.white
-                            : accentColor;
+                        isGlass ? Colors.white : accentColor;
 
                     return ListTile(
-                      tileColor:
-                          isActive
-                              ? activeColor
-                                  .withValues(
-                                  alpha:
-                                      isGlass
-                                          ? 0.14
-                                          : 0.08,
-                                )
-                              : null,
-
+                      tileColor: isActive
+                          ? activeColor.withValues(
+                              alpha: isGlass ? 0.14 : 0.08,
+                            )
+                          : null,
                       leading: Icon(
-                        Icons
-                            .chat_bubble_outline,
-                        color:
-                            isActive
-                                ? activeColor
-                                : secondaryText,
+                        Icons.chat_bubble_outline,
+                        color: isActive ? activeColor : secondaryText,
                       ),
-
                       title: Text(
                         session.title,
                         maxLines: 1,
-                        overflow:
-                            TextOverflow
-                                .ellipsis,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight:
-                              isActive
-                                  ? FontWeight
-                                      .bold
-                                  : null,
-                          color:
-                              isActive
-                                  ? activeColor
-                                  : primaryText,
+                              isActive ? FontWeight.bold : null,
+                          color: isActive ? activeColor : primaryText,
                         ),
                       ),
-
                       subtitle: Text(
                         _formatTime(
-                          session
-                              .createdTime,
+                          session.createdTime,
                         ),
-                        style:
-                            TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color:
-                              secondaryText,
+                          color: secondaryText,
                         ),
                       ),
-
-                      trailing:
-                          IconButton(
-                        icon:
-                            const Icon(
-                          Icons
-                              .delete_outline,
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
                           size: 20,
                         ),
-                        onPressed:
-                            () async {
-                          await SoundHelper()
-                              .playClick();
-
+                        onPressed: () async {
+                          await SoundHelper().playClick();
                           ref
-                              .read(
-                                aiChatProvider
-                                    .notifier,
-                              )
-                              .deleteSession(
-                                session.id,
-                              );
+                              .read(aiChatProvider.notifier)
+                              .deleteSession(session.id);
                         },
-                        color:
-                            secondaryText,
+                        color: secondaryText,
                       ),
-
-                      onTap:
-                          () async {
-                        await SoundHelper()
-                            .playClick();
-
+                      onTap: () async {
+                        await SoundHelper().playClick();
                         ref
-                            .read(
-                              aiChatProvider
-                                  .notifier,
-                            )
-                            .switchSession(
-                              session.id,
-                            );
+                            .read(aiChatProvider.notifier)
+                            .switchSession(session.id);
 
                         if (mounted) {
-                          Navigator.pop(
-                            context,
-                          );
+                          Navigator.pop(context);
                         }
                       },
                     );
                   },
                 ),
         ),
-
         Divider(
           height: 1,
-          color:
-              ThemeHelper.dividerColor(
-            themeMode,
-          ),
+          color: ThemeHelper.dividerColor(themeMode),
         ),
-
         Padding(
-          padding:
-              const EdgeInsets.all(
-            16,
-          ),
-          child:
-              _buildDrawerNewChatButton(
+          padding: const EdgeInsets.all(16),
+          child: _buildDrawerNewChatButton(
             themeMode: themeMode,
             colors: colors,
-            accentColor:
-                accentColor,
-            primaryText:
-                primaryText,
+            accentColor: accentColor,
           ),
         ),
       ],
@@ -1490,48 +1178,36 @@ class _AIAssistantPageState
 
     if (isNeo) {
       return Drawer(
-        backgroundColor:
-            AppColors.neoBase,
-        child: drawerContent,
+        backgroundColor: AppColors.neoBase,
+        child: drawerContents,
       );
     }
 
     if (isGlass) {
       return Drawer(
-        backgroundColor:
-            AppColors.glassBg1,
-        child: drawerContent,
+        backgroundColor: AppColors.glassBg1,
+        child: drawerContents,
       );
     }
 
-    if (ThemeHelper.isAurora(
-      themeMode,
-    )) {
+    if (ThemeHelper.isAurora(themeMode)) {
       return Drawer(
-        backgroundColor:
-            AppColors.auroraSurface,
-        child: drawerContent,
+        backgroundColor: AppColors.auroraSurface,
+        child: drawerContents,
       );
     }
 
-    if (ThemeHelper.isCyber(
-      themeMode,
-    )) {
+    if (ThemeHelper.isCyber(themeMode)) {
       return Drawer(
-        backgroundColor:
-            AppColors.cyberBg,
-        child: drawerContent,
+        backgroundColor: AppColors.cyberBg,
+        child: drawerContents,
       );
     }
 
     return Drawer(
       backgroundColor:
-          ThemeHelper
-              .getScaffoldBackgroundColor(
-        themeMode,
-        colors,
-      ),
-      child: drawerContent,
+          ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+      child: drawerContents,
     );
   }
 
@@ -1539,61 +1215,31 @@ class _AIAssistantPageState
     required AppThemeMode themeMode,
     required ColorScheme colors,
     required Color accentColor,
-    required Color primaryText,
   }) {
-    final bool isGlass =
-        ThemeHelper.isGlass(
-      themeMode,
-    );
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
 
     return ElevatedButton.icon(
       onPressed: () async {
         await SoundHelper().playClick();
-
-        ref
-            .read(
-              aiChatProvider.notifier,
-            )
-            .startNewChat();
+        ref.read(aiChatProvider.notifier).startNewChat();
 
         if (mounted) {
           Navigator.pop(context);
         }
       },
-      icon: const Icon(
-        Icons.add,
-      ),
-      label: const Text(
-        'Chat Baru',
-      ),
+      icon: const Icon(Icons.add),
+      label: const Text('Chat Baru'),
       style: ElevatedButton.styleFrom(
-        minimumSize:
-            const Size(
-          double.infinity,
-          48,
-        ),
-        backgroundColor:
-            isGlass
-                ? Colors.white
-                    .withValues(
-                    alpha: 0.22,
-                  )
-                : accentColor,
-        foregroundColor:
-            isGlass
-                ? Colors.white
-                : colors.onPrimary,
+        minimumSize: const Size(double.infinity, 48),
+        backgroundColor: isGlass
+            ? Colors.white.withValues(alpha: 0.22)
+            : accentColor,
+        foregroundColor: isGlass ? Colors.white : colors.onPrimary,
         elevation: 0,
-        shadowColor:
-            Colors.transparent,
-        shape:
-            RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(
-            ThemeHelper.isCyber(
-                    themeMode)
-                ? 10
-                : 14,
+        shadowColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(
+            ThemeHelper.isCyber(themeMode) ? 10 : 14,
           ),
         ),
       ),
@@ -1607,171 +1253,82 @@ class _AIAssistantPageState
   Widget _buildEmptyState(
     AppThemeMode themeMode,
   ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
-
-    final theme =
-        Theme.of(context);
-
-    final primaryText =
-        _getPrimaryTextColor(
-      themeMode,
-      colors,
-    );
-
-    final secondaryText =
-        _getSecondaryTextColor(
-      themeMode,
-      colors,
-    );
-
-    final accentColor =
-        ThemeHelper.getAccentColor(
-      themeMode,
-      colors,
-    );
+    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
 
     return Center(
       child: SingleChildScrollView(
-        padding:
-            const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
               width: 180,
               height: 180,
               child: Lottie.asset(
                 'assets/animations/ai animation Flow 1.json',
-                fit:
-                    BoxFit.contain,
+                fit: BoxFit.contain,
               ),
             ),
-
-            const SizedBox(
-              height: 24,
-            ),
-
+            const SizedBox(height: 24),
             Text(
               'Halo, Aku AI Assistant',
-              textAlign:
-                  TextAlign.center,
-              style: theme.textTheme
-                  .headlineSmall
-                  ?.copyWith(
-                fontWeight:
-                    FontWeight.bold,
-                color:
-                    primaryText,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: primaryText,
               ),
             ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
+            const SizedBox(height: 8),
             Text(
               'Mau analisis apa hari ini? Pilih topik di bawah atau ketik sendiri.',
-              textAlign:
-                  TextAlign.center,
-              style: theme.textTheme
-                  .bodyMedium
-                  ?.copyWith(
-                color:
-                    secondaryText,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: secondaryText,
               ),
             ),
-
-            const SizedBox(
-              height: 32,
-            ),
-
+            const SizedBox(height: 32),
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              alignment:
-                  WrapAlignment.center,
-              children:
-                  _suggestions.map(
+              alignment: WrapAlignment.center,
+              children: _suggestions.map(
                 (q) {
-                  final chipBackground =
-                      ThemeHelper.isNeo(
-                        themeMode,
-                      )
-                          ? accentColor
-                              .withValues(
-                              alpha: 0.10,
-                            )
-                          : ThemeHelper.isGlass(
-                              themeMode,
-                            )
-                              ? Colors.white
-                                  .withValues(
-                                  alpha: 0.14,
-                                )
-                              : accentColor
-                                  .withValues(
-                                  alpha: 0.08,
-                                );
+                  final chipBackground = ThemeHelper.isNeo(themeMode)
+                      ? accentColor.withValues(alpha: 0.10)
+                      : ThemeHelper.isGlass(themeMode)
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : accentColor.withValues(alpha: 0.08);
 
-                  final chipBorder =
-                      ThemeHelper.isGlass(
-                        themeMode,
-                      )
-                          ? Colors.white
-                              .withValues(
-                              alpha: 0.30,
-                            )
-                          : accentColor
-                              .withValues(
-                              alpha: 0.20,
-                            );
+                  final chipBorder = ThemeHelper.isGlass(themeMode)
+                      ? Colors.white.withValues(alpha: 0.30)
+                      : accentColor.withValues(alpha: 0.20);
 
-                  final chipText =
-                      ThemeHelper.isGlass(
-                        themeMode,
-                      )
-                          ? Colors.white
-                          : primaryText;
+                  final chipText = ThemeHelper.isGlass(themeMode)
+                      ? Colors.white
+                      : primaryText;
 
                   return ActionChip(
-                    avatar:
-                        Icon(
-                      Icons
-                          .auto_awesome_outlined,
+                    avatar: Icon(
+                      Icons.auto_awesome_outlined,
                       size: 18,
-                      color:
-                          accentColor,
+                      color: accentColor,
                     ),
-                    label: Text(
-                      q,
+                    label: Text(q),
+                    backgroundColor: chipBackground,
+                    side: BorderSide(color: chipBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    backgroundColor:
-                        chipBackground,
-                    side: BorderSide(
-                      color:
-                          chipBorder,
-                    ),
-                    shape:
-                        RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(
-                        12,
-                      ),
-                    ),
-                    labelStyle:
-                        TextStyle(
-                      color:
-                          chipText,
-                      fontWeight:
-                          FontWeight.w500,
+                    labelStyle: TextStyle(
+                      color: chipText,
+                      fontWeight: FontWeight.w500,
                     ),
                     onPressed: () async {
-                      await SoundHelper()
-                          .playClick();
-
+                      await SoundHelper().playClick();
                       _sendMessage(q);
                     },
                   );
@@ -1792,70 +1349,46 @@ class _AIAssistantPageState
     ChatMessage message,
     AppThemeMode themeMode,
   ) {
-    final isUser =
-        message.isUser;
+    final isUser = message.isUser;
+    final colors = Theme.of(context).colorScheme;
 
-    final colors =
-        Theme.of(context)
-            .colorScheme;
-
-    final textColor =
-        isUser
-            ? colors.onPrimary
-            : _getPrimaryTextColor(
-                themeMode,
-                colors,
-              );
+    final textColor = isUser
+        ? colors.onPrimary
+        : _getPrimaryTextColor(
+            themeMode,
+            colors,
+          );
 
     final alignment =
-        isUser
-            ? Alignment.centerRight
-            : Alignment.centerLeft;
+        isUser ? Alignment.centerRight : Alignment.centerLeft;
 
     return Align(
-      alignment:
-          alignment,
+      alignment: alignment,
       child: Container(
-        constraints:
-            BoxConstraints(
-          maxWidth:
-              MediaQuery.of(
-                    context,
-                  ).size.width *
-                  0.82,
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.82,
         ),
-        margin:
-            const EdgeInsets.only(
-          bottom: 12,
-        ),
-        padding:
-            const EdgeInsets.symmetric(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 12,
         ),
-        decoration:
-            _getThemedBubbleDecoration(
+        decoration: _getThemedBubbleDecoration(
           themeMode,
           colors,
           isUser,
         ),
         child: Row(
-          mainAxisSize:
-              MainAxisSize.min,
-          crossAxisAlignment:
-              CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Flexible(
-              child:
-                  SelectableText(
+              child: SelectableText(
                 message.text,
-                style:
-                    TextStyle(
-                  color:
-                      textColor,
+                style: TextStyle(
+                  color: textColor,
                   height: 1.4,
-                  fontSize:
-                      14.5,
+                  fontSize: 14.5,
                 ),
               ),
             ),
@@ -1872,68 +1405,40 @@ class _AIAssistantPageState
   Widget _buildTypingIndicator(
     AppThemeMode themeMode,
   ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
-
-    final textColor =
-        _getPrimaryTextColor(
-      themeMode,
-      colors,
-    );
-
-    final accentColor =
-        ThemeHelper.getAccentColor(
-      themeMode,
-      colors,
-    );
+    final colors = Theme.of(context).colorScheme;
+    final textColor = _getPrimaryTextColor(themeMode, colors);
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
 
     return Align(
-      alignment:
-          Alignment.centerLeft,
+      alignment: Alignment.centerLeft,
       child: Container(
-        margin:
-            const EdgeInsets.only(
-          bottom: 12,
-        ),
-        padding:
-            const EdgeInsets.symmetric(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
         ),
-        decoration:
-            _getThemedBubbleDecoration(
+        decoration: _getThemedBubbleDecoration(
           themeMode,
           colors,
           false,
         ),
         child: Row(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
               width: 16,
               height: 16,
-              child:
-                  CircularProgressIndicator(
+              child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color:
-                    accentColor,
+                color: accentColor,
               ),
             ),
-
-            const SizedBox(
-              width: 12,
-            ),
-
+            const SizedBox(width: 12),
             Text(
               'AI sedang berpikir...',
-              style:
-                  TextStyle(
-                color:
-                    textColor,
-                fontSize:
-                    13,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 13,
               ),
             ),
           ],
@@ -1949,378 +1454,156 @@ class _AIAssistantPageState
   Widget _buildComposer(
     AppThemeMode themeMode,
   ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final bool isGlass =
-        ThemeHelper.isGlass(
-      themeMode,
-    );
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+    final bool isNeo = ThemeHelper.isNeo(themeMode);
 
-    final bool isNeo =
-        ThemeHelper.isNeo(
-      themeMode,
-    );
-
-    final bool isAurora =
-        ThemeHelper.isAurora(
-      themeMode,
-    );
-
-    final bool isCyber =
-        ThemeHelper.isCyber(
-      themeMode,
-    );
-
-    final accentColor =
-        ThemeHelper.getAccentColor(
-      themeMode,
-      colors,
-    );
-
-    final primaryText =
-        _getPrimaryTextColor(
-      themeMode,
-      colors,
-    );
-
-    final secondaryText =
-        _getSecondaryTextColor(
-      themeMode,
-      colors,
-    );
-
-    // ==========================================================
-    // COMPOSER BACKGROUND
-    // ==========================================================
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
 
     Color composerBackground;
-
     if (isGlass) {
-      composerBackground =
-          AppColors.glassBg1.withValues(
-        alpha: 0.70,
-      );
+      composerBackground = AppColors.glassBg1.withValues(alpha: 0.70);
     } else if (isNeo) {
-      composerBackground =
-          AppColors.neoBase;
-    } else if (ThemeHelper.isModern(
-      themeMode,
-    )) {
-      composerBackground =
-          AppColors.modernBg;
-    } else if (isAurora) {
-      composerBackground =
-          AppColors.auroraSurface;
-    } else if (isCyber) {
-      composerBackground =
-          AppColors.cyberBg;
+      composerBackground = AppColors.neoBase;
     } else {
-      composerBackground =
-          colors.surface;
+      composerBackground = colors.surface;
     }
 
-    // ==========================================================
-    // INPUT COLORS
-    // ==========================================================
-
-    final Color inputBackground;
-
+    Color inputBackground;
     if (isGlass) {
-      inputBackground =
-          Colors.white.withValues(
-        alpha: 0.12,
-      );
+      inputBackground = Colors.white.withValues(alpha: 0.12);
     } else if (isNeo) {
-      inputBackground =
-          AppColors.neoBaseAlt;
-    } else if (isAurora) {
-      inputBackground =
-          AppColors.auroraSurface
-              .withValues(
-        alpha: 0.72,
-      );
-    } else if (isCyber) {
-      inputBackground =
-          AppColors.cyberSurface
-              .withValues(
-        alpha: 0.85,
-      );
+      inputBackground = AppColors.neoBaseAlt;
     } else {
-      inputBackground =
-          colors.surfaceContainerHighest
-              .withValues(
-        alpha: 0.90,
-      );
+      inputBackground = colors.surfaceContainerHighest;
     }
 
-    final Color inputBorder;
-
-    if (isGlass) {
-      inputBorder =
-          Colors.white.withValues(
-        alpha: 0.20,
-      );
-    } else if (isNeo) {
-      inputBorder =
-          AppColors.neoShadow.withValues(
-        alpha: 0.15,
-      );
-    } else if (isCyber) {
-      inputBorder =
-          accentColor.withValues(
-        alpha: 0.20,
-      );
-    } else {
-      inputBorder =
-          colors.outlineVariant
-              .withValues(
-        alpha: 0.40,
-      );
-    }
+    // FIX: Perbaikan estetika TextField (menghilangkan kotak dan menjaga bentuk pil)
+    final BorderRadius textFieldRadius = BorderRadius.circular(28);
+    final BorderSide transparentBorder = BorderSide.none;
 
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.fromLTRB(
-        12,
-        10,
-        12,
-        12,
-      ),
-      decoration:
-          BoxDecoration(
-        color:
-            composerBackground,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: BoxDecoration(
+        color: composerBackground,
         border: Border(
           top: BorderSide(
-            color:
-                ThemeHelper.dividerColor(
-              themeMode,
-            ).withValues(
-              alpha: 0.45,
-            ),
+            color: ThemeHelper.dividerColor(themeMode).withValues(alpha: 0.45),
           ),
         ),
       ),
-      child: Container(
-        decoration:
-            BoxDecoration(
-          color:
-              inputBackground,
-          borderRadius:
-              BorderRadius.circular(
-            isCyber ? 18 : 28,
-          ),
-          border: Border.all(
-            color:
-                inputBorder,
-            width: 1,
-          ),
-          boxShadow:
-              isNeo
-                  ? [
-                      BoxShadow(
-                        color: Colors.black
-                            .withValues(
-                          alpha:
-                              0.08,
-                        ),
-                        blurRadius:
-                            12,
-                        offset:
-                            const Offset(
-                          3,
-                          3,
-                        ),
-                      ),
-                    ]
-                  : [
-                      BoxShadow(
-                        color:
-                            Colors.black
-                                .withValues(
-                          alpha:
-                              isGlass
-                                  ? 0.06
-                                  : 0.04,
-                        ),
-                        blurRadius:
-                            14,
-                        offset:
-                            const Offset(
-                          0,
-                          5,
-                        ),
-                      ),
-                    ],
-        ),
-        padding:
-            const EdgeInsets.only(
-          left: 16,
-          right: 6,
-          top: 6,
-          bottom: 6,
-        ),
+      child: SafeArea(
+        top: false,
         child: Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // ==================================================
-            // TEXT FIELD
-            // ==================================================
-
             Expanded(
-              child:
-                  TextField(
-                controller:
-                    _controller,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization:
-                    TextCapitalization
-                        .sentences,
-                style:
-                    TextStyle(
-                  color:
-                      primaryText,
-                  fontSize: 14.5,
-                  height: 1.35,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: inputBackground,
+                  borderRadius: textFieldRadius,
+                  border: Border.all(
+                    color: ThemeHelper.isGlass(themeMode)
+                        ? Colors.white.withValues(alpha: 0.20)
+                        : ThemeHelper.isNeo(themeMode)
+                            ? AppColors.neoShadow.withValues(alpha: 0.15)
+                            : colors.outlineVariant.withValues(alpha: 0.40),
+                  ),
                 ),
-                cursorColor:
-                    accentColor,
-
-                // Tidak lagi menggunakan kotak
-                // OutlineInputBorder bawaan.
-                decoration:
-                    InputDecoration(
-                  hintText:
-                      'Tulis pertanyaan kamu...',
-                  hintStyle:
-                      TextStyle(
-                    color:
-                        secondaryText
-                            .withValues(
-                      alpha: 0.78,
+                child: TextField(
+                  controller: _controller,
+                  minLines: 1,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: TextStyle(
+                    color: primaryText,
+                    fontSize: 15,
+                    height: 1.35,
+                  ),
+                  cursorColor: accentColor,
+                  decoration: InputDecoration(
+                    hintText: 'Tulis pertanyaan kamu...',
+                    hintStyle: TextStyle(
+                      color: secondaryText.withValues(alpha: 0.78),
+                      fontSize: 15,
                     ),
-                    fontSize:
-                        14.5,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                    filled: false, // Pastikan tidak ada fill dari InputDecoration yang merusak
+                    border: OutlineInputBorder(
+                      borderRadius: textFieldRadius,
+                      borderSide: transparentBorder,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: textFieldRadius,
+                      borderSide: transparentBorder,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: textFieldRadius,
+                      borderSide: transparentBorder,
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: textFieldRadius,
+                      borderSide: transparentBorder,
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: textFieldRadius,
+                      borderSide: transparentBorder,
+                    ),
                   ),
-                  border:
-                      InputBorder.none,
-                  enabledBorder:
-                      InputBorder.none,
-                  focusedBorder:
-                      InputBorder.none,
-                  disabledBorder:
-                      InputBorder.none,
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets
-                          .symmetric(
-                    vertical: 10,
-                    horizontal: 0,
-                  ),
+                  onSubmitted: (_) => _sendMessage(),
                 ),
-                onSubmitted:
-                    (_) =>
-                        _sendMessage(),
               ),
             ),
-
-            const SizedBox(
-              width: 8,
-            ),
-
-            // ==================================================
-            // SEND BUTTON
-            // ==================================================
-
-            AnimatedContainer(
-              duration:
-                  const Duration(
-                milliseconds: 180,
-              ),
-              height: 46,
-              width: 46,
-              decoration:
-                  BoxDecoration(
-                color:
-                    accentColor,
-                shape:
-                    BoxShape.circle,
-                boxShadow:
-                    [
+            const SizedBox(width: 8),
+            Container(
+              height: 50,
+              width: 50,
+              decoration: BoxDecoration(
+                color: accentColor,
+                shape: BoxShape.circle,
+                boxShadow: [
                   BoxShadow(
-                    color: accentColor
-                        .withValues(
-                      alpha:
-                          0.22,
-                    ),
-                    blurRadius:
-                        10,
-                    offset:
-                        const Offset(
-                      0,
-                      4,
-                    ),
+                    color: accentColor.withValues(alpha: 0.30),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child:
-                  Material(
-                color:
-                    Colors.transparent,
-                child:
-                    InkWell(
-                  customBorder:
-                      const CircleBorder(),
-                  onTap:
-                      ref
-                              .read(
-                                aiChatProvider,
-                              )
-                              .isLoading
-                          ? null
-                          : () async {
-                              await SoundHelper()
-                                  .playClick();
-
-                              _sendMessage();
-                            },
-                  child:
-                      Center(
-                    child: ref
-                            .watch(
-                              aiChatProvider,
-                            )
-                            .isLoading
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: ref.read(aiChatProvider).isLoading
+                      ? null
+                      : () async {
+                          await SoundHelper().playClick();
+                          _sendMessage();
+                        },
+                  child: Center(
+                    child: ref.watch(aiChatProvider).isLoading
                         ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child:
-                                CircularProgressIndicator(
-                              strokeWidth:
-                                  2,
-                              color:
-                                  isGlass
-                                      ? AppColors
-                                          .glassBg1
-                                      : colors
-                                          .onPrimary,
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: isGlass
+                                  ? AppColors.glassBg1
+                                  : colors.onPrimary,
                             ),
                           )
                         : Icon(
-                            Icons
-                                .arrow_upward_rounded,
-                            size: 22,
-                            color:
-                                isGlass
-                                    ? AppColors
-                                        .glassBg1
-                                    : colors
-                                        .onPrimary,
+                            Icons.arrow_upward_rounded,
+                            size: 24,
+                            color: isGlass
+                                ? AppColors.glassBg1
+                                : colors.onPrimary,
                           ),
                   ),
                 ),
@@ -2348,8 +1631,7 @@ class _AIAssistantPageState
 // CYBER BACKGROUND PAINTER
 // ================================================================
 
-class _CyberBackgroundPainter
-    extends CustomPainter {
+class _CyberBackgroundPainter extends CustomPainter {
   final Color lineColor;
 
   _CyberBackgroundPainter({
@@ -2367,9 +1649,7 @@ class _CyberBackgroundPainter
 
     const double spacing = 42;
 
-    for (double x = 0;
-        x <= size.width;
-        x += spacing) {
+    for (double x = 0; x <= size.width; x += spacing) {
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),
@@ -2377,9 +1657,7 @@ class _CyberBackgroundPainter
       );
     }
 
-    for (double y = 0;
-        y <= size.height;
-        y += spacing) {
+    for (double y = 0; y <= size.height; y += spacing) {
       canvas.drawLine(
         Offset(0, y),
         Offset(size.width, y),
@@ -2392,7 +1670,6 @@ class _CyberBackgroundPainter
   bool shouldRepaint(
     covariant _CyberBackgroundPainter oldDelegate,
   ) {
-    return oldDelegate.lineColor !=
-        lineColor;
+    return oldDelegate.lineColor != lineColor;
   }
 }

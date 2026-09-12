@@ -1,47 +1,78 @@
-// features/database_akun.dart
-import 'dart:convert';
+// lib/features/database_akun.dart
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../data.dart';
 import '../helpers/sound_helper.dart';
-import '../constants/appearance.dart'; // 🔥 import warna
+import '../helpers/theme_helper.dart';
+import '../helpers/scroll_reveal.dart';
+import '../constants/appearance.dart';
+
+// ============================================================
+// HELPER COLORS (Disesuaikan agar Dark Mode berfungsi sempurna)
+// ============================================================
+
+Color _getPrimaryTextColor(AppThemeMode themeMode, ColorScheme colors) {
+  if (ThemeHelper.isNeo(themeMode)) return AppColors.neoTextPrimary;
+  if (ThemeHelper.isGlass(themeMode)) return AppColors.glassTextPrimary;
+  if (ThemeHelper.isModern(themeMode)) return AppColors.modernTextPrimary;
+  if (ThemeHelper.isAurora(themeMode)) return AppColors.auroraTextPrimary;
+  if (ThemeHelper.isCyber(themeMode)) return AppColors.cyberTextPrimary;
+  return colors.onSurface;
+}
+
+Color _getSecondaryTextColor(AppThemeMode themeMode, ColorScheme colors) {
+  if (ThemeHelper.isNeo(themeMode)) return AppColors.neoTextSecondary;
+  if (ThemeHelper.isGlass(themeMode)) return AppColors.glassTextSecondary;
+  if (ThemeHelper.isModern(themeMode)) return AppColors.modernTextSecondary;
+  if (ThemeHelper.isAurora(themeMode)) return AppColors.auroraTextSecondary;
+  if (ThemeHelper.isCyber(themeMode)) return AppColors.cyberTextSecondary;
+  return colors.onSurfaceVariant;
+}
+
+Color _getHeaderTextColor(AppThemeMode themeMode, ColorScheme colors) {
+  if (ThemeHelper.isNeo(themeMode)) return AppColors.neoTextPrimary;
+  if (ThemeHelper.isGlass(themeMode)) return AppColors.glassTextPrimary;
+  if (ThemeHelper.isModern(themeMode)) return AppColors.modernTextPrimary;
+  if (ThemeHelper.isAurora(themeMode)) return AppColors.auroraTextPrimary;
+  if (ThemeHelper.isCyber(themeMode)) return AppColors.cyberAccent1;
+  return colors.onSurface;
+}
 
 // ============================================================
 // HALAMAN UTAMA
 // ============================================================
-class DatabaseAkunPage extends StatefulWidget {
+
+class DatabaseAkunPage extends ConsumerStatefulWidget {
   const DatabaseAkunPage({super.key});
 
   @override
-  State<DatabaseAkunPage> createState() => _DatabaseAkunPageState();
+  ConsumerState<DatabaseAkunPage> createState() => _DatabaseAkunPageState();
 }
 
-class _DatabaseAkunPageState extends State<DatabaseAkunPage>
+class _DatabaseAkunPageState extends ConsumerState<DatabaseAkunPage>
     with SingleTickerProviderStateMixin {
   List<AkunDigital> _allAccounts = [];
   bool _isLoading = true;
 
-  // Tab controller
   late TabController _tabController;
-
-  // Filter untuk Siswa (kelas)
   String _filterKelasSiswa = 'Semua';
-
-  // Pencarian
   String _searchQuery = '';
 
-  // Controller untuk form
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _namaSiswaController = TextEditingController(); // tambahan
+  final _namaSiswaController = TextEditingController();
   final _emailController = TextEditingController();
   final _penanggungJawabController = TextEditingController();
   final _passwordController = TextEditingController();
   final _keteranganController = TextEditingController();
+
   String _selectedCategory = 'guru';
   String? _selectedKelas;
 
-  // Daftar pilihan kelas
   final List<String> _kelasOptions = [
     'Semua',
     'X RPL',
@@ -74,63 +105,59 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
     super.dispose();
   }
 
-  // ===================== LOAD & SAVE =====================
+  // ============================================================
+  // FIRESTORE INTEGRATION
+  // ============================================================
+
   Future<void> _loadAccounts() async {
+    setState(() => _isLoading = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? jsonString = prefs.getString('akunDigital');
-      if (jsonString != null) {
-        final List<dynamic> jsonList = json.decode(jsonString);
+      final snapshot = await FirebaseFirestore.instance.collection('akun_digital').get();
+      if (mounted) {
         setState(() {
-          _allAccounts =
-              jsonList.map((e) => AkunDigital.fromJson(e)).toList();
+          _allAccounts = snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return AkunDigital.fromJson(data);
+          }).toList();
         });
-      } else {
-        _allAccounts = [];
       }
     } catch (e) {
       debugPrint('Gagal load akun: $e');
       _allAccounts = [];
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _saveAccounts() async {
+  Future<void> _addAccount(AkunDigital account) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String jsonString =
-          json.encode(_allAccounts.map((a) => a.toJson()).toList());
-      await prefs.setString('akunDigital', jsonString);
+      await FirebaseFirestore.instance.collection('akun_digital').doc(account.id).set(account.toJson());
+      await _loadAccounts();
     } catch (e) {
-      debugPrint('Gagal simpan akun: $e');
+      debugPrint('Gagal tambah akun: $e');
     }
   }
 
-  // ===================== CRUD =====================
-  void _addAccount(AkunDigital account) {
-    setState(() => _allAccounts.add(account));
-    _saveAccounts();
-  }
-
-  void _updateAccount(AkunDigital updated) {
-    final index = _allAccounts.indexWhere((a) => a.id == updated.id);
-    if (index != -1) {
-      setState(() => _allAccounts[index] = updated);
-      _saveAccounts();
+  Future<void> _updateAccount(AkunDigital updated) async {
+    try {
+      await FirebaseFirestore.instance.collection('akun_digital').doc(updated.id).update(updated.toJson());
+      await _loadAccounts();
+    } catch (e) {
+      debugPrint('Gagal update akun: $e');
     }
   }
 
-  void _deleteAccount(String id) {
-    setState(() => _allAccounts.removeWhere((a) => a.id == id));
-    _saveAccounts();
+  Future<void> _deleteAccount(String id) async {
+    try {
+      await FirebaseFirestore.instance.collection('akun_digital').doc(id).delete();
+      await _loadAccounts();
+    } catch (e) {
+      debugPrint('Gagal hapus akun: $e');
+    }
   }
 
-  // ===================== DIALOG TAMBAH / EDIT =====================
   void _showAccountDialog({AkunDigital? existing}) {
-
     if (existing != null) {
       _nameController.text = existing.name;
       _namaSiswaController.text = existing.namaSiswa ?? '';
@@ -151,11 +178,63 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
       _selectedKelas = null;
     }
 
+    final themeMode = ref.read(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+    final bool isNeo = ThemeHelper.isNeo(themeMode);
+    final bool isAurora = ThemeHelper.isAurora(themeMode);
+    final bool isCyber = ThemeHelper.isCyber(themeMode);
+    final bool isModern = ThemeHelper.isModern(themeMode);
+
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    
+    final dialogBackground = isGlass
+        ? AppColors.glassBg1
+        : isNeo
+            ? AppColors.neoBase
+            : isAurora
+                ? AppColors.auroraSurface
+                : isCyber
+                    ? AppColors.cyberSurface
+                    : isModern
+                        ? AppColors.modernSurface
+                        : colors.surface;
+
+    final inputBackground = isGlass
+        ? Colors.white.withValues(alpha: 0.12)
+        : isNeo
+            ? AppColors.neoBaseAlt
+            : isAurora
+                ? AppColors.auroraSurface
+                : isCyber
+                    ? AppColors.cyberSurface
+                    : isModern
+                        ? AppColors.modernSurface
+                        : colors.surfaceContainerHighest;
+
+    final inputBorder = isGlass
+        ? Colors.white.withValues(alpha: 0.30)
+        : isNeo
+            ? AppColors.neoShadow.withValues(alpha: 0.25)
+            : isModern
+                ? AppColors.modernDivider
+                : colors.outlineVariant;
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setStateDialog) {
           return AlertDialog(
+            backgroundColor: dialogBackground,
+            surfaceTintColor: Colors.transparent,
+            titleTextStyle: TextStyle(
+              color: primaryText,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+            contentTextStyle: TextStyle(color: primaryText),
             title: Text(existing == null ? 'Tambah Akun' : 'Edit Akun'),
             content: SizedBox(
               width: double.maxFinite,
@@ -165,121 +244,218 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Nama Akun / Layanan
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: primaryText),
+                        decoration: InputDecoration(
                           labelText: 'Nama Akun / Layanan',
-                          border: OutlineInputBorder(),
+                          labelStyle: TextStyle(color: secondaryText),
+                          filled: true,
+                          fillColor: inputBackground,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: accentColor,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
-                        validator: (v) =>
-                            v!.trim().isEmpty ? 'Wajib diisi' : null,
+                        validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null,
                       ),
-                      const SizedBox(height: 12),
-
-                      // Nama Siswa (hanya jika kategori siswa)
-                      if (_selectedCategory == 'siswa')
+                      if (_selectedCategory == 'siswa') ...[
+                        const SizedBox(height: 12),
                         TextFormField(
                           controller: _namaSiswaController,
-                          decoration: const InputDecoration(
+                          style: TextStyle(color: primaryText),
+                          decoration: InputDecoration(
                             labelText: 'Nama Siswa (untuk tampilan)',
-                            border: OutlineInputBorder(),
+                            labelStyle: TextStyle(color: secondaryText),
+                            filled: true,
+                            fillColor: inputBackground,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: inputBorder),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: accentColor,
+                                width: 1.5,
+                              ),
+                            ),
                           ),
-                          validator: (v) =>
-                              v!.trim().isEmpty ? 'Wajib diisi' : null,
+                          validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null,
                         ),
-                      if (_selectedCategory == 'siswa') const SizedBox(height: 12),
-
-                      // Email
+                      ],
+                      const SizedBox(height: 12),
                       TextFormField(
                         controller: _emailController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: primaryText),
+                        decoration: InputDecoration(
                           labelText: 'Email / Username',
-                          border: OutlineInputBorder(),
+                          labelStyle: TextStyle(color: secondaryText),
+                          filled: true,
+                          fillColor: inputBackground,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: accentColor,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
-                        validator: (v) =>
-                            v!.trim().isEmpty ? 'Wajib diisi' : null,
+                        validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null,
                       ),
                       const SizedBox(height: 12),
-
-                      // Penanggung Jawab
                       TextFormField(
                         controller: _penanggungJawabController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: primaryText),
+                        decoration: InputDecoration(
                           labelText: 'Penanggung Jawab',
-                          border: OutlineInputBorder(),
+                          labelStyle: TextStyle(color: secondaryText),
+                          filled: true,
+                          fillColor: inputBackground,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: accentColor,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Password
                       TextFormField(
                         controller: _passwordController,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(),
-                        ),
                         obscureText: true,
-                        validator: (v) =>
-                            v!.trim().isEmpty ? 'Wajib diisi' : null,
+                        style: TextStyle(color: primaryText),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          labelStyle: TextStyle(color: secondaryText),
+                          filled: true,
+                          fillColor: inputBackground,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: accentColor,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null,
                       ),
                       const SizedBox(height: 12),
-
-                      // Keterangan
                       TextFormField(
                         controller: _keteranganController,
-                        decoration: const InputDecoration(
-                          labelText: 'Keterangan',
-                          border: OutlineInputBorder(),
-                        ),
                         maxLines: 2,
+                        style: TextStyle(color: primaryText),
+                        decoration: InputDecoration(
+                          labelText: 'Keterangan',
+                          labelStyle: TextStyle(color: secondaryText),
+                          filled: true,
+                          fillColor: inputBackground,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: accentColor,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Kategori (Guru / Siswa)
                       DropdownButtonFormField<String>(
                         value: _selectedCategory,
+                        dropdownColor: dialogBackground,
+                        style: TextStyle(color: primaryText),
+                        iconEnabledColor: accentColor,
                         items: const [
                           DropdownMenuItem(value: 'guru', child: Text('Guru')),
-                          DropdownMenuItem(
-                              value: 'siswa', child: Text('Siswa')),
+                          DropdownMenuItem(value: 'siswa', child: Text('Siswa')),
                         ],
                         onChanged: (val) {
+                          if (val == null) return;
                           setStateDialog(() {
-                            _selectedCategory = val!;
-                            if (val == 'guru') _selectedKelas = null;
-                            // reset nama siswa
-                            if (val == 'guru') _namaSiswaController.clear();
+                            _selectedCategory = val;
+                            if (val == 'guru') {
+                              _selectedKelas = null;
+                              _namaSiswaController.clear();
+                            }
                           });
                         },
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Kategori',
-                          border: OutlineInputBorder(),
+                          labelStyle: TextStyle(color: secondaryText),
+                          filled: true,
+                          fillColor: inputBackground,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: accentColor,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-
-                      // Kelas (hanya jika siswa)
-                      if (_selectedCategory == 'siswa')
+                      if (_selectedCategory == 'siswa') ...[
+                        const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: _selectedKelas,
-                          hint: const Text('Pilih Kelas'),
+                          dropdownColor: dialogBackground,
+                          style: TextStyle(color: primaryText),
+                          iconEnabledColor: accentColor,
+                          hint: Text('Pilih Kelas', style: TextStyle(color: secondaryText)),
                           items: _kelasOptions
                               .where((k) => k != 'Semua')
-                              .map((k) => DropdownMenuItem(
-                                    value: k,
-                                    child: Text(k),
-                                  ))
+                              .map((k) => DropdownMenuItem(value: k, child: Text(k)))
                               .toList(),
                           onChanged: (val) {
                             setStateDialog(() => _selectedKelas = val);
                           },
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Kelas',
-                            border: OutlineInputBorder(),
+                            labelStyle: TextStyle(color: secondaryText),
+                            filled: true,
+                            fillColor: inputBackground,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: inputBorder),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: accentColor,
+                                width: 1.5,
+                              ),
+                            ),
                           ),
                           validator: (v) => v == null ? 'Pilih kelas' : null,
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -298,20 +474,15 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                   SoundHelper().playClick();
                   if (_formKey.currentState!.validate()) {
                     final name = _nameController.text.trim();
-                    final namaSiswa = _selectedCategory == 'siswa'
-                        ? _namaSiswaController.text.trim()
-                        : null;
+                    final namaSiswa = _selectedCategory == 'siswa' ? _namaSiswaController.text.trim() : null;
                     final email = _emailController.text.trim();
-                    final penanggungJawab =
-                        _penanggungJawabController.text.trim();
+                    final penanggungJawab = _penanggungJawabController.text.trim();
                     final password = _passwordController.text.trim();
                     final keterangan = _keteranganController.text.trim();
                     final category = _selectedCategory;
-                    final kelas =
-                        category == 'siswa' ? _selectedKelas : null;
+                    final kelas = category == 'siswa' ? _selectedKelas : null;
 
                     if (existing == null) {
-                      // Tambah baru
                       final newAccount = AkunDigital(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
                         name: name,
@@ -328,7 +499,6 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                         const SnackBar(content: Text('Akun berhasil ditambahkan')),
                       );
                     } else {
-                      // Update
                       final updated = AkunDigital(
                         id: existing.id,
                         name: name,
@@ -348,6 +518,10 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                     Navigator.pop(ctx);
                   }
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor,
+                  foregroundColor: isGlass ? AppColors.glassBg1 : colors.onPrimary,
+                ),
                 child: Text(existing == null ? 'Tambah' : 'Simpan'),
               ),
             ],
@@ -357,11 +531,25 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
     );
   }
 
-  // ===================== KONFIRMASI HAPUS =====================
   void _showDeleteConfirmation(String id, String name) {
+    final themeMode = ref.read(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final dialogBackground = isGlass ? AppColors.glassBg1 : colors.surface;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: dialogBackground,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+          color: primaryText,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+        contentTextStyle: TextStyle(color: secondaryText),
         title: const Text('Hapus Akun'),
         content: Text('Yakin ingin menghapus akun "$name"?'),
         actions: [
@@ -381,7 +569,10 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
                 const SnackBar(content: Text('Akun berhasil dihapus')),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Hapus'),
           ),
         ],
@@ -389,13 +580,64 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
     );
   }
 
-  // ===================== NAIK KELAS (PROMOSI) =====================
-  void _promoteClasses() {
+  Future<void> _promoteClasses() async {
     final TextEditingController folderController = TextEditingController();
+    final themeMode = ref.read(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+    final bool isNeo = ThemeHelper.isNeo(themeMode);
+    final bool isAurora = ThemeHelper.isAurora(themeMode);
+    final bool isCyber = ThemeHelper.isCyber(themeMode);
+    final bool isModern = ThemeHelper.isModern(themeMode);
 
-    showDialog(
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    
+    final dialogBackground = isGlass
+        ? AppColors.glassBg1
+        : isNeo
+            ? AppColors.neoBase
+            : isAurora
+                ? AppColors.auroraSurface
+                : isCyber
+                    ? AppColors.cyberSurface
+                    : isModern
+                        ? AppColors.modernSurface
+                        : colors.surface;
+
+    final inputBackground = isGlass
+        ? Colors.white.withValues(alpha: 0.12)
+        : isNeo
+            ? AppColors.neoBaseAlt
+            : isAurora
+                ? AppColors.auroraSurface
+                : isCyber
+                    ? AppColors.cyberSurface
+                    : isModern
+                        ? AppColors.modernSurface
+                        : colors.surfaceContainerHighest;
+
+    final inputBorder = isGlass
+        ? Colors.white.withValues(alpha: 0.30)
+        : isNeo
+            ? AppColors.neoShadow.withValues(alpha: 0.25)
+            : isModern
+                ? AppColors.modernDivider
+                : colors.outlineVariant;
+
+    // Tampilkan dialog untuk mendapatkan nama folder
+    final folderName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: dialogBackground,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+          color: primaryText,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+        contentTextStyle: TextStyle(color: secondaryText),
         title: const Text('Verifikasi Kenaikan Kelas'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -403,19 +645,31 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
           children: [
             const Text(
               'Proses ini akan:\n'
-              '• Mengarsipkan semua siswa kelas XII (lulus) ke folder arsip siswa\n'
-              '• Menaikkan kelas siswa X→XI, XI→XII\n'
-              '• Mengarsipkan akun digital siswa kelas XII ke folder arsip akun digital\n'
-              '• Menaikkan kelas akun digital siswa X→XI, XI→XII\n\n'
-              'Catatan: Siswa baru untuk kelas X harus ditambahkan secara manual.\n\n'
+              '• Mengarsipkan semua akun siswa kelas XII (lulus) ke arsip Firebase\n'
+              '• Menaikkan kelas akun siswa X→XI, XI→XII\n\n'
+              'Catatan: Akun siswa baru untuk kelas X harus ditambahkan secara manual.\n\n'
               'Masukkan nama folder untuk arsip (misal: "2025/2026" atau "Angkatan 2025"):',
             ),
             const SizedBox(height: 12),
             TextField(
               controller: folderController,
-              decoration: const InputDecoration(
+              style: TextStyle(color: primaryText),
+              decoration: InputDecoration(
                 hintText: 'Nama folder arsip',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: secondaryText.withValues(alpha: 0.8)),
+                filled: true,
+                fillColor: inputBackground,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: inputBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: accentColor,
+                    width: 1.5,
+                  ),
+                ),
               ),
             ),
           ],
@@ -431,61 +685,98 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
           ElevatedButton(
             onPressed: () {
               SoundHelper().playClick();
-              final folderName = folderController.text.trim();
-              if (folderName.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Nama folder tidak boleh kosong!'),
-                  ),
-                );
-                return;
-              }
-
-              // 1. Proses kenaikan kelas untuk data siswa (sampleStudents)
-              archiveGraduatedStudents(folderName, sampleStudents); // arsip siswa XII
-              processClassPromotion(sampleStudents); // naikkan X→XI, XI→XII
-
-              // 2. Proses kenaikan kelas untuk akun digital siswa
-              //    Arsipkan akun XII ke arsipAkunSiswa
-              archiveGraduatedAccounts(folderName, _allAccounts);
-              //    Naikkan akun X→XI, XI→XII
-              promoteAccounts(_allAccounts);
-
-              // 3. Simpan perubahan akun digital ke SharedPreferences
-              _saveAccounts();
-
-              // 4. Catat log
-              localLogs.insert(
-                0,
-                ActivityLog(
-                  user: 'Admin',
-                  action: ActivityAction.edit,
-                  detail: 'Kenaikan kelas dengan arsip "$folderName"',
-                  timestamp: DateTime.now(),
-                ),
-              );
-
-              Navigator.pop(ctx);
-              if (mounted) {
-                setState(() {}); // refresh tampilan
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Kenaikan kelas berhasil! Arsip: "$folderName"',
-                  ),
-                ),
-              );
+              Navigator.pop(ctx, folderController.text.trim());
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              foregroundColor: isGlass ? AppColors.glassBg1 : colors.onPrimary,
+            ),
             child: const Text('Ya, Naikkan Kelas'),
           ),
         ],
       ),
     );
+
+    // Jika user batal atau input kosong
+    if (folderName == null) return;
+    
+    if (folderName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama folder tidak boleh kosong!')),
+      );
+      return;
+    }
+
+    // Jalankan proses Firebase setelah dialog tertutup
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Archive XII grader students
+      final batch = FirebaseFirestore.instance.batch();
+      final snapshot = await FirebaseFirestore.instance.collection('akun_digital')
+          .where('category', isEqualTo: 'siswa')
+          .where('kelas', whereIn: ['XII RPL', 'XII TKJ', 'XII TKR'])
+          .get();
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        final archiveRef = FirebaseFirestore.instance.collection('akun_digital_archive').doc(folderName).collection('accounts').doc(doc.id);
+        batch.set(archiveRef, data);
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      // 2. Promote X and XI
+      final batch2 = FirebaseFirestore.instance.batch();
+      final promoteSnapshot = await FirebaseFirestore.instance.collection('akun_digital')
+          .where('category', isEqualTo: 'siswa')
+          .get();
+
+      for (var doc in promoteSnapshot.docs) {
+        final data = doc.data();
+        final kelas = data['kelas'] as String?;
+        if (kelas != null) {
+          String newKelas = kelas;
+          if (kelas.startsWith('XI ')) {
+            newKelas = 'XII ' + kelas.substring(3);
+          } else if (kelas.startsWith('X ')) {
+            newKelas = 'XI ' + kelas.substring(2);
+          }
+          if (newKelas != kelas) {
+            batch2.update(doc.reference, {'kelas': newKelas});
+          }
+        }
+      }
+      await batch2.commit();
+
+      localLogs.insert(
+        0,
+        ActivityLog(
+          user: 'Admin',
+          action: ActivityAction.edit,
+          detail: 'Kenaikan kelas akun digital dengan arsip "$folderName"',
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      await _loadAccounts();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Kenaikan kelas berhasil! Arsip: "$folderName"')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal: $e')),
+        );
+      }
+    }
   }
 
-  // ===================== LIHAT ARSIP AKUN DIGITAL =====================
   void _viewArchive() {
     SoundHelper().playClick();
     Navigator.push(
@@ -494,19 +785,29 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
     ).then((_) => setState(() {}));
   }
 
-  // ===================== BUILD =====================
   @override
   Widget build(BuildContext context) {
-    // Filter guru (tanpa filter kelas)
-    List<AkunDigital> guruList = _allAccounts
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final headerText = _getHeaderTextColor(themeMode, colors);
+
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+    final bool isNeo = ThemeHelper.isNeo(themeMode);
+    final bool isAurora = ThemeHelper.isAurora(themeMode);
+    final bool isCyber = ThemeHelper.isCyber(themeMode);
+    final bool isModern = ThemeHelper.isModern(themeMode);
+
+    final List<AkunDigital> guruList = _allAccounts
         .where((a) => a.category == 'guru')
         .where((a) => _matchesSearch(a))
         .toList();
 
-    // Filter siswa: hanya yang belum lulus (kelas != 'Lulus') dan sesuai filter kelas & pencarian
-    List<AkunDigital> siswaList = _allAccounts
+    final List<AkunDigital> siswaList = _allAccounts
         .where((a) => a.category == 'siswa')
-        .where((a) => a.kelas != 'Lulus') // hilangkan siswa lulus
+        .where((a) => a.kelas != 'Lulus')
         .where((a) {
           if (_filterKelasSiswa == 'Semua') return true;
           return a.kelas == _filterKelasSiswa;
@@ -514,112 +815,159 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
         .where((a) => _matchesSearch(a))
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Database Akun Digital'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.person), text: 'Guru'),
-            Tab(icon: Icon(Icons.school), text: 'Siswa'),
+    final searchBackground = isGlass
+        ? Colors.white.withValues(alpha: 0.14)
+        : isNeo
+            ? AppColors.neoBaseAlt
+            : isAurora
+                ? AppColors.auroraSurface
+                : isCyber
+                    ? AppColors.cyberSurface
+                    : isModern
+                        ? AppColors.modernSurface
+                        : colors.surfaceContainerHighest;
+
+    final searchBorder = isGlass
+        ? Colors.white.withValues(alpha: 0.25)
+        : isNeo
+            ? AppColors.neoShadow.withValues(alpha: 0.20)
+            : isModern
+                ? AppColors.modernDivider
+                : colors.outlineVariant;
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(
+          backgroundColor: isNeo ? AppColors.neoBase : Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            'Database Akun Digital',
+            style: TextStyle(color: headerText),
+          ),
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: accentColor,
+            labelColor: headerText,
+            unselectedLabelColor: secondaryText,
+            tabs: const [
+              Tab(icon: Icon(Icons.person), text: 'Guru'),
+              Tab(icon: Icon(Icons.school), text: 'Siswa'),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.archive, color: headerText),
+              onPressed: _viewArchive,
+              tooltip: 'Lihat Arsip Akun Digital',
+            ),
+            IconButton(
+              icon: Icon(Icons.arrow_upward, color: headerText),
+              onPressed: _promoteClasses,
+              tooltip: 'Kenaikan Kelas',
+            ),
+            IconButton(
+              icon: Icon(Icons.add, color: headerText),
+              onPressed: () {
+                SoundHelper().playClick();
+                _showAccountDialog();
+              },
+              tooltip: 'Tambah Akun',
+            ),
           ],
         ),
-        actions: [
-          // Tombol Arsip (khusus untuk akun digital)
-          IconButton(
-            icon: const Icon(Icons.archive),
-            onPressed: _viewArchive,
-            tooltip: 'Lihat Arsip Akun Digital',
-          ),
-          // Tombol Naik Kelas
-          IconButton(
-            icon: const Icon(Icons.arrow_upward),
-            onPressed: _promoteClasses,
-            tooltip: 'Kenaikan Kelas',
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              SoundHelper().playClick();
-              _showAccountDialog();
-            },
-            tooltip: 'Tambah Akun',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Pencarian
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Cari akun...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                style: TextStyle(color: primaryText),
+                cursorColor: accentColor,
+                decoration: InputDecoration(
+                  hintText: 'Cari akun...',
+                  hintStyle: TextStyle(color: secondaryText.withValues(alpha: 0.8)),
+                  prefixIcon: Icon(Icons.search, color: accentColor),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: searchBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: searchBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: accentColor, width: 1.5),
+                  ),
+                  filled: true,
+                  fillColor: searchBackground,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
               ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase();
-                });
-              },
             ),
-          ),
-          // TabBarView
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // TAB GURU
-                _buildAccountList(guruList, isGuru: true),
-
-                // TAB SISWA (dengan filter kelas)
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          const Text('Filter Kelas:'),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButton<String>(
-                              value: _filterKelasSiswa,
-                              items: _kelasOptions.map((kelas) {
-                                return DropdownMenuItem(
-                                  value: kelas,
-                                  child: Text(kelas),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                SoundHelper().playClick();
-                                setState(() => _filterKelasSiswa = val!);
-                              },
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildAccountList(guruList, isGuru: true),
+                  Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Filter Kelas:',
+                              style: TextStyle(
+                                color: primaryText,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButton<String>(
+                                value: _filterKelasSiswa,
+                                dropdownColor: isGlass ? AppColors.glassBg1 : colors.surface,
+                                style: TextStyle(color: primaryText),
+                                iconEnabledColor: accentColor,
+                                items: _kelasOptions.map((kelas) {
+                                  return DropdownMenuItem(
+                                    value: kelas,
+                                    child: Text(kelas),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val == null) return;
+                                  SoundHelper().playClick();
+                                  setState(() => _filterKelasSiswa = val);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: _buildAccountList(siswaList, isGuru: false),
-                    ),
-                  ],
-                ),
-              ],
+                      Expanded(
+                        child: _buildAccountList(siswaList, isGuru: false),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ===================== FUNGSI BANTU PENCARIAN =====================
   bool _matchesSearch(AkunDigital acc) {
     if (_searchQuery.isEmpty) return true;
     final query = _searchQuery.toLowerCase();
@@ -630,10 +978,15 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
         (acc.kelas?.toLowerCase().contains(query) ?? false);
   }
 
-  // ===================== WIDGET LIST AKUN =====================
   Widget _buildAccountList(List<AkunDigital> accounts, {required bool isGuru}) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: accentColor));
     }
 
     if (accounts.isEmpty) {
@@ -644,17 +997,24 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
             Icon(
               isGuru ? Icons.person_outline : Icons.cast_for_education,
               size: 80,
-              color: Colors.grey.shade400,
+              color: secondaryText.withValues(alpha: 0.55),
             ),
             const SizedBox(height: 16),
             Text(
               'Belum ada akun ${isGuru ? 'guru' : 'siswa aktif'}',
-              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 18,
+                color: primaryText,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Tekan tombol + di atas untuk menambahkan',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              style: TextStyle(
+                fontSize: 14,
+                color: secondaryText,
+              ),
             ),
           ],
         ),
@@ -663,42 +1023,55 @@ class _DatabaseAkunPageState extends State<DatabaseAkunPage>
 
     return ListView.builder(
       itemCount: accounts.length,
+      padding: const EdgeInsets.only(top: 4, bottom: 12),
       itemBuilder: (context, index) {
         final acc = accounts[index];
-        return _buildAccountCard(acc);
+        return ScrollReveal(
+          delay: Duration(milliseconds: 50 * index),
+          child: _buildAccountCard(acc, themeMode),
+        );
       },
     );
   }
 
-  // ===================== WIDGET KARTU AKUN =====================
-Widget _buildAccountCard(AkunDigital acc) {
-  // Data untuk tampilan
-  final displayTitle = acc.name;
+  Widget _buildAccountCard(AkunDigital acc, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
 
-  final displaySubtitle = acc.category == 'siswa'
-      ? (acc.namaSiswa?.isNotEmpty == true
-          ? acc.namaSiswa!
-          : '-')
-      : acc.email;
+    final displayTitle = acc.name;
+    final displaySubtitle = acc.category == 'siswa'
+        ? (acc.namaSiswa?.isNotEmpty == true ? acc.namaSiswa! : '-')
+        : acc.email;
 
-  return Card(
-    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    child: ExpansionTile(
+    final Widget tile = ExpansionTile(
+      backgroundColor: Colors.transparent,
+      collapsedBackgroundColor: Colors.transparent,
+      textColor: primaryText,
+      iconColor: accentColor,
+      collapsedTextColor: primaryText,
+      collapsedIconColor: secondaryText,
       leading: CircleAvatar(
-        backgroundColor: AppColors.primary,
+        backgroundColor: isGlass ? Colors.white.withValues(alpha: 0.18) : accentColor,
         child: Icon(
           acc.category == 'guru' ? Icons.person : Icons.school,
-          color: Colors.white,
+          color: isGlass ? Colors.white : colors.onPrimary,
         ),
       ),
       title: Text(
         displayTitle,
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: primaryText,
+        ),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
       ),
       subtitle: Text(
         displaySubtitle,
+        style: TextStyle(color: secondaryText),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
       ),
@@ -710,16 +1083,24 @@ Widget _buildAccountCard(AkunDigital acc) {
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Chip(
-                label: Text(acc.kelas!),
+                label: Text(
+                  acc.kelas!,
+                  style: TextStyle(
+                    color: isGlass ? Colors.white : primaryText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 backgroundColor: acc.kelas == 'Lulus'
-                    ? Colors.grey.shade300
-                    : Colors.blue.shade100,
+                    ? secondaryText.withValues(alpha: 0.18)
+                    : accentColor.withValues(alpha: 0.14),
+                side: BorderSide(color: accentColor.withValues(alpha: 0.20)),
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
             ),
           IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 20),
+            icon: Icon(Icons.edit_outlined, size: 20, color: accentColor),
             onPressed: () {
               SoundHelper().playClick();
               _showAccountDialog(existing: acc);
@@ -729,11 +1110,7 @@ Widget _buildAccountCard(AkunDigital acc) {
             padding: EdgeInsets.zero,
           ),
           IconButton(
-            icon: const Icon(
-              Icons.delete_outline,
-              size: 20,
-              color: Colors.red,
-            ),
+            icon: Icon(Icons.delete_outline, size: 20, color: colors.error),
             onPressed: () {
               SoundHelper().playClick();
               _showDeleteConfirmation(acc.id, acc.name);
@@ -751,24 +1128,35 @@ Widget _buildAccountCard(AkunDigital acc) {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (acc.category == 'siswa' &&
-                  acc.namaSiswa?.isNotEmpty == true)
-                _infoRow('Nama Siswa', acc.namaSiswa!),
-              _infoRow('Layanan', acc.name),
-              _infoRow('Email', acc.email),
-              _infoRow('Penanggung Jawab', acc.penanggungJawab),
-              _infoRow('Keterangan', acc.keterangan),
-              _infoRow('Password', acc.password),
+              if (acc.category == 'siswa' && acc.namaSiswa?.isNotEmpty == true)
+                _infoRow('Nama Siswa', acc.namaSiswa!, themeMode),
+              _infoRow('Layanan', acc.name, themeMode),
+              _infoRow('Email', acc.email, themeMode),
+              _infoRow('Penanggung Jawab', acc.penanggungJawab, themeMode),
+              _infoRow('Keterangan', acc.keterangan, themeMode),
+              _infoRow('Password', acc.password, themeMode),
               if (acc.category == 'siswa' && acc.kelas != null)
-                _infoRow('Kelas', acc.kelas!),
+                _infoRow('Kelas', acc.kelas!, themeMode),
             ],
           ),
         ),
       ],
-    ),
-  );
-}
-  Widget _infoRow(String label, String value) {
+    );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: _buildThemedContainer(
+        borderRadius: ThemeHelper.isCyber(themeMode) ? 12 : 18,
+        child: tile,
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -778,13 +1166,20 @@ Widget _buildAccountCard(AkunDigital acc) {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(
+                color: secondaryText,
+                fontSize: 13,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value.isEmpty ? '-' : value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: primaryText,
+                fontSize: 13,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -792,107 +1187,278 @@ Widget _buildAccountCard(AkunDigital acc) {
       ),
     );
   }
+
+  Widget _buildThemedContainer({
+    required Widget child,
+    double borderRadius = 18,
+  }) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+
+    if (ThemeHelper.isNeo(themeMode)) {
+      return Container(
+        decoration: neumorphismDecoration(borderRadius: borderRadius, isPressed: false),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: child,
+        ),
+      );
+    }
+    if (ThemeHelper.isGlass(themeMode)) {
+      return Container(
+        decoration: glassmorphismDecoration(borderRadius: borderRadius),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: child,
+          ),
+        ),
+      );
+    }
+    if (ThemeHelper.isModern(themeMode)) {
+      return Container(
+        decoration: modernDecoration(borderRadius: borderRadius),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: child,
+        ),
+      );
+    }
+    if (ThemeHelper.isAurora(themeMode)) {
+      return Container(
+        decoration: auroraDecoration(borderRadius: borderRadius),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: child,
+        ),
+      );
+    }
+    if (ThemeHelper.isCyber(themeMode)) {
+      return Container(
+        decoration: cyberpunkDecoration(borderRadius: borderRadius),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: child,
+        ),
+      );
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      color: colors.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: child,
+    );
+  }
 }
 
 // ============================================================
-// HALAMAN ARSIP AKUN DIGITAL (tidak berubah)
+// HALAMAN ARSIP AKUN DIGITAL
 // ============================================================
-class ArchiveAkunPage extends StatelessWidget {
+
+class ArchiveAkunPage extends ConsumerWidget {
   const ArchiveAkunPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final tahunKeys = arsipAkunSiswa.keys.toList()..sort((a, b) => b.compareTo(a));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Arsip Akun Digital Siswa')),
-      body: tahunKeys.isEmpty
-          ? const Center(child: Text('Belum ada arsip akun digital'))
-          : ListView.builder(
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final headerText = _getHeaderTextColor(themeMode, colors);
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(
+          backgroundColor: ThemeHelper.isNeo(themeMode) ? AppColors.neoBase : Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            'Arsip Akun Digital Siswa',
+            style: TextStyle(color: headerText),
+          ),
+        ),
+        body: FutureBuilder<QuerySnapshot>(
+          future: FirebaseFirestore.instance.collection('akun_digital_archive').get(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator(color: accentColor));
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Center(child: Text('Belum ada arsip akun digital', style: TextStyle(color: secondaryText)));
+            }
+            
+            final tahunKeys = snapshot.data!.docs.map((doc) => doc.id).toList()..sort((a, b) => b.compareTo(a));
+            
+            return ListView.builder(
+              padding: const EdgeInsets.all(12),
               itemCount: tahunKeys.length,
               itemBuilder: (context, index) {
                 final tahun = tahunKeys[index];
-                final kelasMap = arsipAkunSiswa[tahun]!;
-                final totalAkun = kelasMap.values.fold(
-                  0,
-                  (sum, list) => sum + list.length,
-                );
 
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.folder, color: Colors.amber),
-                    title: Text(tahun),
-                    subtitle: Text(
-                      '$totalAkun akun • ${kelasMap.length} kelas',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      SoundHelper().playClick();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ArchiveAkunClassPage(tahun: tahun),
+                return ScrollReveal(
+                  delay: Duration(milliseconds: 50 * index),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: _ArchiveThemeContainer(
+                      themeMode: themeMode,
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.folder,
+                          color: isGlass ? Colors.amberAccent : Colors.amber,
                         ),
-                      );
-                    },
+                        title: Text(
+                          tahun,
+                          style: TextStyle(color: primaryText, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Lihat detail arsip',
+                          style: TextStyle(color: secondaryText),
+                        ),
+                        trailing: Icon(Icons.chevron_right, color: secondaryText),
+                        onTap: () {
+                          SoundHelper().playClick();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ArchiveAkunClassPage(tahun: tahun),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 );
               },
-            ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-class ArchiveAkunClassPage extends StatelessWidget {
+// ============================================================
+// HALAMAN ARSIP PER KELAS
+// ============================================================
+
+class ArchiveAkunClassPage extends ConsumerWidget {
   final String tahun;
+
   const ArchiveAkunClassPage({super.key, required this.tahun});
 
   @override
-  Widget build(BuildContext context) {
-    final kelasMap = arsipAkunSiswa[tahun] ?? {};
-    final kelasKeys = kelasMap.keys.toList()..sort();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: Text('Arsip $tahun')),
-      body: kelasKeys.isEmpty
-          ? const Center(child: Text('Kosong'))
-          : ListView.builder(
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final headerText = _getHeaderTextColor(themeMode, colors);
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(
+          backgroundColor: ThemeHelper.isNeo(themeMode) ? AppColors.neoBase : Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            'Arsip $tahun',
+            style: TextStyle(color: headerText),
+          ),
+        ),
+        body: FutureBuilder<QuerySnapshot>(
+          future: FirebaseFirestore.instance.collection('akun_digital_archive').doc(tahun).collection('accounts').get(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator(color: ThemeHelper.getAccentColor(themeMode, colors)));
+            }
+            
+            final akunList = snapshot.data?.docs.map((doc) {
+              final data = doc.data()! as Map<String, dynamic>;
+              data['id'] = doc.id;
+              return AkunDigital.fromJson(data);
+            }).toList() ?? [];
+
+            final Map<String, List<AkunDigital>> kelasMap = {};
+            for (var acc in akunList) {
+              kelasMap.putIfAbsent(acc.kelas ?? 'Lulus', () => []).add(acc);
+            }
+            final kelasKeys = kelasMap.keys.toList()..sort();
+
+            if (kelasKeys.isEmpty) {
+              return Center(child: Text('Kosong', style: TextStyle(color: secondaryText)));
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(12),
               itemCount: kelasKeys.length,
               itemBuilder: (context, index) {
                 final kelas = kelasKeys[index];
-                final akunList = kelasMap[kelas]!;
+                final kelasAkunList = kelasMap[kelas]!;
 
-                return Card(
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.folder_open,
-                      color: getMajorColor(kelas),
-                    ),
-                    title: Text(kelas),
-                    subtitle: Text('${akunList.length} akun'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      SoundHelper().playClick();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ArchiveAkunListPage(
-                            tahun: tahun,
-                            kelas: kelas,
-                            akunList: akunList,
-                          ),
+                return ScrollReveal(
+                  delay: Duration(milliseconds: 50 * index),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: _ArchiveThemeContainer(
+                      themeMode: themeMode,
+                      child: ListTile(
+                        leading: Icon(Icons.folder_open, color: getMajorColor(kelas)),
+                        title: Text(
+                          kelas,
+                          style: TextStyle(color: primaryText, fontWeight: FontWeight.w600),
                         ),
-                      );
-                    },
+                        subtitle: Text(
+                          '${kelasAkunList.length} akun',
+                          style: TextStyle(color: secondaryText),
+                        ),
+                        trailing: Icon(Icons.chevron_right, color: secondaryText),
+                        onTap: () {
+                          SoundHelper().playClick();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ArchiveAkunListPage(
+                                tahun: tahun,
+                                kelas: kelas,
+                                akunList: kelasAkunList,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 );
               },
-            ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-class ArchiveAkunListPage extends StatelessWidget {
+// ============================================================
+// HALAMAN DAFTAR ARSIP
+// ============================================================
+
+class ArchiveAkunListPage extends ConsumerWidget {
   final String tahun;
   final String kelas;
   final List<AkunDigital> akunList;
@@ -905,39 +1471,154 @@ class ArchiveAkunListPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('$kelas - $tahun')),
-      body: ListView.builder(
-        itemCount: akunList.length,
-        itemBuilder: (context, index) {
-          final a = akunList[index];
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.account_circle, color: Colors.grey),
-              title: Text(
-                a.namaSiswa ?? a.name,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
+    final primaryText = _getPrimaryTextColor(themeMode, colors);
+    final secondaryText = _getSecondaryTextColor(themeMode, colors);
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+    final headerText = _getHeaderTextColor(themeMode, colors);
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(
+          backgroundColor: ThemeHelper.isNeo(themeMode) ? AppColors.neoBase : Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            '$kelas - $tahun',
+            style: TextStyle(color: headerText),
+          ),
+        ),
+        body: ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: akunList.length,
+          itemBuilder: (context, index) {
+            final a = akunList[index];
+
+            return ScrollReveal(
+              delay: Duration(milliseconds: 50 * index),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                child: _ArchiveThemeContainer(
+                  themeMode: themeMode,
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.account_circle,
+                      color: isGlass ? Colors.white : secondaryText,
+                    ),
+                    title: Text(
+                      a.namaSiswa ?? a.name,
+                      style: TextStyle(color: primaryText, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    subtitle: Text(
+                      'Email: ${a.email} • ${a.penanggungJawab}',
+                      style: TextStyle(color: secondaryText),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.remove_red_eye, color: accentColor),
+                      onPressed: () {
+                        SoundHelper().playClick();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Akun sudah diarsipkan (lulus)')),
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
-              subtitle: Text(
-                'Email: ${a.email} • ${a.penanggungJawab}',
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.remove_red_eye, color: Colors.grey),
-                onPressed: () {
-                  SoundHelper().playClick();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Akun sudah diarsipkan (lulus)')),
-                  );
-                },
-              ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// CONTAINER TEMA UNTUK HALAMAN ARSIP
+// ============================================================
+
+class _ArchiveThemeContainer extends StatelessWidget {
+  final AppThemeMode themeMode;
+  final Widget child;
+
+  const _ArchiveThemeContainer({
+    required this.themeMode,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    if (ThemeHelper.isNeo(themeMode)) {
+      return Container(
+        decoration: neumorphismDecoration(borderRadius: 18, isPressed: false),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: child,
+        ),
+      );
+    }
+    if (ThemeHelper.isGlass(themeMode)) {
+      return Container(
+        decoration: glassmorphismDecoration(borderRadius: 18),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: child,
+          ),
+        ),
+      );
+    }
+    if (ThemeHelper.isModern(themeMode)) {
+      return Container(
+        decoration: modernDecoration(borderRadius: 18),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: child,
+        ),
+      );
+    }
+    if (ThemeHelper.isAurora(themeMode)) {
+      return Container(
+        decoration: auroraDecoration(borderRadius: 18),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: child,
+        ),
+      );
+    }
+    if (ThemeHelper.isCyber(themeMode)) {
+      return Container(
+        decoration: cyberpunkDecoration(borderRadius: 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: child,
+        ),
+      );
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      color: colors.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: child,
     );
   }
 }

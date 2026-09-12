@@ -15,7 +15,7 @@ const List<String> defaultTeachers = [
   'Alfida Zumaroh, S. Kom.', 'Nur Khamim', 'Mustagfirrin',
 ];
 
-// Fungsi FAB yang menerima callback dan data
+// Fungsi FAB yang menerima callback dan data (Diperbarui)
 FloatingActionButton FABcheat({
   required BuildContext context,
   required VoidCallback onRefreshUI,
@@ -25,6 +25,7 @@ FloatingActionButton FABcheat({
   required VoidCallback onAutoLunas,
   required VoidCallback onClearAllData,
   required VoidCallback onSeedDefaultTeachers,
+  required VoidCallback onDeleteAllTeachers, // <--- Parameter Baru Ditambahkan
   required int currentBulan,
   required int currentTahun,
 }) {
@@ -52,6 +53,23 @@ FloatingActionButton FABcheat({
                     const SnackBar(
                       content: Text('Data guru default berhasil ditambahkan ke Firebase!'),
                       backgroundColor: Colors.indigo,
+                    ),
+                  );
+                },
+              ),
+              // === HAPUS SEMUA GURU & GAJI DARI FIREBASE ===
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.deepOrange),
+                title: const Text('Hapus Semua Data Guru'),
+                subtitle: const Text('Hapus seluruh guru beserta data gajinya'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onDeleteAllTeachers(); // Memanggil fungsi hapus semua guru
+                  onRefreshUI();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Proses penghapusan semua guru dimulai...'),
+                      backgroundColor: Colors.deepOrange,
                     ),
                   );
                 },
@@ -123,7 +141,7 @@ FloatingActionButton FABcheat({
               ListTile(
                 leading: const Icon(Icons.delete_sweep, color: Colors.red),
                 title: const Text('Hapus Semua Data Gaji'),
-                subtitle: const Text('Kosongkan seluruh data'),
+                subtitle: const Text('Kosongkan seluruh riwayat gaji (Data guru tetap)'),
                 onTap: () {
                   Navigator.pop(ctx);
                   onClearAllData();

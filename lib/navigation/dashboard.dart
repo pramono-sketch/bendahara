@@ -29,31 +29,57 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   double _totalIncomeAll = 0;
   double _totalExpenseAll = 0;
 
-  // =========================================================
-  // TAMBAHAN: DATA BULAN KEMARIN UNTUK KARTU PERBANDINGAN
-  // =========================================================
-
-  double _lastMonthIncome = 0;
-  double _lastMonthExpense = 0;
-
   Map<int, double> _monthlyIncome = {};
   String _aiInsight = '';
   List<Student> _activeStudents = [];
 
   // =========================================================
-  // FUNGSI FETCH DATA
+  // FUNGSI FETCH DATA GABUNGAN (AKTIF + ARSIP BULANAN)
   // =========================================================
 
+  /// Mengambil semua transaksi (transaksi aktif + transaksi arsip bulanan)
+  /// agar Total Kas Sekolah dan grafik tetap menampilkan seluruh history.
+  Future<List<Transaction>> _getAllCombinedTransactions() async {
+    final activeTransactions = await fetchAllTransactions();
+    final archivedMonths = await fetchArchivedMonths();
+
+    final Set<String> seenIds = activeTransactions.map((t) => t.id).toSet();
+    final List<Transaction> all = List.from(activeTransactions);
+
+    // Gabungkan dengan data yang sudah diarsipkan
+    for (final arch in archivedMonths) {
+      for (final t in arch.transactions) {
+        if (!seenIds.contains(t.id)) {
+          all.add(t);
+          seenIds.add(t.id);
+        }
+      }
+    }
+
+    // Gabungkan dengan transaksi lokal yang belum tersinkron
+    for (final t in localTransactions) {
+      if (!seenIds.contains(t.id)) {
+        all.add(t);
+        seenIds.add(t.id);
+      }
+    }
+
+    return all;
+  }
+
   Future<Map<int, double>> _getMonthlyIncome() async {
-    final transactions = await fetchAllTransactions();
+    final transactions = await _getAllCombinedTransactions();
 
     Map<int, double> monthly = {};
 
     for (var t in transactions) {
       if (t.type == TransType.pemasukan) {
         final month = t.date.month;
-
-        monthly[month] = (monthly[month] ?? 0) + t.amount;
+        final year = t.date.year;
+        // hanya hitung tahun berjalan untuk chart dashboard
+        if (year == DateTime.now().year) {
+          monthly[month] = (monthly[month] ?? 0) + t.amount;
+        }
       }
     }
 
@@ -68,7 +94,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final now = DateTime.now();
     final month = now.month;
 
-    final transactions = await fetchAllTransactions();
+    final transactions = await _getAllCombinedTransactions();
 
     double total = 0;
 
@@ -87,7 +113,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final now = DateTime.now();
     final month = now.month;
 
-    final transactions = await fetchAllTransactions();
+    final transactions = await _getAllCombinedTransactions();
 
     double total = 0;
 
@@ -102,64 +128,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return total;
   }
 
-  // =========================================================
-  // TAMBAHAN: FETCH DATA BULAN KEMARIN
-  // =========================================================
-
-  Future<double> _getLastMonthIncome() async {
-    final now = DateTime.now();
-
-    int lastMonth = now.month - 1;
-    int lastYear = now.year;
-
-    if (lastMonth == 0) {
-      lastMonth = 12;
-      lastYear--;
-    }
-
-    final transactions = await fetchAllTransactions();
-
-    double total = 0;
-
-    for (var t in transactions) {
-      if (t.type == TransType.pemasukan &&
-          t.date.month == lastMonth &&
-          t.date.year == lastYear) {
-        total += t.amount;
-      }
-    }
-
-    return total;
-  }
-
-  Future<double> _getLastMonthExpense() async {
-    final now = DateTime.now();
-
-    int lastMonth = now.month - 1;
-    int lastYear = now.year;
-
-    if (lastMonth == 0) {
-      lastMonth = 12;
-      lastYear--;
-    }
-
-    final transactions = await fetchAllTransactions();
-
-    double total = 0;
-
-    for (var t in transactions) {
-      if (t.type == TransType.pengeluaran &&
-          t.date.month == lastMonth &&
-          t.date.year == lastYear) {
-        total += t.amount;
-      }
-    }
-
-    return total;
-  }
-
   Future<double> _getTotalIncomeAllTime() async {
-    final transactions = await fetchAllTransactions();
+    final transactions = await _getAllCombinedTransactions();
 
     double total = 0;
 
@@ -173,7 +143,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Future<double> _getTotalExpenseAllTime() async {
-    final transactions = await fetchAllTransactions();
+    final transactions = await _getAllCombinedTransactions();
 
     double total = 0;
 
@@ -203,7 +173,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       lastYear--;
     }
 
-    final transactions = await fetchAllTransactions();
+    final transactions = await _getAllCombinedTransactions();
 
     double lastMonthIncome = 0;
 
@@ -231,28 +201,21 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
     if (persentaseLunas >= 80) {
       insights.add(
-        translations
-            .t('insight_paid_good')
-            .replaceFirst('{percent}', percentText),
+        translations.t('insight_paid_good').replaceFirst('{percent}', percentText),
       );
     } else if (persentaseLunas >= 50) {
       insights.add(
-        translations
-            .t('insight_paid_medium')
-            .replaceFirst('{percent}', percentText),
+        translations.t('insight_paid_medium').replaceFirst('{percent}', percentText),
       );
     } else {
       insights.add(
-        translations
-            .t('insight_paid_low')
-            .replaceFirst('{percent}', percentText),
+        translations.t('insight_paid_low').replaceFirst('{percent}', percentText),
       );
     }
 
     if (lastMonthIncome > 0 && totalIncome > 0) {
       final selisih = totalIncome - lastMonthIncome;
-
-      final persenChange = selisih / lastMonthIncome * 100;
+      final persenChange = (selisih / lastMonthIncome) * 100;
 
       if (persenChange > 0) {
         insights.add(
@@ -306,13 +269,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       _totalIncome = await _getCurrentMonthIncome();
       _totalExpense = await _getCurrentMonthExpense();
 
-      // ===================================================
-      // TAMBAHAN: FETCH DATA BULAN KEMARIN
-      // ===================================================
-
-      _lastMonthIncome = await _getLastMonthIncome();
-      _lastMonthExpense = await _getLastMonthExpense();
-
       _totalIncomeAll = await _getTotalIncomeAllTime();
       _totalExpenseAll = await _getTotalExpenseAllTime();
 
@@ -355,7 +311,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   void dispose() {
     AksiHelper.setRefreshCallback(null);
-
     super.dispose();
   }
 
@@ -422,19 +377,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
-
     final translations = ref.watch(translationsProvider);
-
     final theme = Theme.of(context);
-
     final colors = theme.colorScheme;
 
-    final headerBgColor =
-        ThemeHelper.getHeaderBgColor(themeMode, colors);
-
-    final headerTextColor =
-        ThemeHelper.getHeaderTextColor(themeMode, colors);
-
+    final headerBgColor = ThemeHelper.getHeaderBgColor(themeMode, colors);
+    final headerTextColor = ThemeHelper.getHeaderTextColor(themeMode, colors);
     final scaffoldBackgroundColor =
         ThemeHelper.getScaffoldBackgroundColor(themeMode, colors);
 
@@ -442,7 +390,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       themeMode,
       Scaffold(
         backgroundColor: scaffoldBackgroundColor,
-
         extendBodyBehindAppBar: true,
 
         appBar: AppBar(
@@ -454,9 +401,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         body: _isLoading
             ? const LottieLoading()
             : _hasError
-                ? LottieError(
-                    message: translations.t('dashboard_loading_error'),
-                  )
+                ? LottieError(message: translations.t('dashboard_loading_error'))
                 : RefreshIndicator(
                     onRefresh: _fetchData,
                     child: NotificationListener<
@@ -491,7 +436,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                   ),
                                 ),
                               ),
-
                               Positioned(
                                 top: MediaQuery.of(context).padding.top +
                                     kToolbarHeight +
@@ -526,15 +470,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                         _getCurrentDate(translations),
                                         style: theme.textTheme.bodyMedium
                                             ?.copyWith(
-                                          color: headerTextColor
-                                              .withOpacity(0.8),
+                                          color:
+                                              headerTextColor.withOpacity(0.8),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-
                               ScrollReveal(
                                 delay: const Duration(milliseconds: 120),
                                 child: Padding(
@@ -559,16 +502,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                             fontSize: 11.5,
                                             fontWeight: FontWeight.w700,
                                             letterSpacing: 1.0,
-                                            color: headerTextColor
-                                                .withOpacity(0.9),
+                                            color:
+                                                headerTextColor.withOpacity(0.9),
                                           ),
                                         ),
                                       ),
-
-                                      // ================================================
-                                      // CARD 1: RINGKASAN SALDO BULAN INI
-                                      // ================================================
-
                                       ThemeHelper.buildSectionGroup(
                                         themeMode,
                                         [
@@ -587,11 +525,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                                 const SizedBox(height: 8),
                                                 Text(
                                                   'Rp ${formatCurrency(_totalIncomeAll - _totalExpenseAll)}',
-                                                  style: theme.textTheme
-                                                      .headlineMedium
+                                                  style: theme
+                                                      .textTheme.headlineMedium
                                                       ?.copyWith(
-                                                    fontWeight:
-                                                        FontWeight.bold,
+                                                    fontWeight: FontWeight.bold,
                                                     color: colors.primary,
                                                   ),
                                                 ),
@@ -599,10 +536,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                                 Row(
                                                   children: [
                                                     Expanded(
-                                                      child:
-                                                          _buildBalanceItem(
-                                                        translations
-                                                            .t('income'),
+                                                      child: _buildBalanceItem(
+                                                        translations.t('income'),
                                                         _totalIncome,
                                                         AppColors.success,
                                                         Icons.arrow_upward,
@@ -617,88 +552,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                                     ),
                                                     const SizedBox(width: 16),
                                                     Expanded(
-                                                      child:
-                                                          _buildBalanceItem(
+                                                      child: _buildBalanceItem(
                                                         translations
                                                             .t('expense'),
                                                         _totalExpense,
                                                         AppColors.error,
                                                         Icons.arrow_downward,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-
-                                      // ================================================
-                                      // CARD 2: PERBANDINGAN DENGAN BULAN KEMARIN
-                                      // ================================================
-
-                                      const SizedBox(height: 12),
-
-                                      ThemeHelper.buildSectionGroup(
-                                        themeMode,
-                                        [
-                                          Padding(
-                                            padding: const EdgeInsets.all(20),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  translations.t(
-                                                      'last_month_comparison'),
-                                                  style: theme
-                                                      .textTheme.bodyMedium,
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  'Rp ${formatCurrency(_lastMonthIncome)} / Rp ${formatCurrency(_lastMonthExpense)}',
-                                                  style: theme.textTheme
-                                                      .headlineSmall
-                                                      ?.copyWith(
-                                                    fontWeight:
-                                                        FontWeight.bold,
-                                                    color: colors.primary,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 20),
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child:
-                                                          _buildComparisonItem(
-                                                        translations
-                                                            .t('income'),
-                                                        _totalIncome,
-                                                        _lastMonthIncome,
-                                                        AppColors.success,
-                                                        Icons.arrow_upward,
-                                                        true,
-                                                      ),
-                                                    ),
-                                                    Container(
-                                                      width: 1,
-                                                      height: 60,
-                                                      color: ThemeHelper
-                                                          .dividerColor(
-                                                              themeMode),
-                                                    ),
-                                                    const SizedBox(width: 16),
-                                                    Expanded(
-                                                      child:
-                                                          _buildComparisonItem(
-                                                        translations
-                                                            .t('expense'),
-                                                        _totalExpense,
-                                                        _lastMonthExpense,
-                                                        AppColors.error,
-                                                        Icons.arrow_downward,
-                                                        false,
                                                       ),
                                                     ),
                                                   ],
@@ -716,9 +575,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                           ),
 
                           Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                            ),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -741,11 +599,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                           Padding(
                                             padding:
                                                 const EdgeInsets.fromLTRB(
-                                              8,
-                                              20,
-                                              16,
-                                              8,
-                                            ),
+                                                    8, 20, 16, 8),
                                             child: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
@@ -767,9 +621,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(height: 24),
-
                                 ScrollReveal(
                                   delay: const Duration(milliseconds: 150),
                                   child: Column(
@@ -778,21 +630,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                     children: [
                                       ThemeHelper.buildSectionHeader(
                                         context,
-                                        translations
-                                            .t('student_payment_status'),
+                                        translations.t('student_payment_status'),
                                         themeMode,
                                       ),
                                       const SizedBox(height: 8),
                                       _buildStudentPaymentCard(
-                                        themeMode,
-                                        translations,
-                                      ),
+                                          themeMode, translations),
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(height: 24),
-
                                 ScrollReveal(
                                   delay: const Duration(milliseconds: 200),
                                   child: Column(
@@ -818,8 +665,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                                   width: 40,
                                                   height: 40,
                                                   child: LottieAiAnimation(
-                                                    size: 40,
-                                                  ),
+                                                      size: 40),
                                                 ),
                                                 const SizedBox(width: 12),
                                                 Expanded(
@@ -827,9 +673,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                                     _aiInsight,
                                                     style: theme
                                                         .textTheme.bodyMedium
-                                                        ?.copyWith(
-                                                      height: 1.4,
-                                                    ),
+                                                        ?.copyWith(height: 1.4),
                                                   ),
                                                 ),
                                               ],
@@ -856,11 +700,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // =========================================================
 
   Widget _buildBalanceItem(
-    String title,
-    double amount,
-    Color color,
-    IconData icon,
-  ) {
+      String title, double amount, Color color, IconData icon) {
     final theme = Theme.of(context);
 
     return Column(
@@ -885,83 +725,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   // =========================================================
-  // TAMBAHAN: COMPARISON ITEM (PERBANDINGAN BULAN KEMARIN)
-  // =========================================================
-
-  Widget _buildComparisonItem(
-    String title,
-    double currentValue,
-    double lastValue,
-    Color color,
-    IconData icon,
-    bool isIncome,
-  ) {
-    final theme = Theme.of(context);
-
-    final difference = currentValue - lastValue;
-
-    // Untuk income: naik = baik (hijau), turun = buruk (merah)
-    // Untuk expense: naik = buruk (merah), turun = baik (hijau)
-    final bool isGood = isIncome ? difference >= 0 : difference <= 0;
-
-    final Color diffColor = isGood ? AppColors.success : AppColors.error;
-
-    final IconData trendIcon =
-        difference >= 0 ? Icons.trending_up : Icons.trending_down;
-
-    final String diffText =
-        '${difference >= 0 ? '+' : ''}Rp ${formatCurrency(difference)}';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(width: 4),
-            Text(title, style: theme.textTheme.labelLarge),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Rp ${formatCurrency(lastValue)}',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Icon(trendIcon, color: diffColor, size: 14),
-            const SizedBox(width: 4),
-            Text(
-              diffText,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: diffColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // =========================================================
   // STUDENT PAYMENT
   // =========================================================
 
   Widget _buildStudentPaymentCard(
-    AppThemeMode themeMode,
-    Translations translations,
-  ) {
+      AppThemeMode themeMode, Translations translations) {
     final theme = Theme.of(context);
-
     final colors = theme.colorScheme;
 
     final paidStudents =
         _activeStudents.where((s) => !s.hasOutstanding).length;
-
     final totalStudents = _activeStudents.length;
 
     final persentaseLunas =
@@ -998,8 +771,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                         value: totalStudents > 0
                             ? paidStudents / totalStudents
                             : 0,
-                        backgroundColor:
-                            colors.surfaceContainerHighest,
+                        backgroundColor: colors.surfaceContainerHighest,
                         color: AppColors.success,
                         minHeight: 8,
                       ),
@@ -1053,7 +825,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     ];
 
     final now = DateTime.now();
-
     List<String> labels = [];
 
     for (int i = 5; i >= 0; i--) {
@@ -1075,10 +846,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // SHORT MONTH NAME
   // =========================================================
 
-  String _getShortMonthName(
-    String monthName,
-    Translations translations,
-  ) {
+  String _getShortMonthName(String monthName, Translations translations) {
     final languageCode = translations.locale.languageCode;
 
     if (languageCode == 'en') {
@@ -1146,7 +914,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   List<double> _getLast6MonthsValues() {
     final now = DateTime.now();
-
     List<double> values = [];
 
     for (int i = 5; i >= 0; i--) {
@@ -1167,12 +934,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   // =========================================================
 
   Widget _buildBarChart(
-    List<String> labels,
-    List<double> values,
-    AppThemeMode themeMode,
-  ) {
+      List<String> labels, List<double> values, AppThemeMode themeMode) {
     final theme = Theme.of(context);
-
     final colors = theme.colorScheme;
 
     final maxVal = values.reduce((a, b) => a > b ? a : b);

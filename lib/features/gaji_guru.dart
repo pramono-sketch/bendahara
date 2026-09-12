@@ -1,11 +1,16 @@
-// features/gaji_guru.dart
+// lib/features/gaji_guru.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import '../helpers/sound_helper.dart';
+import '../helpers/scroll_reveal.dart';
 import '../service/export_gaji_guru.dart';
 import '../simulation/cheat_guru.dart';
 import '../firebase/firestore_service.dart';
+import '../constants/appearance.dart';
+import '../helpers/theme_helper.dart';
 
 // ================== KOMPONEN GAJI ==================
 class KomponenGaji {
@@ -169,14 +174,14 @@ String getBulanNama(int bulan) {
 }
 
 // ================== HALAMAN UTAMA ==================
-class GajiGuruPage extends StatefulWidget {
+class GajiGuruPage extends ConsumerStatefulWidget {
   const GajiGuruPage({super.key});
 
   @override
-  State<GajiGuruPage> createState() => _GajiGuruPageState();
+  ConsumerState<GajiGuruPage> createState() => _GajiGuruPageState();
 }
 
-class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderStateMixin {
+class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerProviderStateMixin {
   // ===== State Data =====
   List<Teacher> teacherList = [];
   List<GajiGuru> gajiGuruList = [];
@@ -280,13 +285,42 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     }
   }
 
-  // ==================== FUNGSI MANIPULASI DATA ====================
-  void removeTeacher(Teacher teacher) {
-    setState(() {
-      teacherList.remove(teacher);
-    });
+  // ==================== FUNGSI HAPUS SEMUA GURU (BARU) ====================
+  Future<void> deleteAllTeachers() async {
+    setState(() => _isLoading = true);
+    try {
+      for (var teacher in teacherList) {
+        await deleteTeacher(teacher.id);
+      }
+      setState(() {
+        teacherList.clear();
+        gajiGuruList.clear(); // Bersihkan juga data gaji lokalnya
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Semua data guru beserta gajinya telah dihapus dari Firebase!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error deleting all teachers: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menghapus data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
+  // ==================== FUNGSI MANIPULASI DATA ==================
   GajiGuru _getOrCreateGajiRecord(String namaGuru, String role, int bulan, int tahun) {
     var existing = gajiGuruList.firstWhere(
       (g) => g.namaGuru == namaGuru && g.bulan == bulan && g.tahun == tahun,
@@ -546,8 +580,12 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     return result;
   }
 
-  // ==================== DIALOG MANAJEMEN GURU (MODERN UI) ====================
+  // ==================== DIALOG MANAJEMEN GURU ====================
   void _showManageTeachersDialog() {
+    final themeMode = ref.read(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     final TextEditingController _newTeacherController = TextEditingController();
     String selectedRole = 'guru';
 
@@ -565,11 +603,11 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
               width: double.maxFinite,
               constraints: const BoxConstraints(maxWidth: 500, maxHeight: 650),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isGlass ? AppColors.glassBg1.withValues(alpha: 0.9) : colors.surface,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: colors.shadow.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -595,7 +633,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Icon(Icons.people_alt_rounded, color: Colors.white, size: 32),
@@ -642,9 +680,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                             controller: _newTeacherController,
                             decoration: InputDecoration(
                               hintText: 'Nama Pegawai...',
-                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              hintStyle: TextStyle(color: colors.onSurfaceVariant.withValues(alpha: 0.5)),
                               filled: true,
-                              fillColor: Colors.grey.shade100,
+                              fillColor: colors.surfaceContainerHighest,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -656,7 +694,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 
                           Row(
                             children: [
-                              const Text('Kategori: ', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black54)),
+                              Text('Kategori: ', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant)),
                               const SizedBox(width: 8),
                               ChoiceChip(
                                 label: const Text('Guru'),
@@ -668,9 +706,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                     });
                                   }
                                 },
-                                selectedColor: Colors.blue.withOpacity(0.2),
+                                selectedColor: Colors.blue.withValues(alpha: 0.2),
                                 labelStyle: TextStyle(
-                                  color: selectedRole == 'guru' ? Colors.blue : Colors.black54,
+                                  color: selectedRole == 'guru' ? Colors.blue : colors.onSurfaceVariant,
                                   fontWeight: selectedRole == 'guru' ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -685,9 +723,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                     });
                                   }
                                 },
-                                selectedColor: Colors.orange.withOpacity(0.2),
+                                selectedColor: Colors.orange.withValues(alpha: 0.2),
                                 labelStyle: TextStyle(
-                                  color: selectedRole == 'karyawan' ? Colors.orange : Colors.black54,
+                                  color: selectedRole == 'karyawan' ? Colors.orange : colors.onSurfaceVariant,
                                   fontWeight: selectedRole == 'karyawan' ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -741,12 +779,12 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.people_outline, size: 64, color: Colors.grey.shade300),
+                                      Icon(Icons.people_outline, size: 64, color: colors.outline),
                                       const SizedBox(height: 12),
-                                      Text('Daftar masih kosong', style: TextStyle(color: Colors.grey.shade500)),
+                                      Text('Daftar masih kosong', style: TextStyle(color: colors.onSurfaceVariant)),
                                       const SizedBox(height: 8),
                                       Text('Gunakan Mode Developer (FAB) untuk tambah data default',
-                                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                                          style: TextStyle(color: colors.outline, fontSize: 12),
                                           textAlign: TextAlign.center),
                                     ],
                                   ),
@@ -762,12 +800,12 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 
                                     return Container(
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: colors.surface,
                                         borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: Colors.grey.shade200),
+                                        border: Border.all(color: colors.outlineVariant),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.02),
+                                            color: colors.shadow.withValues(alpha: 0.02),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
                                           ),
@@ -776,7 +814,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                       child: ListTile(
                                         contentPadding: const EdgeInsets.only(left: 8, right: 8, top: 4, bottom: 4),
                                         leading: CircleAvatar(
-                                          backgroundColor: roleColor.withOpacity(0.1),
+                                          backgroundColor: roleColor.withValues(alpha: 0.1),
                                           child: Icon(
                                             isGuru ? Icons.school : Icons.badge,
                                             color: roleColor,
@@ -787,13 +825,13 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                           teacher.nama,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: colors.onSurface),
                                         ),
                                         subtitle: Container(
                                           margin: const EdgeInsets.only(top: 4),
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: roleColor.withOpacity(0.1),
+                                            color: roleColor.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
@@ -811,9 +849,10 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                             showDialog(
                                               context: ctx,
                                               builder: (confirmCtx) => AlertDialog(
+                                                backgroundColor: isGlass ? AppColors.glassBg1 : null,
                                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                                title: const Text('Konfirmasi Hapus'),
-                                                content: Text('Yakin ingin menghapus "${teacher.nama}" dari daftar?'),
+                                                title: Text('Konfirmasi Hapus', style: TextStyle(color: isGlass ? Colors.white : null)),
+                                                content: Text('Yakin ingin menghapus "${teacher.nama}" dari daftar?', style: TextStyle(color: isGlass ? Colors.white : null)),
                                                 actions: [
                                                   TextButton(
                                                     onPressed: () => Navigator.pop(confirmCtx),
@@ -848,15 +887,15 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                     Container(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+                        color: colors.surface,
+                        border: Border(top: BorderSide(color: colors.outlineVariant, width: 1)),
                       ),
                       child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade200,
-                            foregroundColor: Colors.black87,
+                            backgroundColor: colors.surfaceContainerHighest,
+                            foregroundColor: colors.onSurface,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -893,7 +932,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
         const SizedBox(width: 4),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12),
         ),
       ],
     );
@@ -901,6 +940,10 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 
   // ==================== EDIT GAJI ====================
   void _showEditDialog(GajiGuru gaji) {
+    final themeMode = ref.read(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     String selectedGuru = gaji.namaGuru;
     List<KomponenGaji> komponen = gaji.komponen.map((k) => k.copyWith()).toList();
     int bulan = gaji.bulan;
@@ -966,8 +1009,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
               builder: (dialogCtx) => StatefulBuilder(
                 builder: (dialogCtx, setStateDialog2) {
                   return AlertDialog(
+                    backgroundColor: isGlass ? AppColors.glassBg1 : null,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    title: const Text('Tambah Komponen Gaji'),
+                    title: Text('Tambah Komponen Gaji', style: TextStyle(color: isGlass ? Colors.white : null)),
                     content: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1053,8 +1097,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
           final total = komponen.fold(0.0, (sum, k) => sum + (k.isTunjangan ? k.jumlah : -k.jumlah));
 
           return AlertDialog(
+            backgroundColor: isGlass ? AppColors.glassBg1 : null,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Edit Gaji', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text('Edit Gaji', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : null)),
             content: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
@@ -1064,14 +1109,14 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: colors.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          const Text('Guru: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('Guru: ', style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface)),
                           Expanded(
-                            child: Text(selectedGuru, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                            child: Text(selectedGuru, style: TextStyle(fontWeight: FontWeight.w500, color: colors.onSurface), overflow: TextOverflow.ellipsis),
                           ),
                         ],
                       ),
@@ -1084,11 +1129,11 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400),
+                              border: Border.all(color: colors.outlineVariant),
                               borderRadius: BorderRadius.circular(8),
-                              color: Colors.grey.shade50,
+                              color: colors.surfaceContainerHighest,
                             ),
-                            child: Text(getBulanNama(bulan), style: const TextStyle(fontWeight: FontWeight.w500)),
+                            child: Text(getBulanNama(bulan), style: TextStyle(fontWeight: FontWeight.w500, color: colors.onSurface)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1097,11 +1142,11 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400),
+                              border: Border.all(color: colors.outlineVariant),
                               borderRadius: BorderRadius.circular(8),
-                              color: Colors.grey.shade50,
+                              color: colors.surfaceContainerHighest,
                             ),
-                            child: Text(tahun.toString(), style: const TextStyle(fontWeight: FontWeight.w500)),
+                            child: Text(tahun.toString(), style: TextStyle(fontWeight: FontWeight.w500, color: colors.onSurface)),
                           ),
                         ),
                       ],
@@ -1137,29 +1182,29 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                     ),
                     Container(
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: colors.outlineVariant),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.all(8.0),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
                             child: Row(
                               children: [
-                                Expanded(flex: 2, child: Text('Komponen', style: TextStyle(fontWeight: FontWeight.bold))),
-                                Expanded(flex: 1, child: Text('Jumlah', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-                                SizedBox(width: 8),
-                                Expanded(flex: 1, child: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
-                                SizedBox(width: 8),
+                                Expanded(flex: 2, child: Text('Komponen', style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface))),
+                                Expanded(flex: 1, child: Text('Jumlah', style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface), textAlign: TextAlign.right)),
+                                const SizedBox(width: 8),
+                                Expanded(flex: 1, child: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface))),
+                                const SizedBox(width: 8),
                               ],
                             ),
                           ),
                           if (komponen.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(16.0),
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
                               child: Text(
                                 'Belum ada komponen gaji. Tambahkan komponen dengan tombol di bawah.',
-                                style: TextStyle(color: Colors.grey),
+                                style: TextStyle(color: colors.onSurfaceVariant),
                                 textAlign: TextAlign.center,
                               ),
                             )
@@ -1171,9 +1216,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 child: Row(
                                   children: [
-                                    Expanded(flex: 2, child: Text(k.nama, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
+                                    Expanded(flex: 2, child: Text(k.nama, style: TextStyle(fontSize: 13, color: colors.onSurface), overflow: TextOverflow.ellipsis)),
                                     const SizedBox(width: 8),
-                                    Expanded(flex: 1, child: Text(formatCurrency(k.jumlah), style: const TextStyle(fontSize: 13), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
+                                    Expanded(flex: 1, child: Text(formatCurrency(k.jumlah), style: TextStyle(fontSize: 13, color: colors.onSurface), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       flex: 1,
@@ -1203,7 +1248,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                                Text('Total', style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface)),
                                 Text(
                                   'Rp ${formatCurrency(total)}',
                                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: total >= 0 ? Colors.green : Colors.red),
@@ -1275,35 +1320,40 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 
   // ==================== SLIP GAJI ====================
   void _showSlipGaji(GajiGuru gaji) {
+    final themeMode = ref.read(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isGlass ? AppColors.glassBg1 : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Slip Gaji ${gaji.namaGuru}'),
+        title: Text('Slip Gaji ${gaji.namaGuru}', style: TextStyle(color: isGlass ? Colors.white : null)),
         content: Container(
           width: double.maxFinite,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _detailRow('ID', gaji.id),
-              _detailRow('Nama Guru', gaji.namaGuru),
-              _detailRow('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}'),
-              _detailRow('Role', gaji.role == 'guru' ? 'Guru' : 'Karyawan'),
+              _detailRow('ID', gaji.id, colors: colors, isGlass: isGlass),
+              _detailRow('Nama Guru', gaji.namaGuru, colors: colors, isGlass: isGlass),
+              _detailRow('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}', colors: colors, isGlass: isGlass),
+              _detailRow('Role', gaji.role == 'guru' ? 'Guru' : 'Karyawan', colors: colors, isGlass: isGlass),
               if (gaji.keterangan != null && gaji.keterangan!.isNotEmpty)
-                _detailRow('Keterangan', gaji.keterangan!),
-              const Divider(),
+                _detailRow('Keterangan', gaji.keterangan!, colors: colors, isGlass: isGlass),
+              Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
               if (gaji.komponen.isNotEmpty) ...[
-                const Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
                 const SizedBox(height: 8),
                 SizedBox(height: 120, child: _buildPieChart(gaji.komponen)),
-                const Divider(),
+                Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
               ],
-              const Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
               if (gaji.komponen.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text('Tidak ada komponen gaji', style: TextStyle(color: Colors.grey)),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text('Tidak ada komponen gaji', style: TextStyle(color: isGlass ? Colors.white70 : colors.onSurfaceVariant)),
                 )
               else
                 ...gaji.komponen.map(
@@ -1311,19 +1361,19 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Row(
                       children: [
-                        Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis)),
-                        Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
+                        Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
+                        Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
                       ],
                     ),
                   ),
                 ),
-              const Divider(),
-              _detailRow('Total', 'Rp ${formatCurrency(gaji.totalGaji)}', bold: true),
-              _detailRow('Status', gaji.isPaid ? 'Lunas' : 'Belum'),
+              Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+              _detailRow('Total', 'Rp ${formatCurrency(gaji.totalGaji)}', bold: true, colors: colors, isGlass: isGlass),
+              _detailRow('Status', gaji.isPaid ? 'Lunas' : 'Belum', colors: colors, isGlass: isGlass),
               if (gaji.isPaid && gaji.tanggalBayar != null)
-                _detailRow('Tanggal Bayar', '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}'),
-              if (gaji.metodeBayar != null) _detailRow('Metode', gaji.metodeBayar!),
-              if (gaji.catatan != null && gaji.catatan!.isNotEmpty) _detailRow('Catatan', gaji.catatan!),
+                _detailRow('Tanggal Bayar', '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}', colors: colors, isGlass: isGlass),
+              if (gaji.metodeBayar != null) _detailRow('Metode', gaji.metodeBayar!, colors: colors, isGlass: isGlass),
+              if (gaji.catatan != null && gaji.catatan!.isNotEmpty) _detailRow('Catatan', gaji.catatan!, colors: colors, isGlass: isGlass),
             ],
           ),
         ),
@@ -1366,7 +1416,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _detailRow(String label, String value, {bool bold = false}) {
+  Widget _detailRow(String label, String value, {bool bold = false, required ColorScheme colors, required bool isGlass}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1378,14 +1428,14 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
               label,
               style: TextStyle(
                 fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-                color: bold ? Colors.black87 : Colors.black54,
+                color: bold ? (isGlass ? Colors.white : colors.onSurface) : (isGlass ? Colors.white70 : colors.onSurfaceVariant),
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal),
+              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: isGlass ? Colors.white : colors.onSurface),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1396,18 +1446,22 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 
   // ==================== DIALOG KONFIRMASI ====================
   void _confirmMarkAsPaid(GajiGuru gaji) {
+    final themeMode = ref.read(themeModeProvider);
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isGlass ? AppColors.glassBg1 : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Konfirmasi Pembayaran'),
+        title: Text('Konfirmasi Pembayaran', style: TextStyle(color: isGlass ? Colors.white : null)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Tandai gaji ${gaji.namaGuru} sebagai lunas?'),
+            Text('Tandai gaji ${gaji.namaGuru} sebagai lunas?', style: TextStyle(color: isGlass ? Colors.white : null)),
             const SizedBox(height: 8),
-            Text('Total: Rp ${formatCurrency(gaji.totalGaji)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Total: Rp ${formatCurrency(gaji.totalGaji)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
           ],
         ),
         actions: [
@@ -1433,12 +1487,16 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
   }
 
   void _confirmDeleteGaji(GajiGuru gaji) {
+    final themeMode = ref.read(themeModeProvider);
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isGlass ? AppColors.glassBg1 : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus Data'),
-        content: Text('Yakin hapus gaji ${gaji.namaGuru} periode ${getBulanNama(gaji.bulan)} ${gaji.tahun}?'),
+        title: Text('Hapus Data', style: TextStyle(color: isGlass ? Colors.white : null)),
+        content: Text('Yakin hapus gaji ${gaji.namaGuru} periode ${getBulanNama(gaji.bulan)} ${gaji.tahun}?', style: TextStyle(color: isGlass ? Colors.white : null)),
         actions: [
           TextButton(
             onPressed: () {
@@ -1464,55 +1522,64 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
   // ==================== BUILD ====================
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manajemen Gaji Guru'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.people),
-            onPressed: () {
-              SoundHelper().playClick();
-              _showManageTeachersDialog();
-            },
-            tooltip: 'Manajemen Guru',
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Dashboard'),
-            Tab(text: 'Daftar Gaji'),
-            Tab(text: 'Riwayat'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildDashboard(),
-                _buildListTab(),
-                _buildRiwayatTab(),
-              ],
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(
+          title: const Text('Manajemen Gaji Guru'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.people),
+              onPressed: () {
+                SoundHelper().playClick();
+                _showManageTeachersDialog();
+              },
+              tooltip: 'Manajemen Guru',
             ),
-      floatingActionButton: FABcheat(
-        context: context,
-        onRefreshUI: () => setState(() {}),
-        onSimulateMonthChange: simulateMonthChange,
-        onGenerateCurrentMonthData: generateCurrentMonthData,
-        onGenerateRandomData: generateRandomData,
-        onAutoLunas: autoLunas,
-        onClearAllData: clearAllData,
-        onSeedDefaultTeachers: seedDefaultTeachers,
-        currentBulan: currentBulan,
-        currentTahun: currentTahun,
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Dashboard'),
+              Tab(text: 'Daftar Gaji'),
+              Tab(text: 'Riwayat'),
+            ],
+          ),
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildDashboard(),
+                  _buildListTab(),
+                  _buildRiwayatTab(),
+                ],
+              ),
+        floatingActionButton: FABcheat(
+          context: context,
+          onRefreshUI: () => setState(() {}),
+          onSimulateMonthChange: simulateMonthChange,
+          onGenerateCurrentMonthData: generateCurrentMonthData,
+          onGenerateRandomData: generateRandomData,
+          onAutoLunas: autoLunas,
+          onClearAllData: clearAllData,
+          onSeedDefaultTeachers: seedDefaultTeachers,
+          onDeleteAllTeachers: deleteAllTeachers, // <--- Parameter Baru
+          currentBulan: currentBulan,
+          currentTahun: currentTahun,
+        ),
       ),
     );
   }
 
   // ==================== DASHBOARD ====================
   Widget _buildDashboard() {
+    final themeMode = ref.watch(themeModeProvider);
     final stats = _statistics;
     final bulanIniRecords = gajiGuruList
         .where(
@@ -1549,27 +1616,53 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDashboardCards(stats),
+          // DIBUNGKUS DENGAN SCROLL REVEAL & DELAY TINGKAT
+          ScrollReveal(
+            delay: const Duration(milliseconds: 50),
+            child: _buildDashboardCards(stats, themeMode),
+          ),
           const SizedBox(height: 16),
-          _buildChart(),
+          ScrollReveal(
+            delay: const Duration(milliseconds: 100),
+            child: _buildChart(themeMode),
+          ),
           const SizedBox(height: 16),
-          _buildStatusCard(paidGuru, countGuru, paidBulanIni, totalBulanIni),
+          ScrollReveal(
+            delay: const Duration(milliseconds: 150),
+            child: _buildStatusCard(paidGuru, countGuru, paidBulanIni, totalBulanIni, themeMode),
+          ),
           const SizedBox(height: 16),
-          _buildStatistikCard(rataRata, tertinggi, terendah),
+          ScrollReveal(
+            delay: const Duration(milliseconds: 200),
+            child: _buildStatistikCard(rataRata, tertinggi, terendah, themeMode),
+          ),
           const SizedBox(height: 16),
-          _buildTopGajiCard(topGaji),
+          ScrollReveal(
+            delay: const Duration(milliseconds: 250),
+            child: _buildTopGajiCard(topGaji, themeMode),
+          ),
           const SizedBox(height: 16),
-          _buildComparisonCard(totalBulanIni, stats['totalBulanLalu'] as double),
+          ScrollReveal(
+            delay: const Duration(milliseconds: 300),
+            child: _buildComparisonCard(totalBulanIni, stats['totalBulanLalu'] as double, themeMode),
+          ),
           const SizedBox(height: 16),
-          _buildQuickFilter(),
+          ScrollReveal(
+            delay: const Duration(milliseconds: 350),
+            child: _buildQuickFilter(themeMode),
+          ),
           const SizedBox(height: 16),
-          if (totalArsipBelum > 0) _buildUnpaidArchiveCard(totalArsipBelum, arsipBelumBayar.toList()),
+          if (totalArsipBelum > 0)
+            ScrollReveal(
+              delay: const Duration(milliseconds: 400),
+              child: _buildUnpaidArchiveCard(totalArsipBelum, arsipBelumBayar.toList(), themeMode),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildDashboardCards(Map<String, dynamic> stats) {
+  Widget _buildDashboardCards(Map<String, dynamic> stats, AppThemeMode themeMode) {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1584,6 +1677,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
           icon: Icons.calendar_month,
           color: Colors.blue,
           subtitle: '${stats['countGuruBulanIni']} guru',
+          themeMode: themeMode,
         ),
         _StatCard(
           title: 'Sudah Dibayar',
@@ -1591,6 +1685,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
           icon: Icons.check_circle,
           color: Colors.green,
           subtitle: '${stats['paidGuruBulanIni']} guru',
+          themeMode: themeMode,
         ),
         _StatCard(
           title: 'Belum Dibayar',
@@ -1598,6 +1693,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
           icon: Icons.pending,
           color: Colors.red,
           subtitle: '${stats['countGuruBulanIni'] - stats['paidGuruBulanIni']} guru',
+          themeMode: themeMode,
         ),
         _StatCard(
           title: 'Bulan Lalu',
@@ -1605,27 +1701,26 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
           icon: Icons.history,
           color: Colors.orange,
           subtitle: 'Periode sebelumnya',
+          themeMode: themeMode,
         ),
       ],
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildChart(AppThemeMode themeMode) {
     final data = _chartData;
     final maxTotal = data.fold(0.0, (max, item) => item['total'] > max ? item['total'] : max);
     if (maxTotal == 0) {
-      return Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      return _buildThemedContainer(
+        themeMode,
         child: const Padding(
           padding: EdgeInsets.all(32),
           child: Center(child: Text('Belum ada data gaji')),
         ),
       );
     }
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return _buildThemedContainer(
+      themeMode,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1682,13 +1777,13 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                       barRods: [
                         BarChartRodData(
                           toY: item['total'],
-                          color: Colors.blue.withOpacity(0.6),
+                          color: Colors.blue.withValues(alpha: 0.6),
                           width: 16,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         BarChartRodData(
                           toY: item['paid'],
-                          color: Colors.green.withOpacity(0.8),
+                          color: Colors.green.withValues(alpha: 0.8),
                           width: 16,
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -1698,7 +1793,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withOpacity(0.3), strokeWidth: 1),
+                    getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withValues(alpha: 0.3), strokeWidth: 1),
                   ),
                   borderData: FlBorderData(show: false),
                 ),
@@ -1720,16 +1815,16 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildStatusCard(int paidGuru, int countGuru, double paidBulanIni, double totalBulanIni) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  Widget _buildStatusCard(int paidGuru, int countGuru, double paidBulanIni, double totalBulanIni, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    return _buildThemedContainer(
+      themeMode,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Status Gaji Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Status Gaji Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -1737,18 +1832,18 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('$paidGuru / $countGuru guru lunas', style: const TextStyle(fontSize: 14)),
+                      Text('$paidGuru / $countGuru guru lunas', style: TextStyle(fontSize: 14, color: colors.onSurface)),
                       const SizedBox(height: 4),
                       LinearProgressIndicator(
                         value: countGuru > 0 ? paidGuru / countGuru : 0,
-                        backgroundColor: Colors.grey.shade300,
+                        backgroundColor: colors.surfaceContainerHighest,
                         color: Colors.green,
                         minHeight: 8,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${countGuru > 0 ? (paidGuru / countGuru * 100).toStringAsFixed(0) : 0}% guru lunas',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -1758,18 +1853,18 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Rp ${formatCurrency(paidBulanIni)} / Rp ${formatCurrency(totalBulanIni)}', style: const TextStyle(fontSize: 14)),
+                      Text('Rp ${formatCurrency(paidBulanIni)} / Rp ${formatCurrency(totalBulanIni)}', style: TextStyle(fontSize: 14, color: colors.onSurface)),
                       const SizedBox(height: 4),
                       LinearProgressIndicator(
                         value: totalBulanIni > 0 ? paidBulanIni / totalBulanIni : 0,
-                        backgroundColor: Colors.grey.shade300,
+                        backgroundColor: colors.surfaceContainerHighest,
                         color: Colors.blue,
                         minHeight: 8,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${totalBulanIni > 0 ? (paidBulanIni / totalBulanIni * 100).toStringAsFixed(0) : 0}% nominal dibayar',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -1782,28 +1877,28 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildStatistikCard(double rataRata, double tertinggi, double terendah) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  Widget _buildStatistikCard(double rataRata, double tertinggi, double terendah, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    return _buildThemedContainer(
+      themeMode,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Statistik Gaji Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Statistik Gaji Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: Column(
                     children: [
-                      Text('Rata-rata', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      Text('Rata-rata', style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
                       Container(
                         constraints: const BoxConstraints(maxWidth: double.infinity),
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('Rp ${formatCurrency(rataRata)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          child: Text('Rp ${formatCurrency(rataRata)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
                         ),
                       ),
                     ],
@@ -1812,7 +1907,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                 Expanded(
                   child: Column(
                     children: [
-                      Text('Tertinggi', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      Text('Tertinggi', style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
                       Container(
                         constraints: const BoxConstraints(maxWidth: double.infinity),
                         child: FittedBox(
@@ -1826,7 +1921,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                 Expanded(
                   child: Column(
                     children: [
-                      Text('Terendah', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      Text('Terendah', style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
                       Container(
                         constraints: const BoxConstraints(maxWidth: double.infinity),
                         child: FittedBox(
@@ -1845,19 +1940,19 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildTopGajiCard(List<Map<String, dynamic>> topGaji) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  Widget _buildTopGajiCard(List<Map<String, dynamic>> topGaji, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    return _buildThemedContainer(
+      themeMode,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Top 5 Gaji Tertinggi Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Top 5 Gaji Tertinggi Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
             const SizedBox(height: 8),
             if (topGaji.isEmpty)
-              const Center(child: Text('Belum ada data', style: TextStyle(color: Colors.grey)))
+              Center(child: Text('Belum ada data', style: TextStyle(color: colors.onSurfaceVariant)))
             else
               ...topGaji.asMap().entries.map((entry) {
                 int rank = entry.key + 1;
@@ -1865,9 +1960,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                 return ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  leading: Text('#$rank', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  title: Text(item['nama'], overflow: TextOverflow.ellipsis, maxLines: 2),
-                  trailing: Text('Rp ${formatCurrency(item['total'])}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                  leading: Text('#$rank', style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface)),
+                  title: Text(item['nama'], overflow: TextOverflow.ellipsis, maxLines: 2, style: TextStyle(color: colors.onSurface)),
+                  trailing: Text('Rp ${formatCurrency(item['total'])}', style: TextStyle(fontWeight: FontWeight.w500, color: colors.onSurface)),
                 );
               }),
           ],
@@ -1876,31 +1971,45 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildComparisonCard(double totalBulanIni, double totalBulanLalu) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  // PERBAIKAN WARNA PERBANDINGAN BULAN INI VS BULAN LALU (MENGGUNAKAN COLORSCHEME)
+  Widget _buildComparisonCard(double totalBulanIni, double totalBulanLalu, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final Color bulanIniBg = colors.primaryContainer.withValues(alpha: isDark ? 0.3 : 0.5);
+    final Color bulanIniText = colors.onPrimaryContainer;
+    
+    final Color bulanLaluBg = colors.surfaceContainerHighest;
+    final Color bulanLaluText = colors.onSurfaceVariant;
+    
+    final bool isPositive = totalBulanIni >= totalBulanLalu;
+    final Color trendBg = (isPositive ? Colors.green : Colors.red).withValues(alpha: isDark ? 0.2 : 0.1);
+    final Color trendColor = isPositive ? Colors.green : Colors.red;
+    final Color trendTextColor = isPositive ? (isDark ? Colors.greenAccent : Colors.green.shade800) : (isDark ? Colors.redAccent : Colors.red.shade800);
+
+    return _buildThemedContainer(
+      themeMode,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Perbandingan Bulan Ini vs Bulan Lalu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Perbandingan Bulan Ini vs Bulan Lalu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(color: bulanIniBg, borderRadius: BorderRadius.circular(12)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Bulan Ini', style: TextStyle(fontSize: 12, color: Colors.blue)),
+                        Text('Bulan Ini', style: TextStyle(fontSize: 12, color: bulanIniText)),
                         const SizedBox(height: 4),
                         FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('Rp ${formatCurrency(totalBulanIni)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          child: Text('Rp ${formatCurrency(totalBulanIni)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: bulanIniText)),
                         ),
                       ],
                     ),
@@ -1910,15 +2019,15 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(color: bulanLaluBg, borderRadius: BorderRadius.circular(12)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Bulan Lalu', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('Bulan Lalu', style: TextStyle(fontSize: 12, color: bulanLaluText)),
                         const SizedBox(height: 4),
                         FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('Rp ${formatCurrency(totalBulanLalu)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          child: Text('Rp ${formatCurrency(totalBulanLalu)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface)),
                         ),
                       ],
                     ),
@@ -1930,21 +2039,21 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: totalBulanIni >= totalBulanLalu ? Colors.green.shade50 : Colors.red.shade50,
+                color: trendBg,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   Icon(
-                    totalBulanIni >= totalBulanLalu ? Icons.trending_up : Icons.trending_down,
-                    color: totalBulanIni >= totalBulanLalu ? Colors.green : Colors.red,
+                    isPositive ? Icons.trending_up : Icons.trending_down,
+                    color: trendColor,
                   ),
                   const SizedBox(width: 8),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      '${totalBulanIni >= totalBulanLalu ? '+' : ''}Rp ${formatCurrency(totalBulanIni - totalBulanLalu)} (${totalBulanLalu > 0 ? ((totalBulanIni - totalBulanLalu) / totalBulanLalu * 100).toStringAsFixed(1) : 0}%)',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: totalBulanIni >= totalBulanLalu ? Colors.green : Colors.red),
+                      '${isPositive ? '+' : ''}Rp ${formatCurrency(totalBulanIni - totalBulanLalu)} (${totalBulanLalu > 0 ? ((totalBulanIni - totalBulanLalu) / totalBulanLalu * 100).toStringAsFixed(1) : 0}%)',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: trendTextColor),
                     ),
                   ),
                 ],
@@ -1956,11 +2065,10 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildUnpaidArchiveCard(double totalArsipBelum, List<GajiGuru> arsipBelumBayar) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.orange.shade50,
+  Widget _buildUnpaidArchiveCard(double totalArsipBelum, List<GajiGuru> arsipBelumBayar, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    return _buildThemedContainer(
+      themeMode,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1970,11 +2078,11 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
               children: [
                 const Icon(Icons.archive, color: Colors.orange),
                 const SizedBox(width: 8),
-                const Text('Arsip Belum Bayar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('Arsip Belum Bayar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Total gaji belum lunas dari bulan-bulan sebelumnya:'),
+            Text('Total gaji belum lunas dari bulan-bulan sebelumnya:', style: TextStyle(color: colors.onSurfaceVariant)),
             const SizedBox(height: 4),
             Text('Rp ${formatCurrency(totalArsipBelum)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange)),
             const SizedBox(height: 8),
@@ -1996,16 +2104,16 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildQuickFilter() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  Widget _buildQuickFilter(AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    return _buildThemedContainer(
+      themeMode,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Filter Cepat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Filter Cepat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -2065,6 +2173,8 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 
   // ==================== TAB DAFTAR GAJI ====================
   Widget _buildListTab() {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
     final guruData = _guruListWithSalary;
     int selectedCount = selectedIds.length;
 
@@ -2102,8 +2212,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
+                      backgroundColor: ThemeHelper.isGlass(themeMode) ? AppColors.glassBg1 : null,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      title: const Text('Pilih Periode'),
+                      title: Text('Pilih Periode', style: TextStyle(color: ThemeHelper.isGlass(themeMode) ? Colors.white : null)),
                       content: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -2176,13 +2287,13 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
           ),
         Expanded(
           child: guruData.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.search_off, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text('Tidak ada guru yang cocok'),
+                      Icon(Icons.search_off, size: 64, color: colors.outline),
+                      const SizedBox(height: 16),
+                      Text('Tidak ada guru yang cocok', style: TextStyle(color: colors.onSurfaceVariant)),
                     ],
                   ),
                 )
@@ -2194,7 +2305,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                     final nama = item['nama'] as String;
                     final role = item['role'] as String;
                     final record = item['record'] as GajiGuru?;
-                    return _buildCompactGajiCard(nama, role, record, index);
+                    return _buildCompactGajiCard(nama, role, record, index, themeMode);
                   },
                 ),
         ),
@@ -2203,13 +2314,17 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
   }
 
   void _bulkMarkPaid() {
+    final themeMode = ref.read(themeModeProvider);
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     if (selectedIds.isEmpty) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isGlass ? AppColors.glassBg1 : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Konfirmasi Bulk'),
-        content: Text('Tandai ${selectedIds.length} gaji sebagai lunas?'),
+        title: Text('Konfirmasi Bulk', style: TextStyle(color: isGlass ? Colors.white : null)),
+        content: Text('Tandai ${selectedIds.length} gaji sebagai lunas?', style: TextStyle(color: isGlass ? Colors.white : null)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           ElevatedButton(
@@ -2239,13 +2354,17 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
   }
 
   void _bulkDelete() {
+    final themeMode = ref.read(themeModeProvider);
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
     if (selectedIds.isEmpty) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isGlass ? AppColors.glassBg1 : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Konfirmasi Bulk'),
-        content: Text('Hapus ${selectedIds.length} data gaji?'),
+        title: Text('Konfirmasi Bulk', style: TextStyle(color: isGlass ? Colors.white : null)),
+        content: Text('Hapus ${selectedIds.length} data gaji?', style: TextStyle(color: isGlass ? Colors.white : null)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           ElevatedButton(
@@ -2265,17 +2384,19 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildCompactGajiCard(String namaGuru, String role, GajiGuru? record, int index) {
+  Widget _buildCompactGajiCard(String namaGuru, String role, GajiGuru? record, int index, AppThemeMode themeMode) {
+    final colors = Theme.of(context).colorScheme;
+    
     if (record == null) {
-      return Card(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      return _buildThemedContainer(
+        themeMode,
+        radius: 12,
         child: ListTile(
           leading: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircleAvatar(
-                backgroundColor: Colors.grey.withOpacity(0.2),
+                backgroundColor: Colors.grey.withValues(alpha: 0.2),
                 child: const Icon(Icons.person, color: Colors.grey),
               ),
               if (role == 'karyawan') ...[
@@ -2284,8 +2405,8 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
               ]
             ],
           ),
-          title: Text(namaGuru, overflow: TextOverflow.ellipsis),
-          subtitle: const Text('Belum ada data gaji untuk periode ini'),
+          title: Text(namaGuru, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.onSurface)),
+          subtitle: Text('Belum ada data gaji untuk periode ini', style: TextStyle(color: colors.onSurfaceVariant)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2313,10 +2434,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     final total = record.totalGaji;
     final isSelected = selectedIds.contains(record.id);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return _buildThemedContainer(
+      themeMode,
+      radius: 12,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         leading: Row(
@@ -2328,14 +2448,14 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
                 height: 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: isSelected ? Colors.blue : Colors.grey.shade400, width: 2),
+                  border: Border.all(color: isSelected ? Colors.blue : colors.outline, width: 2),
                   color: isSelected ? Colors.blue : Colors.transparent,
                 ),
                 child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 16) : null,
               )
             else
               CircleAvatar(
-                backgroundColor: record.isPaid ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
+                backgroundColor: record.isPaid ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                 radius: 16,
                 child: Icon(
                   record.isPaid ? Icons.check_circle : Icons.pending,
@@ -2349,7 +2469,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
         ),
         title: Text(
           namaGuru,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colors.onSurface),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -2358,7 +2478,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
           style: TextStyle(
             fontSize: 13,
             fontWeight: record.komponen.isEmpty ? FontWeight.normal : FontWeight.w500,
-            color: record.komponen.isEmpty ? Colors.grey : null,
+            color: record.komponen.isEmpty ? colors.onSurfaceVariant : colors.onSurface,
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -2448,6 +2568,9 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 
   // ==================== TAB RIWAYAT ====================
   Widget _buildRiwayatTab() {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+
     Map<int, List<GajiGuru>> groupedByYear = {};
     for (var g in gajiGuruList) {
       groupedByYear.putIfAbsent(g.tahun, () => []).add(g);
@@ -2456,7 +2579,7 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
     var tahunKeys = groupedByYear.keys.toList()..sort((a, b) => b.compareTo(a));
 
     if (tahunKeys.isEmpty) {
-      return const Center(child: Text('Belum ada data gaji yang diarsipkan'));
+      return Center(child: Text('Belum ada data gaji yang diarsipkan', style: TextStyle(color: colors.onSurfaceVariant)));
     }
 
     return ListView.builder(
@@ -2469,13 +2592,13 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
         double totalNominal = items.fold(0.0, (sum, g) => sum + g.totalGaji);
         int totalLunas = items.where((g) => g.isPaid).length;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        return _buildThemedContainer(
+          themeMode,
+          radius: 12,
           child: ListTile(
             leading: const Icon(Icons.folder, color: Colors.amber),
-            title: Text('$tahun', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('$totalGuru guru • Rp ${formatCurrency(totalNominal)} • $totalLunas lunas'),
+            title: Text('$tahun', style: TextStyle(fontWeight: FontWeight.bold, color: colors.onSurface)),
+            subtitle: Text('$totalGuru guru • Rp ${formatCurrency(totalNominal)} • $totalLunas lunas', style: TextStyle(color: colors.onSurfaceVariant)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               SoundHelper().playClick();
@@ -2494,165 +2617,172 @@ class _GajiGuruPageState extends State<GajiGuruPage> with SingleTickerProviderSt
 }
 
 // ================== HALAMAN RIWAYAT PER BULAN ==================
-class RiwayatBulanPage extends StatelessWidget {
+class RiwayatBulanPage extends ConsumerWidget {
   final int tahun;
   final List<GajiGuru> data;
 
   const RiwayatBulanPage({super.key, required this.tahun, required this.data});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+
     Map<int, List<GajiGuru>> groupedByMonth = {};
     for (var g in data) {
       groupedByMonth.putIfAbsent(g.bulan, () => []).add(g);
     }
     var bulanKeys = groupedByMonth.keys.toList()..sort((a, b) => b.compareTo(a));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Arsip $tahun'),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.download),
-            tooltip: 'Download',
-            onSelected: (value) async {
-              try {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Menyiapkan file...')),
-                );
-                if (value == 'word') {
-                  await DownloadService.exportYearToWord(tahun, data);
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(
+          title: Text('Arsip $tahun'),
+          actions: [
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.download),
+              tooltip: 'Download',
+              onSelected: (value) async {
+                try {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                    const SnackBar(content: Text('Menyiapkan file...')),
                   );
-                } else if (value == 'excel') {
-                  await DownloadService.exportYearToExcel(tahun, data);
+                  if (value == 'word') {
+                    await DownloadService.exportYearToWord(tahun, data);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                    );
+                  } else if (value == 'excel') {
+                    await DownloadService.exportYearToExcel(tahun, data);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                    SnackBar(content: Text('Gagal download: $e'), backgroundColor: Colors.red),
                   );
                 }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Gagal download: $e'), backgroundColor: Colors.red),
-                );
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'word',
-                child: Row(
-                  children: [
-                    Icon(Icons.description, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Text('Word (.doc)'),
-                  ],
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'word',
+                  child: Row(
+                    children: [
+                      Icon(Icons.description, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Word (.doc)'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'excel',
-                child: Row(
-                  children: [
-                    Icon(Icons.table_chart, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text('Excel (.xls)'),
-                  ],
+                const PopupMenuItem(
+                  value: 'excel',
+                  child: Row(
+                    children: [
+                      Icon(Icons.table_chart, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text('Excel (.xls)'),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: bulanKeys.isEmpty
-          ? const Center(child: Text('Tidak ada data bulan'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: bulanKeys.length,
-              itemBuilder: (context, index) {
-                int bulan = bulanKeys[index];
-                var items = groupedByMonth[bulan]!;
-                double totalBulan = items.fold(0.0, (sum, g) => sum + g.totalGaji);
-                int lunasBulan = items.where((g) => g.isPaid).length;
+              ],
+            ),
+          ],
+        ),
+        body: bulanKeys.isEmpty
+            ? Center(child: Text('Tidak ada data bulan', style: TextStyle(color: colors.onSurfaceVariant)))
+            : ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: bulanKeys.length,
+                itemBuilder: (context, index) {
+                  int bulan = bulanKeys[index];
+                  var items = groupedByMonth[bulan]!;
+                  double totalBulan = items.fold(0.0, (sum, g) => sum + g.totalGaji);
+                  int lunasBulan = items.where((g) => g.isPaid).length;
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    leading: const Icon(Icons.folder_open, color: Colors.blue),
-                    title: Text(getBulanNama(bulan), style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('${items.length} guru • Rp ${formatCurrency(totalBulan)} • $lunasBulan lunas'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.download, size: 18),
-                          onSelected: (value) async {
-                            try {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Menyiapkan file...')),
-                              );
-                              if (value == 'word') {
-                                await DownloadService.exportMonthToWord(tahun, bulan, items);
+                  return _buildThemedContainer(
+                    themeMode,
+                    radius: 12,
+                    child: ListTile(
+                      leading: const Icon(Icons.folder_open, color: Colors.blue),
+                      title: Text(getBulanNama(bulan), style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurface)),
+                      subtitle: Text('${items.length} guru • Rp ${formatCurrency(totalBulan)} • $lunasBulan lunas', style: TextStyle(color: colors.onSurfaceVariant)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.download, size: 18),
+                            onSelected: (value) async {
+                              try {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                                  const SnackBar(content: Text('Menyiapkan file...')),
                                 );
-                              } else if (value == 'excel') {
-                                await DownloadService.exportMonthToExcel(tahun, bulan, items);
+                                if (value == 'word') {
+                                  await DownloadService.exportMonthToWord(tahun, bulan, items);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                                  );
+                                } else if (value == 'excel') {
+                                  await DownloadService.exportMonthToExcel(tahun, bulan, items);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                                  );
+                                }
+                              } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('File berhasil disimpan di folder Download!'), backgroundColor: Colors.green),
+                                  SnackBar(content: Text('Gagal download: $e'), backgroundColor: Colors.red),
                                 );
                               }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Gagal download: $e'), backgroundColor: Colors.red),
-                              );
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'word',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.description, size: 16, color: Colors.blue),
-                                  SizedBox(width: 4),
-                                  Text('Word', style: TextStyle(fontSize: 12)),
-                                ],
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'word',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.description, size: 16, color: Colors.blue),
+                                    SizedBox(width: 4),
+                                    Text('Word', style: TextStyle(fontSize: 12)),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'excel',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.table_chart, size: 16, color: Colors.green),
-                                  SizedBox(width: 4),
-                                  Text('Excel', style: TextStyle(fontSize: 12)),
-                                ],
+                              const PopupMenuItem(
+                                value: 'excel',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.table_chart, size: 16, color: Colors.green),
+                                    SizedBox(width: 4),
+                                    Text('Excel', style: TextStyle(fontSize: 12)),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                          tooltip: 'Export',
-                        ),
-                        const Icon(Icons.chevron_right),
-                      ],
+                            ],
+                            tooltip: 'Export',
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
+                      onTap: () {
+                        SoundHelper().playClick();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RiwayatGuruPage(tahun: tahun, bulan: bulan, data: items),
+                          ),
+                        );
+                      },
                     ),
-                    onTap: () {
-                      SoundHelper().playClick();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => RiwayatGuruPage(tahun: tahun, bulan: bulan, data: items),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }
 
 // ================== HALAMAN RIWAYAT PER GURU ==================
-class RiwayatGuruPage extends StatelessWidget {
+class RiwayatGuruPage extends ConsumerWidget {
   final int tahun;
   final int bulan;
   final List<GajiGuru> data;
@@ -2660,107 +2790,119 @@ class RiwayatGuruPage extends StatelessWidget {
   const RiwayatGuruPage({super.key, required this.tahun, required this.bulan, required this.data});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('${getBulanNama(bulan)} $tahun')),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(8),
-        itemCount: data.length,
-        itemBuilder: (context, index) {
-          final gaji = data[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: gaji.isPaid ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                child: Icon(gaji.isPaid ? Icons.check_circle : Icons.pending, color: gaji.isPaid ? Colors.green : Colors.red, size: 18),
-              ),
-              title: Text(gaji.namaGuru, overflow: TextOverflow.ellipsis),
-              subtitle: Text(
-                gaji.komponen.isEmpty ? 'Belum ada komponen' : 'Rp ${formatCurrency(gaji.totalGaji)}',
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (gaji.isPaid && gaji.tanggalBayar != null)
-                    Text(
-                      '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}',
-                      style: const TextStyle(fontSize: 12, color: Colors.black54),
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.visibility, size: 18),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          title: Text('Slip Gaji ${gaji.namaGuru}'),
-                          content: Container(
-                            width: double.maxFinite,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _detailRow('ID', gaji.id),
-                                _detailRow('Nama Guru', gaji.namaGuru),
-                                _detailRow('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}'),
-                                _detailRow('Role', gaji.role == 'guru' ? 'Guru' : 'Karyawan'),
-                                if (gaji.keterangan != null && gaji.keterangan!.isNotEmpty) _detailRow('Keterangan', gaji.keterangan!),
-                                const Divider(),
-                                if (gaji.komponen.isNotEmpty) ...[
-                                  const Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 8),
-                                  SizedBox(height: 120, child: _buildPieChart(gaji.komponen)),
-                                  const Divider(),
-                                ],
-                                const Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                if (gaji.komponen.isEmpty)
-                                  const Padding(
-                                    padding: EdgeInsets.all(8.0),
-                                    child: Text('Tidak ada komponen gaji', style: TextStyle(color: Colors.grey)),
-                                  )
-                                else
-                                  ...gaji.komponen.map(
-                                    (k) => Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 2),
-                                      child: Row(
-                                        children: [
-                                          Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis)),
-                                          Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
-                                        ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(
+          title: Text('${getBulanNama(bulan)} $tahun'),
+        ),
+        body: ListView.builder(
+          padding: const EdgeInsets.all(8),
+          itemCount: data.length,
+          itemBuilder: (context, index) {
+            final gaji = data[index];
+            return _buildThemedContainer(
+              themeMode,
+              radius: 12,
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: gaji.isPaid ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                  child: Icon(gaji.isPaid ? Icons.check_circle : Icons.pending, color: gaji.isPaid ? Colors.green : Colors.red, size: 18),
+                ),
+                title: Text(gaji.namaGuru, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.onSurface)),
+                subtitle: Text(
+                  gaji.komponen.isEmpty ? 'Belum ada komponen' : 'Rp ${formatCurrency(gaji.totalGaji)}',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.onSurfaceVariant),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (gaji.isPaid && gaji.tanggalBayar != null)
+                      Text(
+                        '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}',
+                        style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.visibility, size: 18),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: isGlass ? AppColors.glassBg1 : null,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            title: Text('Slip Gaji ${gaji.namaGuru}', style: TextStyle(color: isGlass ? Colors.white : null)),
+                            content: Container(
+                              width: double.maxFinite,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildDetailRowStatic('ID', gaji.id, colors, isGlass),
+                                  _buildDetailRowStatic('Nama Guru', gaji.namaGuru, colors, isGlass),
+                                  _buildDetailRowStatic('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}', colors, isGlass),
+                                  _buildDetailRowStatic('Role', gaji.role == 'guru' ? 'Guru' : 'Karyawan', colors, isGlass),
+                                  if (gaji.keterangan != null && gaji.keterangan!.isNotEmpty) _buildDetailRowStatic('Keterangan', gaji.keterangan!, colors, isGlass),
+                                  Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                  if (gaji.komponen.isNotEmpty) ...[
+                                    Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
+                                    const SizedBox(height: 8),
+                                    SizedBox(height: 120, child: _buildPieChartStatic(gaji.komponen)),
+                                    Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                  ],
+                                  Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
+                                  if (gaji.komponen.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text('Tidak ada komponen gaji', style: TextStyle(color: isGlass ? Colors.white70 : colors.onSurfaceVariant)),
+                                    )
+                                  else
+                                    ...gaji.komponen.map(
+                                      (k) => Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 2),
+                                        child: Row(
+                                          children: [
+                                            Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
+                                            Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                const Divider(),
-                                _detailRow('Total', 'Rp ${formatCurrency(gaji.totalGaji)}', bold: true),
-                                _detailRow('Status', gaji.isPaid ? 'Lunas' : 'Belum'),
-                                if (gaji.isPaid && gaji.tanggalBayar != null)
-                                  _detailRow('Tanggal Bayar', '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}'),
-                                if (gaji.metodeBayar != null) _detailRow('Metode', gaji.metodeBayar!),
-                                if (gaji.catatan != null && gaji.catatan!.isNotEmpty) _detailRow('Catatan', gaji.catatan!),
-                              ],
+                                  Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                  _buildDetailRowStatic('Total', 'Rp ${formatCurrency(gaji.totalGaji)}', colors, isGlass, bold: true),
+                                  _buildDetailRowStatic('Status', gaji.isPaid ? 'Lunas' : 'Belum', colors, isGlass),
+                                  if (gaji.isPaid && gaji.tanggalBayar != null)
+                                    _buildDetailRowStatic('Tanggal Bayar', '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}', colors, isGlass),
+                                  if (gaji.metodeBayar != null) _buildDetailRowStatic('Metode', gaji.metodeBayar!, colors, isGlass),
+                                  if (gaji.catatan != null && gaji.catatan!.isNotEmpty) _buildDetailRowStatic('Catatan', gaji.catatan!, colors, isGlass),
+                                ],
+                              ),
                             ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+                            ],
                           ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
-                          ],
-                        ),
-                      );
-                    },
-                    tooltip: 'Detail',
-                  ),
-                ],
+                        );
+                      },
+                      tooltip: 'Detail',
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _detailRow(String label, String value, {bool bold = false}) {
+  Widget _buildDetailRowStatic(String label, String value, ColorScheme colors, bool isGlass, {bool bold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -2770,18 +2912,18 @@ class RiwayatGuruPage extends StatelessWidget {
             width: 100,
             child: Text(
               label,
-              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600, color: bold ? Colors.black87 : Colors.black54),
+              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600, color: bold ? (isGlass ? Colors.white : colors.onSurface) : (isGlass ? Colors.white70 : colors.onSurfaceVariant)),
             ),
           ),
           Expanded(
-            child: Text(value, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal), overflow: TextOverflow.ellipsis),
+            child: Text(value, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: isGlass ? Colors.white : colors.onSurface), overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPieChart(List<KomponenGaji> komponen) {
+  Widget _buildPieChartStatic(List<KomponenGaji> komponen) {
     Map<String, double> grouped = {};
     for (var k in komponen) {
       grouped[k.kategori] = (grouped[k.kategori] ?? 0) + k.jumlah;
@@ -2809,132 +2951,142 @@ class RiwayatGuruPage extends StatelessWidget {
 }
 
 // ================== HALAMAN ARSIP BELUM BAYAR ==================
-class ArchiveUnpaidPage extends StatelessWidget {
+class ArchiveUnpaidPage extends ConsumerWidget {
   final List<GajiGuru> records;
   final Function(GajiGuru) onMarkPaid;
 
   const ArchiveUnpaidPage({super.key, required this.records, required this.onMarkPaid});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Arsip Belum Bayar')),
-      body: records.isEmpty
-          ? const Center(child: Text('Tidak ada data belum bayar di arsip'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: records.length,
-              itemBuilder: (context, index) {
-                final g = records[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    leading: const Icon(Icons.pending, color: Colors.orange),
-                    title: Text(g.namaGuru, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('${getBulanNama(g.bulan)} ${g.tahun} • Rp ${formatCurrency(g.totalGaji)}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.payment, color: Colors.green),
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Konfirmasi Pembayaran'),
-                                content: Text('Tandai gaji ${g.namaGuru} (${getBulanNama(g.bulan)} ${g.tahun}) sebagai lunas?'),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.pop(ctx);
-                                      onMarkPaid(g);
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Gaji ditandai lunas!')),
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                    child: const Text('Ya, Bayar'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                          tooltip: 'Bayar',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.visibility),
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                title: Text('Slip Gaji ${g.namaGuru}'),
-                                content: Container(
-                                  width: double.maxFinite,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _detailRow('ID', g.id),
-                                      _detailRow('Nama Guru', g.namaGuru),
-                                      _detailRow('Periode', '${getBulanNama(g.bulan)} ${g.tahun}'),
-                                      _detailRow('Role', g.role == 'guru' ? 'Guru' : 'Karyawan'),
-                                      if (g.keterangan != null && g.keterangan!.isNotEmpty) _detailRow('Keterangan', g.keterangan!),
-                                      const Divider(),
-                                      if (g.komponen.isNotEmpty) ...[
-                                        const Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
-                                        SizedBox(height: 120, child: _buildPieChart(g.komponen)),
-                                        const Divider(),
-                                      ],
-                                      const Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      if (g.komponen.isEmpty)
-                                        const Padding(
-                                          padding: EdgeInsets.all(8.0),
-                                          child: Text('Tidak ada komponen gaji', style: TextStyle(color: Colors.grey)),
-                                        )
-                                      else
-                                        ...g.komponen.map(
-                                          (k) => Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 2),
-                                            child: Row(
-                                              children: [
-                                                Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis)),
-                                                Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
-                                              ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = Theme.of(context).colorScheme;
+    final bool isGlass = ThemeHelper.isGlass(themeMode);
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+        appBar: AppBar(title: const Text('Arsip Belum Bayar')),
+        body: records.isEmpty
+            ? Center(child: Text('Tidak ada data belum bayar di arsip', style: TextStyle(color: colors.onSurfaceVariant)))
+            : ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: records.length,
+                itemBuilder: (context, index) {
+                  final g = records[index];
+                  return _buildThemedContainer(
+                    themeMode,
+                    radius: 12,
+                    child: ListTile(
+                      leading: const Icon(Icons.pending, color: Colors.orange),
+                      title: Text(g.namaGuru, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.onSurface)),
+                      subtitle: Text('${getBulanNama(g.bulan)} ${g.tahun} • Rp ${formatCurrency(g.totalGaji)}', style: TextStyle(color: colors.onSurfaceVariant)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.payment, color: Colors.green),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: isGlass ? AppColors.glassBg1 : null,
+                                  title: Text('Konfirmasi Pembayaran', style: TextStyle(color: isGlass ? Colors.white : null)),
+                                  content: Text('Tandai gaji ${g.namaGuru} (${getBulanNama(g.bulan)} ${g.tahun}) sebagai lunas?', style: TextStyle(color: isGlass ? Colors.white : null)),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        onMarkPaid(g);
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Gaji ditandai lunas!')),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                      child: const Text('Ya, Bayar'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            tooltip: 'Bayar',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.visibility),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: isGlass ? AppColors.glassBg1 : null,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  title: Text('Slip Gaji ${g.namaGuru}', style: TextStyle(color: isGlass ? Colors.white : null)),
+                                  content: Container(
+                                    width: double.maxFinite,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildDetailRowStatic('ID', g.id, colors, isGlass),
+                                        _buildDetailRowStatic('Nama Guru', g.namaGuru, colors, isGlass),
+                                        _buildDetailRowStatic('Periode', '${getBulanNama(g.bulan)} ${g.tahun}', colors, isGlass),
+                                        _buildDetailRowStatic('Role', g.role == 'guru' ? 'Guru' : 'Karyawan', colors, isGlass),
+                                        if (g.keterangan != null && g.keterangan!.isNotEmpty) _buildDetailRowStatic('Keterangan', g.keterangan!, colors, isGlass),
+                                        Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                        if (g.komponen.isNotEmpty) ...[
+                                          Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
+                                          const SizedBox(height: 8),
+                                          SizedBox(height: 120, child: _buildPieChartStatic(g.komponen)),
+                                          Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                        ],
+                                        Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
+                                        if (g.komponen.isEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Text('Tidak ada komponen gaji', style: TextStyle(color: isGlass ? Colors.white70 : colors.onSurfaceVariant)),
+                                          )
+                                        else
+                                          ...g.komponen.map(
+                                            (k) => Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 2),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
+                                                  Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
+                                                ],
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      const Divider(),
-                                      _detailRow('Total', 'Rp ${formatCurrency(g.totalGaji)}', bold: true),
-                                      _detailRow('Status', g.isPaid ? 'Lunas' : 'Belum'),
-                                      if (g.isPaid && g.tanggalBayar != null)
-                                        _detailRow('Tanggal Bayar', '${g.tanggalBayar!.day}/${g.tanggalBayar!.month}/${g.tanggalBayar!.year}'),
-                                      if (g.metodeBayar != null) _detailRow('Metode', g.metodeBayar!),
-                                      if (g.catatan != null && g.catatan!.isNotEmpty) _detailRow('Catatan', g.catatan!),
-                                    ],
+                                        Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                        _buildDetailRowStatic('Total', 'Rp ${formatCurrency(g.totalGaji)}', colors, isGlass, bold: true),
+                                        _buildDetailRowStatic('Status', g.isPaid ? 'Lunas' : 'Belum', colors, isGlass),
+                                        if (g.isPaid && g.tanggalBayar != null)
+                                          _buildDetailRowStatic('Tanggal Bayar', '${g.tanggalBayar!.day}/${g.tanggalBayar!.month}/${g.tanggalBayar!.year}', colors, isGlass),
+                                        if (g.metodeBayar != null) _buildDetailRowStatic('Metode', g.metodeBayar!, colors, isGlass),
+                                        if (g.catatan != null && g.catatan!.isNotEmpty) _buildDetailRowStatic('Catatan', g.catatan!, colors, isGlass),
+                                      ],
+                                    ),
                                   ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+                                  ],
                                 ),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
+      ),
     );
   }
 
-  Widget _detailRow(String label, String value, {bool bold = false}) {
+  Widget _buildDetailRowStatic(String label, String value, ColorScheme colors, bool isGlass, {bool bold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -2944,18 +3096,18 @@ class ArchiveUnpaidPage extends StatelessWidget {
             width: 100,
             child: Text(
               label,
-              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600, color: bold ? Colors.black87 : Colors.black54),
+              style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600, color: bold ? (isGlass ? Colors.white : colors.onSurface) : (isGlass ? Colors.white70 : colors.onSurfaceVariant)),
             ),
           ),
           Expanded(
-            child: Text(value, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal), overflow: TextOverflow.ellipsis),
+            child: Text(value, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: isGlass ? Colors.white : colors.onSurface), overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPieChart(List<KomponenGaji> komponen) {
+  Widget _buildPieChartStatic(List<KomponenGaji> komponen) {
     Map<String, double> grouped = {};
     for (var k in komponen) {
       grouped[k.kategori] = (grouped[k.kategori] ?? 0) + k.jumlah;
@@ -2989,6 +3141,7 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String subtitle;
+  final AppThemeMode themeMode;
 
   const _StatCard({
     required this.title,
@@ -2996,13 +3149,16 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.subtitle,
+    required this.themeMode,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    final colors = Theme.of(context).colorScheme;
+    return _buildThemedContainer(
+      themeMode,
+      radius: 16,
+      margin: EdgeInsets.zero,
       child: Container(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -3012,13 +3168,13 @@ class _StatCard extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: color.withOpacity(0.15),
+                  backgroundColor: color.withValues(alpha: 0.15),
                   radius: 20,
                   child: Icon(icon, color: color, size: 22),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(title, style: TextStyle(color: Colors.black54, fontSize: 12)),
+                  child: Text(title, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
                 ),
               ],
             ),
@@ -3028,13 +3184,82 @@ class _StatCard extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface)),
               ),
             ),
-            Text(subtitle, style: TextStyle(color: Colors.black54, fontSize: 10)),
+            Text(subtitle, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10)),
           ],
         ),
       ),
     );
   }
+}
+
+// ================== HELPER CONTAINER ==================
+Widget _buildThemedContainer(
+  AppThemeMode themeMode, {
+  required Widget child,
+  double radius = 16,
+  EdgeInsetsGeometry margin = const EdgeInsets.only(bottom: 8),
+}) {
+  if (ThemeHelper.isNeo(themeMode)) {
+    return Container(
+      margin: margin,
+      decoration: neumorphismDecoration(borderRadius: radius),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: child,
+      ),
+    );
+  }
+  if (ThemeHelper.isGlass(themeMode)) {
+    return Container(
+      margin: margin,
+      decoration: glassmorphismDecoration(borderRadius: radius),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: child,
+        ),
+      ),
+    );
+  }
+  if (ThemeHelper.isModern(themeMode)) {
+    return Container(
+      margin: margin,
+      decoration: modernDecoration(borderRadius: radius),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: child,
+      ),
+    );
+  }
+  if (ThemeHelper.isAurora(themeMode)) {
+    return Container(
+      margin: margin,
+      decoration: auroraDecoration(borderRadius: radius),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: child,
+      ),
+    );
+  }
+  if (ThemeHelper.isCyber(themeMode)) {
+    return Container(
+      margin: margin,
+      decoration: cyberpunkDecoration(borderRadius: radius),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: child,
+      ),
+    );
+  }
+
+  return Card(
+    margin: margin,
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+    child: child,
+  );
 }

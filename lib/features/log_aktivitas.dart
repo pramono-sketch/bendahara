@@ -1,10 +1,11 @@
 // features/log_aktivitas.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../constants/appearance.dart'; // 🔥 import warna
+import '../constants/appearance.dart';
 import '../data.dart';
 
-/// Halaman untuk menampilkan log aktivitas dengan filter dan pencarian.
+/// Halaman untuk menampilkan log aktivitas dari Firebase dengan filter dan pencarian.
 class LogAktivitasPage extends StatefulWidget {
   const LogAktivitasPage({super.key});
 
@@ -27,189 +28,13 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
   // Query pencarian
   String _searchQuery = '';
 
-  // Daftar log yang ditampilkan (setelah filter & search)
-  List<ActivityLog> _filteredLogs = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _ensureLocalLogs();
-    _applyFilterAndSearch();
-  }
-
-  /// Jika localLogs kosong, generate data sample untuk demo.
-  void _ensureLocalLogs() {
-    if (localLogs.isEmpty) {
-      // Menambahkan log untuk berbagai aktivitas
-      final now = DateTime.now();
-
-      // Log siswa
-      localLogs.addAll([
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.tambah,
-          detail: 'Siswa baru: Andi Pratama (X RPL)',
-          timestamp: now.subtract(const Duration(days: 2, hours: 1)),
-        ),
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.edit,
-          detail: 'Edit data siswa: Budi Santoso (XI TKJ)',
-          timestamp: now.subtract(const Duration(days: 1, hours: 3)),
-        ),
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.hapus,
-          detail: 'Hapus siswa: Citra Dewi (XII TKR)',
-          timestamp: now.subtract(const Duration(days: 1, hours: 5)),
-        ),
-      ]);
-
-      // Log transaksi
-      localLogs.addAll([
-        ActivityLog(
-          user: 'Bendahara',
-          action: ActivityAction.tambah,
-          detail: 'Pemasukan SPP dari 10 siswa (Rp 2.000.000)',
-          timestamp: now.subtract(const Duration(days: 1, hours: 2)),
-        ),
-        ActivityLog(
-          user: 'Bendahara',
-          action: ActivityAction.edit,
-          detail: 'Edit transaksi pengeluaran ATK (Rp 500.000)',
-          timestamp: now.subtract(const Duration(hours: 4)),
-        ),
-        ActivityLog(
-          user: 'Bendahara',
-          action: ActivityAction.hapus,
-          detail: 'Hapus transaksi pemasukan duplikat (Rp 1.000.000)',
-          timestamp: now.subtract(const Duration(hours: 2)),
-        ),
-      ]);
-
-      // Log akun digital
-      localLogs.addAll([
-        ActivityLog(
-          user: 'IT Support',
-          action: ActivityAction.tambah,
-          detail: 'Akun digital baru: Google Workspace (admin@eduvest.sch.id)',
-          timestamp: now.subtract(const Duration(days: 3)),
-        ),
-        ActivityLog(
-          user: 'IT Support',
-          action: ActivityAction.edit,
-          detail: 'Perbarui password akun Zoom Meeting',
-          timestamp: now.subtract(const Duration(days: 2, hours: 6)),
-        ),
-        ActivityLog(
-          user: 'IT Support',
-          action: ActivityAction.hapus,
-          detail: 'Hapus akun lama: Sistem Absensi (v1)',
-          timestamp: now.subtract(const Duration(days: 1, hours: 8)),
-        ),
-      ]);
-
-      // Log pembayaran siswa
-      localLogs.addAll([
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.bayar,
-          detail: 'Pembayaran SPP siswa: Eko Saputra (XII RPL) - Rp 200.000',
-          timestamp: now.subtract(const Duration(hours: 1, minutes: 30)),
-        ),
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.bayar,
-          detail: 'Pembayaran Gedung siswa: Fajar Nugroho (XI TKJ) - Rp 5.000.000',
-          timestamp: now.subtract(const Duration(hours: 45)),
-        ),
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.edit,
-          detail: 'Update status pembayaran SPP siswa: Gita Wulandari (X RPL)',
-          timestamp: now.subtract(const Duration(hours: 20)),
-        ),
-      ]);
-
-      // Log login/logout
-      localLogs.addAll([
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.login,
-          detail: 'Admin login dari perangkat baru (IP 192.168.1.10)',
-          timestamp: now.subtract(const Duration(hours: 3)),
-        ),
-        ActivityLog(
-          user: 'Bendahara',
-          action: ActivityAction.login,
-          detail: 'Bendahara login (IP 192.168.1.15)',
-          timestamp: now.subtract(const Duration(hours: 2, minutes: 30)),
-        ),
-        ActivityLog(
-          user: 'Admin',
-          action: ActivityAction.logout,
-          detail: 'Admin logout',
-          timestamp: now.subtract(const Duration(minutes: 10)),
-        ),
-      ]);
-    }
-  }
-
-  /// Menerapkan filter kategori dan pencarian ke daftar log.
-  void _applyFilterAndSearch() {
-    setState(() {
-      List<ActivityLog> logs = List.from(localLogs);
-
-      // Filter berdasarkan kategori
-      if (_selectedFilter != 'Semua') {
-        logs = logs.where((log) {
-          final detail = log.detail.toLowerCase();
-          final action = log.action;
-          switch (_selectedFilter) {
-            case 'Siswa':
-              return detail.contains('siswa') ||
-                  detail.contains('siswa baru') ||
-                  detail.contains('edit data siswa') ||
-                  detail.contains('hapus siswa');
-            case 'Transaksi':
-              return detail.contains('pemasukan') ||
-                  detail.contains('pengeluaran') ||
-                  detail.contains('transaksi');
-            case 'Akun Digital':
-              return detail.contains('akun digital') ||
-                  detail.contains('akun') ||
-                  detail.contains('google') ||
-                  detail.contains('zoom') ||
-                  detail.contains('password');
-            case 'Pembayaran':
-              return action == ActivityAction.bayar ||
-                  detail.contains('pembayaran') ||
-                  detail.contains('spp') ||
-                  detail.contains('gedung');
-            case 'Login/Logout':
-              return action == ActivityAction.login ||
-                  action == ActivityAction.logout;
-            default:
-              return true;
-          }
-        }).toList();
-      }
-
-      // Pencarian berdasarkan user, action, atau detail
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        logs = logs.where((log) {
-          return log.user.toLowerCase().contains(query) ||
-              log.actionText.toLowerCase().contains(query) ||
-              log.detail.toLowerCase().contains(query);
-        }).toList();
-      }
-
-      // Urutkan dari yang terbaru
-      logs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-      _filteredLogs = logs;
-    });
+  /// Stream data log aktivitas dari Firestore (diurutkan dari yang terbaru)
+  Stream<QuerySnapshot> _getLogStream() {
+    return FirebaseFirestore.instance
+        .collection('log_aktivitas')
+        .orderBy('timestamp', descending: true)
+        .limit(500) // Batasi 500 log terakhir agar tidak berat
+        .snapshots();
   }
 
   /// Menentukan warna berdasarkan action.
@@ -234,6 +59,7 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
   String _getCategoryLabel(ActivityLog log) {
     final detail = log.detail.toLowerCase();
     final action = log.action;
+    
     if (action == ActivityAction.bayar) return 'Pembayaran';
     if (action == ActivityAction.login || action == ActivityAction.logout) {
       return 'Login/Logout';
@@ -252,19 +78,75 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
     return 'Lainnya';
   }
 
+  /// Cek apakah log cocok dengan filter kategori yang dipilih
+  bool _matchesFilter(ActivityLog log) {
+    if (_selectedFilter == 'Semua') return true;
+
+    final detail = log.detail.toLowerCase();
+    final action = log.action;
+
+    switch (_selectedFilter) {
+      case 'Siswa':
+        return detail.contains('siswa') ||
+            detail.contains('siswa baru') ||
+            detail.contains('edit data siswa') ||
+            detail.contains('hapus siswa');
+      case 'Transaksi':
+        return detail.contains('pemasukan') ||
+            detail.contains('pengeluaran') ||
+            detail.contains('transaksi');
+      case 'Akun Digital':
+        return detail.contains('akun digital') ||
+            detail.contains('akun') ||
+            detail.contains('google') ||
+            detail.contains('zoom') ||
+            detail.contains('password');
+      case 'Pembayaran':
+        return action == ActivityAction.bayar ||
+            detail.contains('pembayaran') ||
+            detail.contains('spp') ||
+            detail.contains('gedung');
+      case 'Login/Logout':
+        return action == ActivityAction.login ||
+            action == ActivityAction.logout;
+      default:
+        return true;
+    }
+  }
+
+  /// Cek apakah log cocok dengan query pencarian
+  bool _matchesSearch(ActivityLog log) {
+    if (_searchQuery.isEmpty) return true;
+
+    final query = _searchQuery.toLowerCase();
+    return log.user.toLowerCase().contains(query) ||
+        log.actionText.toLowerCase().contains(query) ||
+        log.detail.toLowerCase().contains(query);
+  }
+
+  /// Format timestamp menjadi string yang rapi.
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inDays > 7) {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} hari yang lalu';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} jam yang lalu';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} menit yang lalu';
+    } else {
+      return 'Baru saja';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Log Aktivitas'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              _applyFilterAndSearch();
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -292,7 +174,6 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
                             setState(() {
                               _selectedFilter = newValue;
                             });
-                            _applyFilterAndSearch();
                           }
                         },
                       ),
@@ -314,33 +195,52 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
                     setState(() {
                       _searchQuery = value;
                     });
-                    _applyFilterAndSearch();
                   },
                 ),
               ],
             ),
           ),
-          // Jumlah log
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                Text(
-                  'Menampilkan ${_filteredLogs.length} log',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
           const Divider(height: 1),
-          // Daftar log
+          
+          // Daftar log dari Firebase
           Expanded(
-            child: _filteredLogs.isEmpty
-                ? const Center(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _getLogStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Terjadi error: ${snapshot.error}'),
+                  );
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'Belum ada log aktivitas',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  );
+                }
+
+                // Parse semua dokumen Firestore menjadi list ActivityLog
+                List<ActivityLog> allLogs = snapshot.data!.docs.map((doc) {
+                  return ActivityLog.fromMap(doc.data() as Map<String, dynamic>);
+                }).toList();
+
+                // Terapkan filter dan pencarian secara lokal
+                List<ActivityLog> filteredLogs = allLogs.where((log) {
+                  return _matchesFilter(log) && _matchesSearch(log);
+                }).toList();
+
+                if (filteredLogs.isEmpty) {
+                  return const Center(
                     child: Text(
                       'Tidak ada log yang sesuai',
                       style: TextStyle(
@@ -348,130 +248,142 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: _filteredLogs.length,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemBuilder: (context, index) {
-                      final log = _filteredLogs[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor:
-                                _logColor(log.action).withOpacity(0.15),
-                            child: Icon(
-                              log.actionIcon,
-                              color: _logColor(log.action),
-                              size: 22,
+                  );
+                }
+
+                return Column(
+                  children: [
+                    // Jumlah log
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Menampilkan ${filteredLogs.length} log',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
                             ),
                           ),
-                          title: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  log.actionText,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        ],
+                      ),
+                    ),
+                    // List View
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredLogs.length,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemBuilder: (context, index) {
+                          final log = filteredLogs[index];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor:
+                                    _logColor(log.action).withOpacity(0.15),
+                                child: Icon(
+                                  log.actionIcon,
+                                  color: _logColor(log.action),
+                                  size: 22,
                                 ),
                               ),
-                              // Label kategori
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _logColor(log.action).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _logColor(log.action).withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Text(
-                                  _getCategoryLabel(log),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: _logColor(log.action),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(log.detail),
-                              const SizedBox(height: 4),
-                              Row(
+                              title: Row(
                                 children: [
-                                  Icon(
-                                    Icons.person_outline,
-                                    size: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    log.user,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                  Expanded(
+                                    child: Text(
+                                      log.actionText,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Icon(
-                                    Icons.access_time,
-                                    size: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _formatTimestamp(log.timestamp),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                  // Label kategori
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _logColor(log.action).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: _logColor(log.action).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _getCategoryLabel(log),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: _logColor(log.action),
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                          isThreeLine: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text(log.detail),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.person_outline,
+                                        size: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        log.user,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _formatTimestamp(log.timestamp),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
     );
-  }
-
-  /// Format timestamp menjadi string yang rapi.
-  String _formatTimestamp(DateTime timestamp) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inDays > 7) {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} hari yang lalu';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} jam yang lalu';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} menit yang lalu';
-    } else {
-      return 'Baru saja';
-    }
   }
 }

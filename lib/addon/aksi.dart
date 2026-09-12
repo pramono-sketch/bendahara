@@ -1,3 +1,5 @@
+// lib/addon/aksi.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,9 +81,7 @@ class AksiHelper {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ==================================================
                 // HANDLE
-                // ==================================================
                 Container(
                   width: 40,
                   height: 4,
@@ -93,9 +93,7 @@ class AksiHelper {
 
                 const SizedBox(height: 20),
 
-                // ==================================================
                 // TITLE
-                // ==================================================
                 Text(
                   translations.t('quick_menu'),
                   style: TextStyle(
@@ -107,9 +105,7 @@ class AksiHelper {
 
                 const SizedBox(height: 20),
 
-                // ==================================================
                 // ACTIONS
-                // ==================================================
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -127,7 +123,6 @@ class AksiHelper {
 
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!parentContext.mounted) return;
-
                           showAddTransactionDialog(parentContext, onUpdate);
                         });
                       },
@@ -142,29 +137,42 @@ class AksiHelper {
                       isGlass: isGlass,
                       onTap: () {
                         SoundHelper().playClick();
-
                         Navigator.of(sheetContext).pop();
-
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!parentContext.mounted) return;
-
                           showCalculatorDialog(parentContext);
                         });
                       },
                     ),
 
                     // ================= SIMULASI =================
+                    // Saat ditekan, akan otomatis mengarsipkan
+                    // transaksi bulan ini ke Firebase terlebih
+                    // dahulu, baru kemudian menampilkan dialog
+                    // simulasi pergantian bulan.
                     _buildQuickAction(
                       icon: Icons.developer_mode,
                       label: translations.t('simulation_data'),
                       accentColor: accentColor,
                       textColor: primaryText,
                       isGlass: isGlass,
-                      onTap: () {
+                      onTap: () async {
                         SoundHelper().playClick();
 
                         Navigator.of(sheetContext).pop();
 
+                        // ===== ARSIPKAN TRANSAKSI BULAN INI KE FIREBASE =====
+                        // Sebelum simulasi pergantian bulan, simpan
+                        // terlebih dahulu transaksi bulan ini ke koleksi
+                        // archived_transactions agar dapat dibandingkan
+                        // di laporan.dart.
+                        try {
+                          await archiveCurrentMonthData();
+                        } catch (e) {
+                          debugPrint('Archive error: $e');
+                        }
+
+                        // ===== TAMPILKAN DIALOG SIMULASI =====
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!parentContext.mounted) return;
 
@@ -186,12 +194,9 @@ class AksiHelper {
                       isGlass: isGlass,
                       onTap: () {
                         SoundHelper().playClick();
-
                         Navigator.of(sheetContext).pop();
-
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!parentContext.mounted) return;
-
                           Navigator.of(parentContext).push(
                             MaterialPageRoute(
                               builder: (_) => const AIAssistantPage(),
@@ -239,9 +244,7 @@ class AksiHelper {
               backgroundColor: circleBackground,
               child: Icon(icon, color: iconColor, size: 30),
             ),
-
             const SizedBox(height: 8),
-
             Text(
               label,
               textAlign: TextAlign.center,
@@ -286,7 +289,6 @@ class AksiHelper {
 
   static void showCalculatorDialog(BuildContext parentContext) {
     if (!parentContext.mounted) return;
-
     showDialog(
       context: parentContext,
       builder: (_) => const CalculatorDialog(),
@@ -310,19 +312,14 @@ class _AddTransactionDialog extends StatefulWidget {
 
 class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   final _descCtrl = TextEditingController();
-
   final _amountCtrl = TextEditingController();
-
   TransType _selectedType = TransType.pemasukan;
-
   bool _isSaving = false;
 
   @override
   void dispose() {
     _descCtrl.dispose();
-
     _amountCtrl.dispose();
-
     super.dispose();
   }
 
@@ -336,9 +333,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     setState(() => _isSaving = true);
 
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
-
     final description = _descCtrl.text.trim();
-
     final now = DateTime.now();
 
     final newTransaction = Transaction(
@@ -361,18 +356,14 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 
     try {
       await addTransaction(newTransaction);
-
       await addActivityLog(newLog);
 
       localTransactions.insert(0, newTransaction);
-
       localLogs.insert(0, newLog);
 
       if (mounted) {
         Navigator.of(context).pop();
-
         widget.onUpdate();
-
         widget.onRefresh?.call();
       }
     } catch (e) {
@@ -409,7 +400,6 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     final colors = Theme.of(context).colorScheme;
 
     final bool isGlass = ThemeHelper.isGlass(themeMode);
-
     final bool isNeo = ThemeHelper.isNeo(themeMode);
 
     final Color accentColor = ThemeHelper.getAccentColor(themeMode, colors);
@@ -436,7 +426,6 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       backgroundColor: dialogBackground,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-
       title: Text(
         translations.t('add_transaction'),
         style: TextStyle(
@@ -445,7 +434,6 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
           fontWeight: FontWeight.bold,
         ),
       ),
-
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -454,7 +442,6 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
             dropdownColor: dialogBackground,
             style: TextStyle(color: primaryText),
             iconEnabledColor: primaryText,
-
             items: [
               DropdownMenuItem(
                 value: TransType.pemasukan,
@@ -465,15 +452,10 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                 child: Text(translations.t('expense')),
               ),
             ],
-
             onChanged: (value) {
               if (value == null) return;
-
-              setState(() {
-                _selectedType = value;
-              });
+              setState(() => _selectedType = value);
             },
-
             decoration: InputDecoration(
               labelText: translations.t('transaction_type'),
               labelStyle: TextStyle(color: secondaryText),
@@ -493,9 +475,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           TextField(
             controller: _descCtrl,
             style: TextStyle(color: primaryText),
@@ -518,9 +498,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           TextField(
             controller: _amountCtrl,
             keyboardType: TextInputType.number,
@@ -546,14 +524,12 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
           ),
         ],
       ),
-
       actions: [
         TextButton(
           onPressed: _isSaving
               ? null
               : () {
                   SoundHelper().playClick();
-
                   Navigator.of(context).pop();
                 },
           child: Text(
@@ -561,7 +537,6 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
             style: TextStyle(color: isGlass ? Colors.white : accentColor),
           ),
         ),
-
         FilledButton(
           onPressed: _isSaving ? null : _saveTransaction,
           style: FilledButton.styleFrom(
@@ -597,276 +572,153 @@ class CalculatorDialog extends StatefulWidget {
 
 class _CalculatorDialogState extends State<CalculatorDialog> {
   String _display = '0';
-
   String _expression = '';
-
   String _operator = '';
-
   double _firstOperand = 0;
-
   bool _newNumber = true;
-
   bool _isResult = false;
-
-  // ==========================================================
-  // DIGIT
-  // ==========================================================
 
   void _pressDigit(String digit) {
     SoundHelper().playClick();
-
     setState(() {
       if (_isResult) {
         _display = digit;
-
         _expression = '';
-
         _isResult = false;
-
         _newNumber = false;
-
         return;
       }
-
-      if (digit == '.' && _display.contains('.')) {
-        return;
-      }
-
+      if (digit == '.' && _display.contains('.')) return;
       if (_newNumber) {
         _display = digit == '.' ? '0.' : digit;
-
         _newNumber = false;
       } else {
-        if (_display.length < 15) {
-          _display += digit;
-        }
+        if (_display.length < 15) _display += digit;
       }
     });
   }
 
-  // ==========================================================
-  // OPERATOR
-  // ==========================================================
-
   void _pressOperator(String op) {
     SoundHelper().playClick();
-
-    if (_operator.isNotEmpty && !_newNumber) {
-      _calculateResult();
-    }
-
+    if (_operator.isNotEmpty && !_newNumber) _calculateResult();
     setState(() {
       _firstOperand = double.tryParse(_display) ?? 0;
-
       _operator = op;
-
       _expression = '$_display $op ';
-
       _newNumber = true;
-
       _isResult = false;
     });
   }
 
-  // ==========================================================
-  // CALCULATE
-  // ==========================================================
-
   void _calculateResult() {
     final second = double.tryParse(_display) ?? 0;
-
     double result = 0;
-
     String resultStr = '';
 
     switch (_operator) {
       case '+':
         result = _firstOperand + second;
-
-        resultStr =
-            '${_firstOperand.toStringAsFixed(0)} + '
-            '${second.toStringAsFixed(0)} =';
-
+        resultStr = '${_firstOperand.toStringAsFixed(0)} + ${second.toStringAsFixed(0)} =';
         break;
-
       case '-':
         result = _firstOperand - second;
-
-        resultStr =
-            '${_firstOperand.toStringAsFixed(0)} - '
-            '${second.toStringAsFixed(0)} =';
-
+        resultStr = '${_firstOperand.toStringAsFixed(0)} - ${second.toStringAsFixed(0)} =';
         break;
-
       case '×':
         result = _firstOperand * second;
-
-        resultStr =
-            '${_firstOperand.toStringAsFixed(0)} × '
-            '${second.toStringAsFixed(0)} =';
-
+        resultStr = '${_firstOperand.toStringAsFixed(0)} × ${second.toStringAsFixed(0)} =';
         break;
-
       case '÷':
         if (second == 0) {
           setState(() {
             _display = 'Error';
-
             _operator = '';
-
             _newNumber = true;
-
             _isResult = true;
           });
-
           return;
         }
-
         result = _firstOperand / second;
-
-        resultStr =
-            '${_firstOperand.toStringAsFixed(0)} ÷ '
-            '${second.toStringAsFixed(0)} =';
-
+        resultStr = '${_firstOperand.toStringAsFixed(0)} ÷ ${second.toStringAsFixed(0)} =';
         break;
-
       default:
         return;
     }
 
-    String displayResult = result
-        .toStringAsFixed(2)
-        .replaceAll(RegExp(r'\.00$'), '');
-
+    String displayResult = result.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
     if (displayResult.length > 15) {
       displayResult = result.toStringAsExponential(2);
     }
 
     setState(() {
       _display = displayResult;
-
       _expression = resultStr;
-
       _operator = '';
-
       _newNumber = true;
-
       _isResult = true;
     });
   }
 
-  // ==========================================================
-  // EQUALS
-  // ==========================================================
-
   void _pressEquals() {
-    if (_operator.isEmpty) {
-      return;
-    }
-
+    if (_operator.isEmpty) return;
     SoundHelper().playClick();
-
     _calculateResult();
   }
 
-  // ==========================================================
-  // CLEAR
-  // ==========================================================
-
   void _pressClear() {
     SoundHelper().playClick();
-
     setState(() {
       _display = '0';
-
       _expression = '';
-
       _operator = '';
-
       _firstOperand = 0;
-
       _newNumber = true;
-
       _isResult = false;
     });
   }
 
-  // ==========================================================
-  // DELETE
-  // ==========================================================
-
   void _pressDelete() {
     SoundHelper().playClick();
-
     if (_isResult) {
       _pressClear();
-
       return;
     }
-
     setState(() {
       if (_display.length > 1) {
         _display = _display.substring(0, _display.length - 1);
       } else {
         _display = '0';
-
         _newNumber = true;
       }
     });
   }
 
-  // ==========================================================
-  // PERCENT
-  // ==========================================================
-
   void _pressPercent() {
     SoundHelper().playClick();
-
     setState(() {
       final value = double.tryParse(_display) ?? 0;
-
       final result = value / 100;
-
       _display = result.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
-
       _isResult = true;
     });
   }
 
-  // ==========================================================
-  // PLUS MINUS
-  // ==========================================================
-
   void _pressPlusMinus() {
     SoundHelper().playClick();
-
     setState(() {
       final value = double.tryParse(_display) ?? 0;
-
       final result = value * -1;
-
       _display = result.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '');
     });
   }
 
-  // ==========================================================
-  // BUILD
-  // ==========================================================
-
   @override
   Widget build(BuildContext context) {
-    final translations = ProviderScope.containerOf(
-      context,
-    ).read(translationsProvider);
-
-    final themeMode = ProviderScope.containerOf(
-      context,
-    ).read(themeModeProvider);
-
+    final translations = ProviderScope.containerOf(context).read(translationsProvider);
+    final themeMode = ProviderScope.containerOf(context).read(themeModeProvider);
     final colors = Theme.of(context).colorScheme;
 
     final bool isGlass = ThemeHelper.isGlass(themeMode);
-
     final bool isNeo = ThemeHelper.isNeo(themeMode);
 
     final Color accentColor = ThemeHelper.getAccentColor(themeMode, colors);
@@ -900,26 +752,19 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
       backgroundColor: dialogBackground,
       surfaceTintColor: Colors.transparent,
       elevation: isGlass || isNeo ? 0 : 8,
-
       child: Container(
         width: 320,
         padding: const EdgeInsets.all(20),
-
         decoration: isGlass
             ? glassmorphismDecoration(borderRadius: 20)
             : isNeo
             ? neumorphismDecoration(borderRadius: 20, isPressed: false)
             : null,
-
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ==================================================
-            // HEADER
-            // ==================================================
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
               children: [
                 Text(
                   translations.t('calculator'),
@@ -929,12 +774,10 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                     color: primaryText,
                   ),
                 ),
-
                 IconButton(
                   icon: Icon(Icons.close, size: 20, color: secondaryText),
                   onPressed: () {
                     SoundHelper().playClick();
-
                     Navigator.of(context).pop();
                   },
                   padding: EdgeInsets.zero,
@@ -943,17 +786,11 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // ==================================================
-            // DISPLAY
-            // ==================================================
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: displayBackground,
-
                 gradient: isGlass
                     ? LinearGradient(
                         begin: Alignment.topLeft,
@@ -964,9 +801,7 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                         ],
                       )
                     : null,
-
                 borderRadius: BorderRadius.circular(12),
-
                 border: Border.all(
                   color: isGlass
                       ? Colors.white.withValues(alpha: 0.25)
@@ -975,10 +810,8 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                       : colors.outlineVariant,
                 ),
               ),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
-
                 children: [
                   if (_expression.isNotEmpty)
                     Text(
@@ -989,17 +822,13 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-
                   const SizedBox(height: 4),
-
                   Text(
                     _display,
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: _display == 'Error'
-                          ? AppColors.error
-                          : primaryText,
+                      color: _display == 'Error' ? AppColors.error : primaryText,
                       height: 1.2,
                     ),
                     maxLines: 1,
@@ -1008,202 +837,104 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // ==================================================
-            // BUTTONS
-            // ==================================================
             Column(
               children: [
                 Row(
                   children: [
-                    _calcButton(
-                      'AC',
-                      _pressClear,
-                      color: _getFunctionButtonColor(themeMode, colors),
-                      textColor: primaryText,
-                    ),
-
-                    _calcButton(
-                      '⌫',
-                      _pressDelete,
-                      color: _getFunctionButtonColor(themeMode, colors),
-                      textColor: primaryText,
-                    ),
-
-                    _calcButton(
-                      '%',
-                      _pressPercent,
-                      color: _getFunctionButtonColor(themeMode, colors),
-                      textColor: primaryText,
-                    ),
-
-                    _calcButton(
-                      '÷',
-                      () => _pressOperator('÷'),
-                      color: accentColor,
-                      textColor: isGlass
-                          ? AppColors.glassBg1
-                          : colors.onPrimary,
-                    ),
+                    _calcButton('AC', _pressClear,
+                        color: _getFunctionButtonColor(themeMode, colors),
+                        textColor: primaryText),
+                    _calcButton('⌫', _pressDelete,
+                        color: _getFunctionButtonColor(themeMode, colors),
+                        textColor: primaryText),
+                    _calcButton('%', _pressPercent,
+                        color: _getFunctionButtonColor(themeMode, colors),
+                        textColor: primaryText),
+                    _calcButton('÷', () => _pressOperator('÷'),
+                        color: accentColor,
+                        textColor: isGlass ? AppColors.glassBg1 : colors.onPrimary),
                   ],
                 ),
-
                 const SizedBox(height: 8),
-
                 Row(
                   children: [
-                    _calcButton(
-                      '7',
-                      () => _pressDigit('7'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '8',
-                      () => _pressDigit('8'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '9',
-                      () => _pressDigit('9'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '×',
-                      () => _pressOperator('×'),
-                      color: accentColor,
-                      textColor: isGlass
-                          ? AppColors.glassBg1
-                          : colors.onPrimary,
-                    ),
+                    _calcButton('7', () => _pressDigit('7'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('8', () => _pressDigit('8'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('9', () => _pressDigit('9'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('×', () => _pressOperator('×'),
+                        color: accentColor,
+                        textColor: isGlass ? AppColors.glassBg1 : colors.onPrimary),
                   ],
                 ),
-
                 const SizedBox(height: 8),
-
                 Row(
                   children: [
-                    _calcButton(
-                      '4',
-                      () => _pressDigit('4'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '5',
-                      () => _pressDigit('5'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '6',
-                      () => _pressDigit('6'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '-',
-                      () => _pressOperator('-'),
-                      color: accentColor,
-                      textColor: isGlass
-                          ? AppColors.glassBg1
-                          : colors.onPrimary,
-                    ),
+                    _calcButton('4', () => _pressDigit('4'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('5', () => _pressDigit('5'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('6', () => _pressDigit('6'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('-', () => _pressOperator('-'),
+                        color: accentColor,
+                        textColor: isGlass ? AppColors.glassBg1 : colors.onPrimary),
                   ],
                 ),
-
                 const SizedBox(height: 8),
-
                 Row(
                   children: [
-                    _calcButton(
-                      '1',
-                      () => _pressDigit('1'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '2',
-                      () => _pressDigit('2'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '3',
-                      () => _pressDigit('3'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '+',
-                      () => _pressOperator('+'),
-                      color: accentColor,
-                      textColor: isGlass
-                          ? AppColors.glassBg1
-                          : colors.onPrimary,
-                    ),
+                    _calcButton('1', () => _pressDigit('1'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('2', () => _pressDigit('2'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('3', () => _pressDigit('3'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('+', () => _pressOperator('+'),
+                        color: accentColor,
+                        textColor: isGlass ? AppColors.glassBg1 : colors.onPrimary),
                   ],
                 ),
-
                 const SizedBox(height: 8),
-
                 Row(
                   children: [
-                    _calcButton(
-                      '0',
-                      () => _pressDigit('0'),
-                      flex: 2,
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '.',
-                      () => _pressDigit('.'),
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '±',
-                      _pressPlusMinus,
-                      textColor: primaryText,
-                      buttonColor: dialogBackground,
-                      borderColor: secondaryText.withValues(alpha: 0.2),
-                    ),
-
-                    _calcButton(
-                      '=',
-                      _pressEquals,
-                      color: accentColor,
-                      textColor: isGlass
-                          ? AppColors.glassBg1
-                          : colors.onPrimary,
-                    ),
+                    _calcButton('0', () => _pressDigit('0'),
+                        flex: 2,
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('.', () => _pressDigit('.'),
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('±', _pressPlusMinus,
+                        textColor: primaryText,
+                        buttonColor: dialogBackground,
+                        borderColor: secondaryText.withValues(alpha: 0.2)),
+                    _calcButton('=', _pressEquals,
+                        color: accentColor,
+                        textColor: isGlass ? AppColors.glassBg1 : colors.onPrimary),
                   ],
                 ),
               ],
@@ -1214,25 +945,15 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
     );
   }
 
-  // ==========================================================
-  // FUNCTION BUTTON COLOR
-  // ==========================================================
-
   Color _getFunctionButtonColor(AppThemeMode themeMode, ColorScheme colors) {
     if (ThemeHelper.isGlass(themeMode)) {
       return Colors.white.withValues(alpha: 0.16);
     }
-
     if (ThemeHelper.isNeo(themeMode)) {
       return Color.lerp(AppColors.neoBase, AppColors.neoShadow, 0.05)!;
     }
-
     return colors.surfaceContainerHighest;
   }
-
-  // ==========================================================
-  // CALCULATOR BUTTON
-  // ==========================================================
 
   Widget _calcButton(
     String label,
@@ -1243,23 +964,16 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
     Color? buttonColor,
     Color? borderColor,
   }) {
-    final themeMode = ProviderScope.containerOf(
-      context,
-    ).read(themeModeProvider);
-
+    final themeMode = ProviderScope.containerOf(context).read(themeModeProvider);
     final colors = Theme.of(context).colorScheme;
 
     final bool isOperator =
         color != null && color == ThemeHelper.getAccentColor(themeMode, colors);
-
     final bool isFunction = color != null && !isOperator;
-
     final bool isGlass = ThemeHelper.isGlass(themeMode);
-
     final bool isNeo = ThemeHelper.isNeo(themeMode);
 
-    final Color background =
-        color ??
+    final Color background = color ??
         buttonColor ??
         (isGlass
             ? Colors.white.withValues(alpha: 0.08)
@@ -1267,8 +981,7 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
             ? AppColors.neoBase
             : colors.surface);
 
-    final Color effectiveText =
-        textColor ??
+    final Color effectiveText = textColor ??
         (isOperator
             ? (isGlass ? AppColors.glassBg1 : colors.onPrimary)
             : isGlass
@@ -1299,10 +1012,7 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
             borderRadius: BorderRadius.circular(12),
             splashColor: isOperator
                 ? Colors.white.withValues(alpha: 0.25)
-                : ThemeHelper.getAccentColor(
-                    themeMode,
-                    colors,
-                  ).withValues(alpha: 0.10),
+                : ThemeHelper.getAccentColor(themeMode, colors).withValues(alpha: 0.10),
             highlightColor: isOperator
                 ? Colors.white.withValues(alpha: 0.15)
                 : isNeo

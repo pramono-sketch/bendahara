@@ -9,6 +9,7 @@ import '../data.dart';
 import '../firebase/firestore_service.dart';
 import '../service/import_tambahkan.dart';
 import '../helpers/sound_helper.dart';
+import '../helpers/scroll_reveal.dart'; // IMPORT SCROLL REVEL HELPER
 
 // ============================================================
 // ================== HALAMAN MANAJEMEN SISWA ==================
@@ -1369,44 +1370,79 @@ class _ManageStudentsPageState extends ConsumerState<ManageStudentsPage> {
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                    sliver: SliverToBoxAdapter(child: _buildStatsSection(themeMode, _students)),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    sliver: SliverToBoxAdapter(child: _buildSectionHeader(title: 'Aksi Cepat', themeMode: themeMode)),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    sliver: SliverToBoxAdapter(child: _buildQuickActionsSection(themeMode)),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    sliver: SliverToBoxAdapter(child: _buildSectionHeader(title: 'Filter Kelas', themeMode: themeMode)),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    sliver: SliverToBoxAdapter(child: _buildFilterSection(themeMode)),
+                    sliver: SliverToBoxAdapter(
+                      child: ScrollReveal(
+                        child: _buildStatsSection(themeMode, _students),
+                      ),
+                    ),
                   ),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     sliver: SliverToBoxAdapter(
-                      child: _buildSectionHeader(
-                        title: filteredStudents.isEmpty ? 'Daftar Siswa' : 'Daftar Siswa (${filteredStudents.length})',
-                        themeMode: themeMode,
+                      child: ScrollReveal(
+                        delay: const Duration(milliseconds: 100),
+                        child: _buildSectionHeader(title: 'Aksi Cepat', themeMode: themeMode),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: ScrollReveal(
+                        delay: const Duration(milliseconds: 200),
+                        child: _buildQuickActionsSection(themeMode),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: ScrollReveal(
+                        delay: const Duration(milliseconds: 300),
+                        child: _buildSectionHeader(title: 'Filter Kelas', themeMode: themeMode),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: ScrollReveal(
+                        delay: const Duration(milliseconds: 400),
+                        child: _buildFilterSection(themeMode),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: ScrollReveal(
+                        delay: const Duration(milliseconds: 500),
+                        child: _buildSectionHeader(
+                          title: filteredStudents.isEmpty ? 'Daftar Siswa' : 'Daftar Siswa (${filteredStudents.length})',
+                          themeMode: themeMode,
+                        ),
                       ),
                     ),
                   ),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                     sliver: filteredStudents.isEmpty
-                        ? SliverToBoxAdapter(child: _buildEmptyState(themeMode))
+                        ? SliverToBoxAdapter(
+                            child: ScrollReveal(
+                              delay: const Duration(milliseconds: 600),
+                              child: _buildEmptyState(themeMode),
+                            ),
+                          )
                         : SliverList.builder(
                             itemCount: filteredStudents.length,
                             itemBuilder: (context, index) {
                               final s = filteredStudents[index];
-                              return Padding(
-                                padding: EdgeInsets.only(bottom: index < filteredStudents.length - 1 ? 10 : 0),
-                                child: _buildStudentCard(s, themeMode),
+                              return ScrollReveal(
+                                delay: Duration(milliseconds: 100 * (index % 5)), // Membuat animasi mengalir bertahap
+                                child: Padding(
+                                  padding: EdgeInsets.only(bottom: index < filteredStudents.length - 1 ? 10 : 0),
+                                  child: _buildStudentCard(s, themeMode),
+                                ),
                               );
                             },
                           ),

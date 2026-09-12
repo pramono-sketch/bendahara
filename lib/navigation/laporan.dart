@@ -22,13 +22,46 @@ class ReportsPage extends ConsumerStatefulWidget {
 class _ReportsPageState extends ConsumerState<ReportsPage> {
   bool _isLoading = true;
   bool _hasError = false;
-  List<Transaction> _allTransactions = [];
+
+  /// Semua transaksi (gabungan transaksi aktif + arsip bulanan)
+  /// Sama persis dengan yang dibaca oleh Dashboard.
+  List<Transaction> _allCombinedTransactions = [];
 
   // =========================================================
-  // FETCH DATA DARI FIREBASE + MERGE DENGAN DATA LOKAL
+  // FETCH DATA: GABUNGKAN SEMUA (SAMA PERSIS DENGAN DASHBOARD)
   // =========================================================
 
-  Future<void> _fetchTransactions() async {
+  /// Mengambil semua transaksi (transaksi aktif + transaksi arsip bulanan)
+  /// agar Laporan dan Dashboard memiliki angka yang sama persis.
+  Future<List<Transaction>> _getAllCombinedTransactions() async {
+    final activeTransactions = await fetchAllTransactions();
+    final archivedMonths = await fetchArchivedMonths();
+
+    final Set<String> seenIds = activeTransactions.map((t) => t.id).toSet();
+    final List<Transaction> all = List.from(activeTransactions);
+
+    // Gabungkan dengan data yang sudah diarsipkan
+    for (final arch in archivedMonths) {
+      for (final t in arch.transactions) {
+        if (!seenIds.contains(t.id)) {
+          all.add(t);
+          seenIds.add(t.id);
+        }
+      }
+    }
+
+    // Gabungkan dengan transaksi lokal yang belum tersinkron
+    for (final t in localTransactions) {
+      if (!seenIds.contains(t.id)) {
+        all.add(t);
+        seenIds.add(t.id);
+      }
+    }
+
+    return all;
+  }
+
+  Future<void> _fetchData() async {
     if (!mounted) return;
 
     setState(() {
@@ -37,44 +70,11 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     });
 
     try {
-      // =======================================================
-      // 1. AMBIL SEMUA TRANSAKSI DARI FIREBASE
-      // =======================================================
-
-      final firebaseTransactions = await fetchAllTransactions();
-
-      final Set<String> seenIds =
-          firebaseTransactions.map((t) => t.id).toSet();
-
-      final List<Transaction> all = List.from(firebaseTransactions);
-
-      // =======================================================
-      // 2. TAMBAHKAN TRANSAKSI LOKAL YANG BELUM ADA DI FIREBASE
-      // =======================================================
-
-      for (final t in localTransactions) {
-        if (!seenIds.contains(t.id)) {
-          all.add(t);
-          seenIds.add(t.id);
-        }
-      }
-
-      // =======================================================
-      // 3. TAMBAHKAN TRANSAKSI ARSIP YANG BELUM ADA DI FIREBASE
-      // =======================================================
-
-      for (final list in arsipTransaksi.values) {
-        for (final t in list) {
-          if (!seenIds.contains(t.id)) {
-            all.add(t);
-            seenIds.add(t.id);
-          }
-        }
-      }
+      // Ambil semua data gabungan
+      _allCombinedTransactions = await _getAllCombinedTransactions();
 
       if (mounted) {
         setState(() {
-          _allTransactions = all;
           _isLoading = false;
         });
       }
@@ -89,30 +89,50 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   }
 
   // =========================================================
-  // GROUP TRANSAKSI BERDASARKAN BULAN
+  // SUSUN DATA PER-BULAN UNTUK TAHUN TERTENTU
   // =========================================================
 
-  Map<String, List<Transaction>> _groupTransactions() {
-    final Map<String, List<Transaction>> grouped = {};
+  /// Mengelompokkan _allCombinedTransactions ke dalam bulan-bulan
+  /// pada tahun tertentu.
+  Map<int, List<Transaction>> _getMonthsDataForYear(int year) {
+    final Map<int, List<Transaction>> result = {};
 
-    for (final transaction in _allTransactions) {
-      final key =
-          '${transaction.date.year}-'
-          '${transaction.date.month.toString().padLeft(2, '0')}';
-
-      grouped.putIfAbsent(key, () => []);
-
-      grouped[key]!.add(transaction);
+    // Inisialisasi 12 bulan kosong.
+    for (int m = 1; m <= 12; m++) {
+      result[m] = [];
     }
 
-    return grouped;
+    // Isi dari gabungan seluruh transaksi
+    for (final t in _allCombinedTransactions) {
+      if (t.date.year == year) {
+        result[t.date.month]!.add(t);
+      }
+    }
+
+    return result;
+  }
+
+  // =========================================================
+  // DAFTAR TAHUN YANG TERSEDIA
+  // =========================================================
+
+  List<int> _getAvailableYears() {
+    final Set<int> years = {};
+    final now = DateTime.now();
+    years.add(now.year); // Selalu tampilkan tahun berjalan.
+
+    for (final t in _allCombinedTransactions) {
+      years.add(t.date.year);
+    }
+
+    final list = years.toList()..sort((a, b) => b.compareTo(a));
+    return list;
   }
 
   @override
   void initState() {
     super.initState();
-
-    _fetchTransactions();
+    _fetchData();
   }
 
   // =========================================================
@@ -122,16 +142,10 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
-
     final translations = ref.watch(translationsProvider);
-
     final t = translations.t;
-
     final colors = Theme.of(context).colorScheme;
-
-    final accentColor =
-        ThemeHelper.getAccentColor(themeMode, colors);
-
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
     final scaffoldBackgroundColor =
         ThemeHelper.getScaffoldBackgroundColor(themeMode, colors);
 
@@ -160,81 +174,31 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
         Scaffold(
           backgroundColor: scaffoldBackgroundColor,
           appBar: AppBar(title: Text(t('reports'))),
-          body: LottieError(
-            message: t('dashboard_loading_error'),
-          ),
+          body: LottieError(message: t('dashboard_loading_error')),
         ),
       );
     }
 
-    // =========================================================
-    // GROUP & SORT TRANSAKSI
-    // =========================================================
-
-    final grouped = _groupTransactions();
-
-    final keys = grouped.keys.toList()
-      ..sort((a, b) => b.compareTo(a));
+    final years = _getAvailableYears();
+    final currentYear = DateTime.now().year;
 
     return ThemeHelper.buildThemedBackground(
       themeMode,
       DefaultTabController(
-        length: 3,
+        length: 2,
         child: Scaffold(
           backgroundColor: scaffoldBackgroundColor,
 
+          // =====================================================
+          // APP BAR
+          // =====================================================
+
           appBar: AppBar(
             title: Text(t('reports')),
-
-            actions: [
-              // =================================================
-              // TOMBOL REFRESH
-              // =================================================
-
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  SoundHelper().playClick();
-                  _fetchTransactions();
-                },
-              ),
-
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  SoundHelper().playClick();
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        t('export_development').replaceFirst(
-                          '{format}',
-                          value,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'PDF',
-                    child: Text(t('export_pdf')),
-                  ),
-                  PopupMenuItem(
-                    value: 'Excel',
-                    child: Text(t('export_excel')),
-                  ),
-                ],
-
-                icon: const Icon(Icons.download),
-              ),
-            ],
-
             bottom: TabBar(
               tabs: [
                 Tab(text: t('monthly')),
                 Tab(text: t('yearly')),
-                Tab(text: t('all_reports')),
               ],
               labelColor: accentColor,
               unselectedLabelColor: colors.onSurfaceVariant,
@@ -244,9 +208,11 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
 
           body: TabBarView(
             children: [
-              _buildMonthlyReport(context, grouped, keys, t),
-              _buildYearlyReport(context, grouped, keys, t),
-              _buildAllReport(context, grouped, keys, t),
+              // === BULANAN: 12 BULAN PADA TAHUN BERJALAN ===
+              _buildMonthlyReport(context, currentYear, t, translations, accentColor),
+
+              // === TAHUNAN: FOLDER TAHUN, DI DALAMNYA BULAN ===
+              _buildYearlyReport(context, years, t, translations),
             ],
           ),
         ),
@@ -255,48 +221,42 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   }
 
   // =========================================================
-  // LAPORAN BULANAN
+  // LAPORAN BULANAN — 12 BULAN PADA TAHUN BERJALAN
   // =========================================================
 
   Widget _buildMonthlyReport(
     BuildContext context,
-    Map<String, List<Transaction>> grouped,
-    List<String> keys,
+    int year,
     String Function(String) t,
+    Translations translations,
+    Color accentColor,
   ) {
-    if (keys.isEmpty) {
-      return LottieError(
-        message: t('no_monthly_report_data'),
-      );
-    }
+    final monthsData = _getMonthsDataForYear(year);
+    final now = DateTime.now();
+    final isIndonesian = translations.locale.languageCode == 'id';
+    final currentMonthLabel = isIndonesian ? 'Bulan Ini' : 'Current Month';
+    final noDataLabel = isIndonesian ? 'Belum ada data' : 'No data yet';
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: keys.length,
+      itemCount: 12,
       itemBuilder: (context, index) {
-        final key = keys[index];
-
-        final list = grouped[key]!;
+        final month = index + 1;
+        final list = monthsData[month] ?? [];
 
         final totalIncome = list
-            .where((transaction) =>
-                transaction.type == TransType.pemasukan)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+            .where((tr) => tr.type == TransType.pemasukan)
+            .fold<double>(0, (sum, tr) => sum + tr.amount);
 
         final totalExpense = list
-            .where((transaction) =>
-                transaction.type == TransType.pengeluaran)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+            .where((tr) => tr.type == TransType.pengeluaran)
+            .fold<double>(0, (sum, tr) => sum + tr.amount);
 
         final net = totalIncome - totalExpense;
-
-        final parts = key.split('-');
-
-        final monthName = _getMonthName(int.parse(parts[1]), t);
-
-        final year = parts[0];
-
+        final monthName = _getMonthName(month, t);
         final label = '$monthName $year';
+        final isCurrentMonth = (month == now.month && year == now.year);
+        final hasData = list.isNotEmpty;
 
         final delayMs = (index * 50).clamp(0, 400).toInt();
 
@@ -304,25 +264,93 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
           delay: Duration(milliseconds: delayMs),
           child: Card(
             margin: const EdgeInsets.only(bottom: 8),
+            color: isCurrentMonth ? accentColor.withOpacity(0.08) : null,
+            shape: isCurrentMonth
+                ? RoundedRectangleBorder(
+                    side: BorderSide(
+                      color: accentColor.withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  )
+                : null,
             child: ListTile(
-              title: Text(label),
-              subtitle: Text(
-                '${t('income')}: '
-                'Rp ${formatCurrency(totalIncome)} • '
-                '${t('expense')}: '
-                'Rp ${formatCurrency(totalExpense)}',
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight: isCurrentMonth
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  if (isCurrentMonth)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        currentMonthLabel,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: accentColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              trailing: Text(
-                'Rp ${formatCurrency(net)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: net >= 0 ? AppColors.success : AppColors.error,
-                ),
-              ),
-              onTap: () {
-                SoundHelper().playClick();
-                _showDetailDialog(context, label, list, t);
-              },
+              subtitle: hasData
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '${t('income')}: Rp ${formatCurrency(totalIncome)} • '
+                        '${t('expense')}: Rp ${formatCurrency(totalExpense)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        noDataLabel,
+                        style: TextStyle(
+                          fontStyle: FontStyle.italic,
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+              trailing: hasData
+                  ? Text(
+                      'Rp ${formatCurrency(net)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: net >= 0 ? AppColors.success : AppColors.error,
+                      ),
+                    )
+                  : Text(
+                      '-',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+              onTap: hasData
+                  ? () {
+                      SoundHelper().playClick();
+                      _showDetailDialog(context, label, list, t);
+                    }
+                  : null,
             ),
           ),
         );
@@ -331,75 +359,113 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   }
 
   // =========================================================
-  // LAPORAN TAHUNAN
+  // LAPORAN TAHUNAN — FOLDER TAHUN, DI DALAMNYA BULAN
   // =========================================================
 
   Widget _buildYearlyReport(
     BuildContext context,
-    Map<String, List<Transaction>> grouped,
-    List<String> keys,
+    List<int> years,
     String Function(String) t,
+    Translations translations,
   ) {
-    final Map<String, List<Transaction>> yearly = {};
-
-    for (final key in keys) {
-      final year = key.split('-')[0];
-
-      yearly.putIfAbsent(year, () => []);
-
-      yearly[year]!.addAll(grouped[key]!);
+    if (years.isEmpty) {
+      return LottieError(message: t('no_yearly_report_data'));
     }
 
-    final yearKeys = yearly.keys.toList()
-      ..sort((a, b) => b.compareTo(a));
-
-    if (yearKeys.isEmpty) {
-      return LottieError(
-        message: t('no_yearly_report_data'),
-      );
-    }
+    final isIndonesian = translations.locale.languageCode == 'id';
+    final noDataLabel = isIndonesian ? 'Belum ada data' : 'No data yet';
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: yearKeys.length,
+      itemCount: years.length,
       itemBuilder: (context, index) {
-        final year = yearKeys[index];
+        final year = years[index];
+        final delayMs = (index * 50).clamp(0, 400).toInt();
 
-        final list = yearly[year]!;
+        final monthsData = _getMonthsDataForYear(year);
 
-        final totalIncome = list
-            .where((transaction) =>
-                transaction.type == TransType.pemasukan)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+        // Hitung total seluruh bulan pada tahun ini.
+        final List<Transaction> yearTransactions = [];
+        for (int m = 1; m <= 12; m++) {
+          yearTransactions.addAll(monthsData[m] ?? []);
+        }
 
-        final totalExpense = list
-            .where((transaction) =>
-                transaction.type == TransType.pengeluaran)
-            .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+        final totalIncome = yearTransactions
+            .where((tr) => tr.type == TransType.pemasukan)
+            .fold<double>(0, (sum, tr) => sum + tr.amount);
+
+        final totalExpense = yearTransactions
+            .where((tr) => tr.type == TransType.pengeluaran)
+            .fold<double>(0, (sum, tr) => sum + tr.amount);
 
         final net = totalIncome - totalExpense;
+        final hasData = yearTransactions.isNotEmpty;
 
-        final delayMs = (index * 50).clamp(0, 400).toInt();
+        // Hitung jumlah bulan yang punya data.
+        final monthsWithData = monthsData.entries
+            .where((e) => e.value.isNotEmpty)
+            .length;
 
         return ScrollReveal(
           delay: Duration(milliseconds: delayMs),
           child: Card(
             margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              title: Text('${t('year_label')} $year'),
-              subtitle: Text(
-                '${t('income')}: '
-                'Rp ${formatCurrency(totalIncome)} • '
-                '${t('expense')}: '
-                'Rp ${formatCurrency(totalExpense)}',
+            child: ExpansionTile(
+              tilePadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              title: Row(
+                children: [
+                  Icon(Icons.folder,
+                      color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${t('year_label')} $year',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
-              trailing: Text(
-                'Rp ${formatCurrency(net)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: net >= 0 ? AppColors.success : AppColors.error,
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4, left: 32),
+                child: Text(
+                  hasData
+                      ? '${t('income')}: Rp ${formatCurrency(totalIncome)} • '
+                          '${t('expense')}: Rp ${formatCurrency(totalExpense)}\n'
+                          '${monthsWithData}/12 ${isIndonesian ? 'bulan' : 'months'}'
+                      : noDataLabel,
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
+              trailing: Text(
+                hasData ? 'Rp ${formatCurrency(net)}' : '-',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: hasData
+                      ? (net >= 0 ? AppColors.success : AppColors.error)
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              children: [
+                // Tampilkan setiap bulan yang ada datanya.
+                for (int m = 1; m <= 12; m++)
+                  if ((monthsData[m] ?? []).isNotEmpty)
+                    _buildMonthSubItem(context, year, m, monthsData[m]!, t),
+
+                // Jika tidak ada data sama sekali, tampilkan pesan.
+                if (yearTransactions.isEmpty)
+                  ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.only(left: 32),
+                    title: Text(
+                      noDataLabel,
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         );
@@ -408,118 +474,63 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   }
 
   // =========================================================
-  // LAPORAN SEMUA
+  // SUB-ITEM BULAN (DI DALAM FOLDER TAHUN)
   // =========================================================
 
-  Widget _buildAllReport(
+  Widget _buildMonthSubItem(
     BuildContext context,
-    Map<String, List<Transaction>> grouped,
-    List<String> keys,
+    int year,
+    int month,
+    List<Transaction> list,
     String Function(String) t,
   ) {
-    final List<Transaction> all = [];
+    final totalIncome = list
+        .where((tr) => tr.type == TransType.pemasukan)
+        .fold<double>(0, (sum, tr) => sum + tr.amount);
 
-    for (final list in grouped.values) {
-      all.addAll(list);
-    }
-
-    if (all.isEmpty) {
-      return LottieError(
-        message: t('no_all_report_data'),
-      );
-    }
-
-    final totalIncome = all
-        .where((transaction) => transaction.type == TransType.pemasukan)
-        .fold<double>(0, (sum, transaction) => sum + transaction.amount);
-
-    final totalExpense = all
-        .where((transaction) => transaction.type == TransType.pengeluaran)
-        .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+    final totalExpense = list
+        .where((tr) => tr.type == TransType.pengeluaran)
+        .fold<double>(0, (sum, tr) => sum + tr.amount);
 
     final net = totalIncome - totalExpense;
+    final monthName = _getMonthName(month, t);
 
-    return Center(
-      child: ScrollReveal(
-        child: Card(
-          margin: const EdgeInsets.all(16),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  t('total_overall'),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _summaryRow(
-                  context,
-                  t('total_income'),
-                  formatCurrency(totalIncome),
-                  AppColors.success,
-                ),
-                _summaryRow(
-                  context,
-                  t('total_expense'),
-                  formatCurrency(totalExpense),
-                  AppColors.error,
-                ),
-                const Divider(),
-                _summaryRow(
-                  context,
-                  t('ending_balance'),
-                  formatCurrency(net),
-                  net >= 0
-                      ? Theme.of(context).colorScheme.primary
-                      : AppColors.error,
-                ),
-              ],
-            ),
-          ),
+    final now = DateTime.now();
+    final isCurrentMonth = (month == now.month && year == now.year);
+
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.only(left: 32, right: 16),
+      leading: Icon(
+        isCurrentMonth ? Icons.event_available : Icons.calendar_month,
+        size: 20,
+        color: isCurrentMonth
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      title: Text(
+        '$monthName $year',
+        style: TextStyle(
+          fontWeight: isCurrentMonth ? FontWeight.bold : FontWeight.normal,
         ),
       ),
-    );
-  }
-
-  // =========================================================
-  // SUMMARY ROW
-  // =========================================================
-
-  Widget _summaryRow(
-    BuildContext context,
-    String label,
-    String value,
-    Color color,
-  ) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              color: colors.onSurfaceVariant,
-            ),
-          ),
-          Text(
-            'Rp $value',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: color,
-            ),
-          ),
-        ],
+      subtitle: Text(
+        '${t('income')}: Rp ${formatCurrency(totalIncome)} • '
+        '${t('expense')}: Rp ${formatCurrency(totalExpense)}',
+        style: const TextStyle(fontSize: 12),
       ),
+      trailing: Text(
+        'Rp ${formatCurrency(net)}',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          color: net >= 0 ? AppColors.success : AppColors.error,
+        ),
+      ),
+      onTap: () {
+        SoundHelper().playClick();
+        _showDetailDialog(context, '$monthName $year', list, t);
+      },
     );
   }
 

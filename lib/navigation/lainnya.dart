@@ -6,7 +6,7 @@ import '../features/settings.dart';
 import '../features/tambahkan.dart';
 import '../features/ai_assistant.dart';
 import '../features/database_akun.dart';
-import '../features/log_aktivitas.dart';
+// import '../features/log_aktivitas.dart';
 import '../features/statistik.dart';
 import '../features/tagihan.dart';
 import '../features/gaji_guru.dart';
@@ -32,11 +32,11 @@ class _MorePageState extends ConsumerState<MorePage> {
     final colors = Theme.of(context).colorScheme;
 
     final List<Map<String, dynamic>> keuanganItems = [
-      {
-        'title': translations.t('bills'),
-        'icon': Icons.receipt_long,
-        'page': const TagihanPage(),
-      },
+      // {
+      //   'title': translations.t('bills'),
+      //   'icon': Icons.receipt_long,
+      //   'page': const TagihanPage(),
+      // },
       {
         'title': translations.t('teacher_salary'),
         'icon': Icons.attach_money,
@@ -60,11 +60,11 @@ class _MorePageState extends ConsumerState<MorePage> {
         'icon': Icons.vpn_key,
         'page': const DatabaseAkunPage(),
       },
-      {
-        'title': translations.t('activity_log'),
-        'icon': Icons.history,
-        'page': const LogAktivitasPage(),
-      },
+      // {
+      //   'title': translations.t('activity_log'),
+      //   'icon': Icons.history,
+      //   'page': const LogAktivitasPage(),
+      // },
     ];
 
     final List<Map<String, dynamic>> lainnyaItems = [

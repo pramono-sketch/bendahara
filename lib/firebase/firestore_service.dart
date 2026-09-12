@@ -1,5 +1,3 @@
-// lib/firebase/firestore_service.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 
 import '../data.dart';
@@ -37,6 +35,10 @@ final userAccountsCollection = firestore.FirebaseFirestore.instance.collection(
 final archiveStudentsCollection = firestore.FirebaseFirestore.instance
     .collection('archive_students');
 
+// Koleksi arsip transaksi bulanan untuk laporan perbandingan.
+final archiveTransactionsCollection = firestore.FirebaseFirestore.instance
+    .collection('archived_transactions');
+
 // ============================================================
 // KOLEKSI GURU & KARYAWAN
 // ============================================================
@@ -46,33 +48,47 @@ final teachersCollection = firestore.FirebaseFirestore.instance.collection(
 );
 
 // ============================================================
+// MODEL ARSIP BULANAN
+// ============================================================
+
+/// Model untuk transaksi bulanan yang sudah diarsipkan.
+class ArchivedMonth {
+  final String monthKey; // Format: YYYY-MM
+  final int year;
+  final int month;
+  final List<Transaction> transactions;
+  final double totalIncome;
+  final double totalExpense;
+  final DateTime? archivedAt;
+
+  ArchivedMonth({
+    required this.monthKey,
+    required this.year,
+    required this.month,
+    required this.transactions,
+    required this.totalIncome,
+    required this.totalExpense,
+    this.archivedAt,
+  });
+
+  double get net => totalIncome - totalExpense;
+}
+
+// ============================================================
 // ACCOUNT MANAGEMENT
 // ============================================================
 
-/// Ambil akun aplikasi berdasarkan UID Firebase Authentication.
-///
-/// Collection:
-/// manajemen account
-///
-/// Document ID:
-/// UID Firebase
 Future<firestore.DocumentSnapshot<Map<String, dynamic>>> fetchUserAccount(
   String uid,
 ) async {
   return await userAccountsCollection.doc(uid).get();
 }
 
-/// Mengecek apakah UID sudah memiliki akun di Firestore.
 Future<bool> isUserAccountRegistered(String uid) async {
   final snapshot = await userAccountsCollection.doc(uid).get();
-
   return snapshot.exists;
 }
 
-/// Simpan / update akun aplikasi.
-///
-/// UID Firebase digunakan sebagai document ID agar satu
-/// akun Firebase hanya memiliki satu profile aplikasi.
 Future<void> saveUserAccount({
   required String uid,
   required String nama,
@@ -96,9 +112,6 @@ Future<void> saveUserAccount({
   }, firestore.SetOptions(merge: true));
 }
 
-/// Membuat akun baru.
-///
-/// Fungsi ini menggunakan createdAt hanya saat document baru.
 Future<void> createUserAccount({
   required String uid,
   required String nama,
@@ -123,9 +136,6 @@ Future<void> createUserAccount({
   }, firestore.SetOptions(merge: false));
 }
 
-/// Hapus akun aplikasi dari collection manajemen account.
-///
-/// Tidak menghapus akun dari Firebase Authentication.
 Future<void> deleteUserAccount(String uid) async {
   await userAccountsCollection.doc(uid).delete();
 }
@@ -137,7 +147,7 @@ Future<void> deleteUserAccount(String uid) async {
 class Teacher {
   final String id;
   final String nama;
-  final String role; // 'guru' atau 'karyawan'
+  final String role;
 
   Teacher({required this.id, required this.nama, required this.role});
 
@@ -160,7 +170,6 @@ Future<void> deleteTeacher(String id) async {
 
 Future<List<Teacher>> fetchTeachers() async {
   final snapshot = await teachersCollection.get();
-
   return snapshot.docs.map((doc) => Teacher.fromMap(doc.data())).toList();
 }
 
@@ -168,43 +177,30 @@ Future<List<Teacher>> fetchTeachers() async {
 // STUDENT CRUD
 // ============================================================
 
-/// Ambil semua siswa aktif dari Firestore.
 Future<List<Student>> fetchActiveStudents() async {
   final snapshot = await studentsCollection
       .where('isActive', isEqualTo: true)
       .get();
-
   return snapshot.docs.map((doc) => Student.fromMap(doc.data())).toList();
 }
 
-/// Ambil semua siswa termasuk tidak aktif.
 Future<List<Student>> fetchAllStudents() async {
   final snapshot = await studentsCollection.get();
-
   return snapshot.docs.map((doc) => Student.fromMap(doc.data())).toList();
 }
 
-/// Simpan atau perbarui siswa.
 Future<void> saveStudent(Student student) async {
   await studentsCollection.doc(student.id).set(student.toMap());
 }
 
-/// Hapus siswa.
 Future<void> deleteStudent(String id) async {
   await studentsCollection.doc(id).delete();
 }
 
 // ============================================================
-// FUNGSI ARSIP
+// FUNGSI ARSIP SISWA
 // ============================================================
 
-/// Mengarsipkan siswa kelas XII.
-///
-/// Siswa dipindahkan dari:
-/// students
-///
-/// ke:
-/// archive_students
 Future<void> archiveGraduatedStudentsFirestore(String tahunArsip) async {
   final snapshot = await studentsCollection
       .where('isActive', isEqualTo: true)
@@ -214,26 +210,19 @@ Future<void> archiveGraduatedStudentsFirestore(String tahunArsip) async {
 
   for (var doc in snapshot.docs) {
     final data = doc.data();
-
     final String kelas = data['kelas'] ?? '';
 
     if (kelas.startsWith('XII ')) {
       final parts = kelas.split(' ');
-
       final String jurusan = parts.length >= 2 ? parts[1] : '';
 
       final archiveData = Map<String, dynamic>.from(data);
-
       archiveData['tahunArsip'] = tahunArsip;
-
       archiveData['jurusan'] = jurusan;
-
       archiveData['isActive'] = false;
-
       archiveData['archivedAt'] = firestore.FieldValue.serverTimestamp();
 
       batch.set(archiveStudentsCollection.doc(doc.id), archiveData);
-
       batch.delete(doc.reference);
     }
   }
@@ -241,40 +230,30 @@ Future<void> archiveGraduatedStudentsFirestore(String tahunArsip) async {
   await batch.commit();
 }
 
-/// Ambil daftar folder arsip.
 Future<List<Map<String, dynamic>>> fetchArchiveFolders() async {
   final snapshot = await archiveStudentsCollection.get();
 
   final Map<String, int> counts = {};
-
   for (var doc in snapshot.docs) {
     final String tahun = doc.data()['tahunArsip'] as String? ?? 'Unknown';
-
     counts[tahun] = (counts[tahun] ?? 0) + 1;
   }
 
   final result = counts.entries
       .map((entry) => {'name': entry.key, 'count': entry.value})
       .toList();
-
   result.sort((a, b) => (b['name'] as String).compareTo(a['name'] as String));
-
   return result;
 }
 
-/// Ambil daftar jurusan pada tahun arsip tertentu.
-Future<List<Map<String, dynamic>>> fetchMajorsInArchive(
-  String tahunArsip,
-) async {
+Future<List<Map<String, dynamic>>> fetchMajorsInArchive(String tahunArsip) async {
   final snapshot = await archiveStudentsCollection
       .where('tahunArsip', isEqualTo: tahunArsip)
       .get();
 
   final Map<String, int> counts = {};
-
   for (var doc in snapshot.docs) {
     final String jurusan = doc.data()['jurusan'] as String? ?? 'Unknown';
-
     if (jurusan.isNotEmpty) {
       counts[jurusan] = (counts[jurusan] ?? 0) + 1;
     }
@@ -283,54 +262,30 @@ Future<List<Map<String, dynamic>>> fetchMajorsInArchive(
   final result = counts.entries
       .map((entry) => {'name': entry.key, 'count': entry.value})
       .toList();
-
   result.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
-
   return result;
 }
 
-/// Ambil siswa arsip berdasarkan tahun dan jurusan.
-Future<List<Student>> fetchArchivedStudents(
-  String tahunArsip,
-  String jurusan,
-) async {
+Future<List<Student>> fetchArchivedStudents(String tahunArsip, String jurusan) async {
   final snapshot = await archiveStudentsCollection
       .where('tahunArsip', isEqualTo: tahunArsip)
       .where('jurusan', isEqualTo: jurusan)
       .get();
-
   return snapshot.docs.map((doc) => Student.fromMap(doc.data())).toList();
 }
 
-/// Simpan perubahan siswa arsip.
-Future<void> saveArchivedStudent(
-  Student student,
-  String tahunArsip,
-  String jurusan,
-) async {
+Future<void> saveArchivedStudent(Student student, String tahunArsip, String jurusan) async {
   final data = student.toMap();
-
   data['tahunArsip'] = tahunArsip;
-
   data['jurusan'] = jurusan;
-
   data['isActive'] = false;
-
   await archiveStudentsCollection.doc(student.id).set(data);
 }
-
-// ============================================================
-// END ARSIP
-// ============================================================
 
 // ============================================================
 // NAIK KELAS
 // ============================================================
 
-/// Menaikkan kelas siswa aktif.
-///
-/// X  -> XI
-/// XI -> XII
 Future<void> promoteStudentsFirestore() async {
   final snapshot = await studentsCollection
       .where('isActive', isEqualTo: true)
@@ -340,7 +295,6 @@ Future<void> promoteStudentsFirestore() async {
 
   for (var doc in snapshot.docs) {
     final data = doc.data();
-
     final String kelas = data['kelas'] ?? '';
 
     if (kelas.startsWith('X ')) {
@@ -357,44 +311,183 @@ Future<void> promoteStudentsFirestore() async {
 // TRANSACTION CRUD
 // ============================================================
 
-/// Ambil transaksi terbaru.
 Future<List<Transaction>> fetchTransactions({int limit = 50}) async {
   final snapshot = await transactionsCollection
       .orderBy('date', descending: true)
       .limit(limit)
       .get();
-
   return snapshot.docs.map((doc) => Transaction.fromMap(doc.data())).toList();
 }
 
-/// Ambil semua transaksi.
 Future<List<Transaction>> fetchAllTransactions() async {
   final snapshot = await transactionsCollection.get();
-
   return snapshot.docs.map((doc) => Transaction.fromMap(doc.data())).toList();
 }
 
-/// Tambah transaksi.
 Future<void> addTransaction(Transaction transaction) async {
   await transactionsCollection.doc(transaction.id).set(transaction.toMap());
+}
+
+// ============================================================
+// 🔥 ARSIP TRANSAKSI BULANAN (untuk laporan perbandingan)
+// ============================================================
+
+/// Arsipkan transaksi bulan tertentu ke koleksi archived_transactions.
+///
+/// Dokumen disimpan dengan ID = "YYYY-MM" agar mudah dicari
+/// dan tidak dobel saat user melakukan simulasi berkali-kali.
+Future<void> archiveCurrentMonthTransactions(
+  List<Transaction> transactions,
+  int year,
+  int month,
+) async {
+  final monthKey = '$year-${month.toString().padLeft(2, '0')}';
+
+  final totalIncome = transactions
+      .where((t) => t.type == TransType.pemasukan)
+      .fold<double>(0, (sum, t) => sum + t.amount);
+
+  final totalExpense = transactions
+      .where((t) => t.type == TransType.pengeluaran)
+      .fold<double>(0, (sum, t) => sum + t.amount);
+
+  await archiveTransactionsCollection.doc(monthKey).set({
+    'monthKey': monthKey,
+    'year': year,
+    'month': month,
+    'transactions': transactions.map((t) => t.toMap()).toList(),
+    'totalIncome': totalIncome,
+    'totalExpense': totalExpense,
+    'transactionCount': transactions.length,
+    'archivedAt': firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+/// Ambil semua bulan yang sudah diarsipkan dari Firebase.
+Future<List<ArchivedMonth>> fetchArchivedMonths() async {
+  final snapshot = await archiveTransactionsCollection.get();
+
+  final result = snapshot.docs.map((doc) {
+    final data = doc.data();
+
+    final transactions = (data['transactions'] as List<dynamic>?)
+            ?.map((t) => Transaction.fromMap(t as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    return ArchivedMonth(
+      monthKey: data['monthKey'] ?? '',
+      year: (data['year'] ?? 0) as int,
+      month: (data['month'] ?? 0) as int,
+      transactions: transactions,
+      totalIncome: (data['totalIncome'] ?? 0).toDouble(),
+      totalExpense: (data['totalExpense'] ?? 0).toDouble(),
+      archivedAt: data['archivedAt'] != null
+          ? (data['archivedAt'] as firestore.Timestamp).toDate()
+          : null,
+    );
+  }).toList();
+
+  // Sort by year descending, then month descending
+  result.sort((a, b) {
+    if (a.year != b.year) return b.year.compareTo(a.year);
+    return b.month.compareTo(a.month);
+  });
+
+  return result;
+}
+
+/// Ambil satu bulan arsip tertentu berdasarkan monthKey "YYYY-MM".
+Future<ArchivedMonth?> fetchArchivedMonth(String monthKey) async {
+  final doc = await archiveTransactionsCollection.doc(monthKey).get();
+  if (!doc.exists) return null;
+
+  final data = doc.data()!;
+
+  final transactions = (data['transactions'] as List<dynamic>?)
+          ?.map((t) => Transaction.fromMap(t as Map<String, dynamic>))
+          .toList() ??
+      [];
+
+  return ArchivedMonth(
+    monthKey: data['monthKey'] ?? monthKey,
+    year: (data['year'] ?? 0) as int,
+    month: (data['month'] ?? 0) as int,
+    transactions: transactions,
+    totalIncome: (data['totalIncome'] ?? 0).toDouble(),
+    totalExpense: (data['totalExpense'] ?? 0).toDouble(),
+    archivedAt: data['archivedAt'] != null
+        ? (data['archivedAt'] as firestore.Timestamp).toDate()
+        : null,
+  );
+}
+
+/// Helper komprehensif: ambil semua transaksi bulan ini
+/// (dari Firebase + lokal) lalu arsipkan.
+///
+/// Dipanggil sebelum simulasi pergantian bulan.
+Future<bool> archiveCurrentMonthData() async {
+  try {
+    final now = DateTime.now();
+
+    // Ambil semua transaksi dari Firebase
+    final allTransactions = await fetchAllTransactions();
+
+    // Filter transaksi bulan ini
+    final currentMonthTransactions = allTransactions.where((t) =>
+        t.date.month == now.month && t.date.year == now.year).toList();
+
+    // Tambahkan transaksi lokal yang belum ada di Firebase
+    final Set<String> seenIds =
+        currentMonthTransactions.map((t) => t.id).toSet();
+    for (final t in localTransactions) {
+      if (t.date.month == now.month &&
+          t.date.year == now.year &&
+          !seenIds.contains(t.id)) {
+        currentMonthTransactions.add(t);
+        seenIds.add(t.id);
+      }
+    }
+
+    if (currentMonthTransactions.isEmpty) return false;
+
+    // Arsipkan ke Firebase
+    await archiveCurrentMonthTransactions(
+      currentMonthTransactions,
+      now.year,
+      now.month,
+    );
+
+    // Juga simpan ke arsip lokal agar konsisten
+    final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    arsipTransaksi.putIfAbsent(monthKey, () => []);
+    // Hindari duplikasi di arsip lokal
+    final existingIds = arsipTransaksi[monthKey]!.map((t) => t.id).toSet();
+    for (final t in currentMonthTransactions) {
+      if (!existingIds.contains(t.id)) {
+        arsipTransaksi[monthKey]!.add(t);
+      }
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 // ============================================================
 // ACTIVITY LOG CRUD
 // ============================================================
 
-/// Tambah log aktivitas.
 Future<void> addActivityLog(ActivityLog log) async {
   await logsCollection.add(log.toMap());
 }
 
-/// Ambil log terbaru.
 Future<List<ActivityLog>> fetchRecentLogs({int limit = 20}) async {
   final snapshot = await logsCollection
       .orderBy('timestamp', descending: true)
       .limit(limit)
       .get();
-
   return snapshot.docs.map((doc) => ActivityLog.fromMap(doc.data())).toList();
 }
 
@@ -402,10 +495,8 @@ Future<List<ActivityLog>> fetchRecentLogs({int limit = 20}) async {
 // DIGITAL ACCOUNT CRUD
 // ============================================================
 
-/// Ambil akun digital.
 Future<List<DigitalAccount>> fetchDigitalAccounts() async {
   final snapshot = await accountsCollection.get();
-
   return snapshot.docs
       .map((doc) => DigitalAccount.fromMap(doc.data()))
       .toList();
@@ -415,37 +506,25 @@ Future<List<DigitalAccount>> fetchDigitalAccounts() async {
 // SEED DATA
 // ============================================================
 
-/// Isi data sample ke Firestore jika koleksi kosong.
 Future<void> seedFirestoreIfEmpty() async {
-  // ==========================================================
   // STUDENTS
-  // ==========================================================
-
   final studentSnapshot = await studentsCollection.limit(1).get();
-
   if (studentSnapshot.docs.isEmpty) {
     final sampleList = generateSampleStudents();
-
     for (var student in sampleList) {
       await studentsCollection.doc(student.id).set(student.toMap());
     }
   }
 
-  // ==========================================================
   // TRANSACTIONS
-  // ==========================================================
-
   final transactionSnapshot = await transactionsCollection.limit(1).get();
-
   if (transactionSnapshot.docs.isEmpty) {
     generateSampleTransactions();
 
     final allTransactions = <Transaction>[];
-
     arsipTransaksi.forEach((key, list) {
       allTransactions.addAll(list);
     });
-
     allTransactions.addAll(localTransactions);
 
     for (var transaction in allTransactions) {
@@ -453,16 +532,11 @@ Future<void> seedFirestoreIfEmpty() async {
     }
 
     localTransactions.clear();
-
     arsipTransaksi.clear();
   }
 
-  // ==========================================================
   // DIGITAL ACCOUNTS
-  // ==========================================================
-
   final accountSnapshot = await accountsCollection.limit(1).get();
-
   if (accountSnapshot.docs.isEmpty) {
     for (var account in defaultAccounts) {
       await accountsCollection.add(account.toMap());
