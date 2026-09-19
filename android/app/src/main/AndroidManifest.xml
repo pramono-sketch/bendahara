@@ -1,11 +1,9 @@
-<!-- android/app/src/main/AndroidManifest.xml -->
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permission untuk akses jaringan/internet -->
+    <!-- Akses internet -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
-    <!-- 🔥 TAMBAHAN: Permission untuk akses file Excel di folder Download -->
+    <!-- Permission penyimpanan untuk kebutuhan aplikasi -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
@@ -15,8 +13,9 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
-        android:requestLegacyExternalStorage="true"> <!-- 🔥 TAMBAHAN: Wajib untuk Android 10 -->
+        android:requestLegacyExternalStorage="true">
 
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -38,29 +37,35 @@
 
         </activity>
 
+        <!-- Flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
 
     </application>
 
+    <!-- Query intents -->
     <queries>
 
+        <!-- Flutter text processing -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
 
+        <!-- Membuka URL HTTPS -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
         </intent>
 
+        <!-- WhatsApp -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="whatsapp"/>
         </intent>
 
+        <!-- Berbagi file -->
         <intent>
             <action android:name="android.intent.action.SEND"/>
             <data android:mimeType="*/*"/>

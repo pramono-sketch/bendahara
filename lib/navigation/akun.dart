@@ -16,7 +16,7 @@ import '../constants/appearance.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/theme_helper.dart';
 import '../helpers/sound_helper.dart';
-import '../auth/auth_page.dart';
+import '../auth/auth_gate.dart'; // TAMBAHAN: Import AuthGate
 import '../firebase/firestore_service.dart';
 
 // ============================================================
@@ -57,9 +57,7 @@ class HeartClipper extends CustomClipper<Path> {
   }
 
   @override
-  bool shouldReclip(
-    CustomClipper<Path> oldClipper,
-  ) {
+  bool shouldReclip(CustomClipper<Path> oldClipper) {
     return false;
   }
 }
@@ -72,21 +70,17 @@ class AkunPage extends ConsumerStatefulWidget {
   const AkunPage({super.key});
 
   @override
-  ConsumerState<AkunPage> createState() =>
-      _AkunPageState();
+  ConsumerState<AkunPage> createState() => _AkunPageState();
 }
 
-class _AkunPageState
-    extends ConsumerState<AkunPage> {
+class _AkunPageState extends ConsumerState<AkunPage> {
   // ==========================================================
   // FIREBASE
   // ==========================================================
 
-  final FirebaseAuth _firebaseAuth =
-      FirebaseAuth.instance;
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
-  static const String _accountCollection =
-      'manajemen account';
+  static const String _accountCollection = 'manajemen account';
 
   // ==========================================================
   // PROFILE DATA
@@ -114,30 +108,23 @@ class _AkunPageState
   // IMAGE
   // ==========================================================
 
-  final ImagePicker _picker =
-      ImagePicker();
+  final ImagePicker _picker = ImagePicker();
 
   // ==========================================================
   // FORM
   // ==========================================================
 
-  final _formKey =
-      GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();
 
-  final _nameController =
-      TextEditingController();
+  final _nameController = TextEditingController();
 
-  final _emailController =
-      TextEditingController();
+  final _emailController = TextEditingController();
 
-  final _nisController =
-      TextEditingController();
+  final _nisController = TextEditingController();
 
-  final _phoneController =
-      TextEditingController();
+  final _phoneController = TextEditingController();
 
-  final _addressController =
-      TextEditingController();
+  final _addressController = TextEditingController();
 
   // ==========================================================
   // STATE
@@ -162,136 +149,71 @@ class _AkunPageState
 
   Future<void> _loadProfileData() async {
     try {
-      final prefs =
-          await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
-      _profileImagePath =
-          prefs.getString(
-        'profileImagePath',
-      );
+      _profileImagePath = prefs.getString('profileImagePath');
 
-      _isHeartShape =
-          prefs.getBool(
-                'isHeartShape',
-              ) ??
-              false;
+      _isHeartShape = prefs.getBool('isHeartShape') ?? false;
 
-      final User? user =
-          _firebaseAuth.currentUser;
+      final User? user = _firebaseAuth.currentUser;
 
       if (user == null) {
-        throw Exception(
-          'Sesi pengguna tidak ditemukan.',
-        );
+        throw Exception('Sesi pengguna tidak ditemukan.');
       }
 
       _currentUser = user;
 
-      final DocumentSnapshot<
-          Map<String, dynamic>> account =
-          await fetchUserAccount(
-        user.uid,
-      );
+      final DocumentSnapshot<Map<String, dynamic>> account =
+          await fetchUserAccount(user.uid);
 
-      final Map<String, dynamic> data =
-          account.data() ?? {};
+      final Map<String, dynamic> data = account.data() ?? {};
 
-      _username =
-          _readString(
-        data['nama'],
-      );
+      _username = _readString(data['nama']);
 
       if (_username.isEmpty) {
-        _username =
-            user.displayName?.trim() ?? '';
+        _username = user.displayName?.trim() ?? '';
       }
 
-      _email =
-          user.email?.trim() ??
-              _readString(
-                data['email'],
-              );
+      _email = user.email?.trim() ?? _readString(data['email']);
 
-      _role =
-          _readString(
-        data['role'],
-      );
+      _role = _readString(data['role']);
 
       if (_role.isEmpty) {
         _role = 'guru';
       }
 
-      _nis =
-          _readFirstString(
-        data,
-        [
-          'nis',
-          'nik',
-          'nisNIK',
-        ],
-      );
+      _nis = _readFirstString(data, ['nis', 'nik', 'nisNIK']);
 
-      _phone =
-          _readFirstString(
-        data,
-        [
-          'nomorTelepon',
-          'phone',
-        ],
-      );
+      _phone = _readFirstString(data, ['nomorTelepon', 'phone']);
 
-      _address =
-          _readFirstString(
-        data,
-        [
-          'alamat',
-          'address',
-        ],
-      );
+      _address = _readFirstString(data, ['alamat', 'address']);
 
-      _googlePhotoUrl =
-          _readFirstString(
-        data,
-        [
-          'photoUrl',
-        ],
-      );
+      _googlePhotoUrl = _readFirstString(data, ['photoUrl']);
 
-      if (_googlePhotoUrl == null ||
-          _googlePhotoUrl!.isEmpty) {
-        _googlePhotoUrl =
-            user.photoURL;
+      if (_googlePhotoUrl == null || _googlePhotoUrl!.isEmpty) {
+        _googlePhotoUrl = user.photoURL;
       }
 
-      _joinedSince =
-          _formatJoinedDate(
-        data['tanggalBergabung'] ??
-            data['createdAt'],
+      _joinedSince = _formatJoinedDate(
+        data['tanggalBergabung'] ?? data['createdAt'],
       );
     } catch (e) {
-      debugPrint(
-        'Gagal load profil: $e',
-      );
+      debugPrint('Gagal load profil: $e');
     } finally {
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
 
-        _nameController.text =
-            _username;
+        _nameController.text = _username;
 
-        _emailController.text =
-            _email;
+        _emailController.text = _email;
 
-        _nisController.text =
-            _nis;
+        _nisController.text = _nis;
 
-        _phoneController.text =
-            _phone;
+        _phoneController.text = _phone;
 
-        _addressController.text =
-            _address;
+        _addressController.text = _address;
       });
     }
   }
@@ -300,9 +222,7 @@ class _AkunPageState
   // READ STRING
   // ==========================================================
 
-  String _readString(
-    dynamic value,
-  ) {
+  String _readString(dynamic value) {
     if (value == null) {
       return '';
     }
@@ -319,8 +239,7 @@ class _AkunPageState
     List<String> keys,
   ) {
     for (final String key in keys) {
-      final String value =
-          _readString(data[key]);
+      final String value = _readString(data[key]);
 
       if (value.isNotEmpty) {
         return value;
@@ -334,9 +253,7 @@ class _AkunPageState
   // DATE FORMAT
   // ==========================================================
 
-  String _formatJoinedDate(
-    dynamic value,
-  ) {
+  String _formatJoinedDate(dynamic value) {
     DateTime? date;
 
     if (value is Timestamp) {
@@ -344,9 +261,7 @@ class _AkunPageState
     } else if (value is DateTime) {
       date = value;
     } else if (value is String) {
-      date = DateTime.tryParse(
-        value,
-      );
+      date = DateTime.tryParse(value);
     }
 
     if (date == null) {
@@ -368,9 +283,7 @@ class _AkunPageState
       'Desember',
     ];
 
-    return '${date.day} '
-        '${months[date.month - 1]} '
-        '${date.year}';
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   // ==========================================================
@@ -379,53 +292,27 @@ class _AkunPageState
 
   Future<void> _saveProfileData() async {
     try {
-      final prefs =
-          await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
-      await prefs.setString(
-        'username',
-        _username,
-      );
+      await prefs.setString('username', _username);
 
-      await prefs.setString(
-        'email',
-        _email,
-      );
+      await prefs.setString('email', _email);
 
-      await prefs.setString(
-        'nis',
-        _nis,
-      );
+      await prefs.setString('nis', _nis);
 
-      await prefs.setString(
-        'phone',
-        _phone,
-      );
+      await prefs.setString('phone', _phone);
 
-      await prefs.setString(
-        'address',
-        _address,
-      );
+      await prefs.setString('address', _address);
 
-      await prefs.setBool(
-        'isHeartShape',
-        _isHeartShape,
-      );
+      await prefs.setBool('isHeartShape', _isHeartShape);
 
       if (_profileImagePath != null) {
-        await prefs.setString(
-          'profileImagePath',
-          _profileImagePath!,
-        );
+        await prefs.setString('profileImagePath', _profileImagePath!);
       } else {
-        await prefs.remove(
-          'profileImagePath',
-        );
+        await prefs.remove('profileImagePath');
       }
     } catch (e) {
-      debugPrint(
-        'Gagal simpan profil lokal: $e',
-      );
+      debugPrint('Gagal simpan profil lokal: $e');
     }
   }
 
@@ -439,14 +326,10 @@ class _AkunPageState
     required String phone,
     required String address,
   }) async {
-    final User? user =
-        _currentUser ??
-            _firebaseAuth.currentUser;
+    final User? user = _currentUser ?? _firebaseAuth.currentUser;
 
     if (user == null) {
-      throw Exception(
-        'Sesi pengguna tidak ditemukan.',
-      );
+      throw Exception('Sesi pengguna tidak ditemukan.');
     }
 
     await FirebaseFirestore.instance
@@ -459,22 +342,15 @@ class _AkunPageState
         'nomorTelepon': phone,
         'alamat': address,
         'email': user.email,
-        'role': _role.isEmpty
-            ? 'guru'
-            : _role,
+        'role': _role.isEmpty ? 'guru' : _role,
         'provider': 'google.com',
-        'photoUrl':
-            _googlePhotoUrl ??
-                user.photoURL,
-        'updatedAt':
-            FieldValue.serverTimestamp(),
+        'photoUrl': _googlePhotoUrl ?? user.photoURL,
+        'updatedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
     );
 
-    await user.updateDisplayName(
-      nama,
-    );
+    await user.updateDisplayName(nama);
 
     _currentUser = user;
   }
@@ -483,27 +359,18 @@ class _AkunPageState
   // COPY IMAGE
   // ==========================================================
 
-  Future<String?>
-      _copyImageToPermanentDir(
-    File imageFile,
-  ) async {
+  Future<String?> _copyImageToPermanentDir(File imageFile) async {
     try {
-      final dir =
-          await getApplicationDocumentsDirectory();
+      final dir = await getApplicationDocumentsDirectory();
 
       final String fileName =
           'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      final File newFile =
-          await imageFile.copy(
-        '${dir.path}/$fileName',
-      );
+      final File newFile = await imageFile.copy('${dir.path}/$fileName');
 
       return newFile.path;
     } catch (e) {
-      debugPrint(
-        'Gagal menyimpan foto: $e',
-      );
+      debugPrint('Gagal menyimpan foto: $e');
 
       return null;
     }
@@ -514,108 +381,63 @@ class _AkunPageState
   // ==========================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final themeMode =
-        ref.watch(
-      themeModeProvider,
-    );
+  Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
 
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     final scaffoldBackgroundColor =
-        ThemeHelper
-            .getScaffoldBackgroundColor(
-      themeMode,
-      colors,
-    );
+        ThemeHelper.getScaffoldBackgroundColor(themeMode, colors);
 
-    return ThemeHelper
-        .buildThemedBackground(
+    return ThemeHelper.buildThemedBackground(
       themeMode,
       Scaffold(
-        backgroundColor:
-            scaffoldBackgroundColor,
+        backgroundColor: scaffoldBackgroundColor,
 
         appBar: AppBar(
-          title:
-              const Text(
-            'Profil Saya',
-          ),
+          title: const Text('Profil Saya'),
           centerTitle: true,
           actions: [
             IconButton(
-              icon:
-                  const Icon(
-                Icons.edit_outlined,
-              ),
-              onPressed:
-                  _isLoading
-                      ? null
-                      : () {
-                          SoundHelper()
-                              .playClick();
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      SoundHelper().playClick();
 
-                          _showEditProfileDialog();
-                        },
+                      _showEditProfileDialog();
+                    },
               tooltip: 'Edit Profil',
             ),
           ],
         ),
 
         body: _isLoading
-            ? const Center(
-                child:
-                    CircularProgressIndicator(),
-              )
+            ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
-                padding:
-                    const EdgeInsets.all(
-                  16,
-                ),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
                     ScrollReveal(
-                      delay:
-                          const Duration(
-                        milliseconds: 50,
-                      ),
-                      child:
-                          _buildProfileHeader(),
+                      delay: const Duration(milliseconds: 50),
+                      child: _buildProfileHeader(),
                     ),
 
-                    const SizedBox(
-                      height: 24,
-                    ),
+                    const SizedBox(height: 24),
 
                     ScrollReveal(
-                      delay:
-                          const Duration(
-                        milliseconds: 120,
-                      ),
-                      child:
-                          _buildInfoCard(),
+                      delay: const Duration(milliseconds: 120),
+                      child: _buildInfoCard(),
                     ),
 
-                    const SizedBox(
-                      height: 24,
-                    ),
+                    const SizedBox(height: 24),
 
                     ScrollReveal(
-                      delay:
-                          const Duration(
-                        milliseconds: 190,
-                      ),
-                      child:
-                          _buildMenuCard(),
+                      delay: const Duration(milliseconds: 190),
+                      child: _buildMenuCard(),
                     ),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -628,126 +450,70 @@ class _AkunPageState
   // ============================================================
 
   Widget _buildProfileHeader() {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final themeMode =
-        ref.read(
-      themeModeProvider,
-    );
+    final themeMode = ref.read(themeModeProvider);
 
-    final accentColor =
-        ThemeHelper.getAccentColor(
-      themeMode,
-      colors,
-    );
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
 
-    final bool hasLocalImage =
-        _profileImagePath != null &&
-            File(
-              _profileImagePath!,
-            ).existsSync();
+    final bool hasLocalImage = _profileImagePath != null &&
+        File(_profileImagePath!).existsSync();
 
     Widget avatar = CircleAvatar(
       radius: 60,
-
-      backgroundImage:
-          hasLocalImage
-              ? FileImage(
-                  File(
-                    _profileImagePath!,
-                  ),
-                )
-              : _googlePhotoUrl != null &&
-                      _googlePhotoUrl!
-                          .isNotEmpty
-                  ? NetworkImage(
-                      _googlePhotoUrl!,
-                    )
-                  : null,
-
-      backgroundColor:
-          colors
-              .surfaceContainerHighest,
-
-      child:
-          !hasLocalImage &&
-                  (_googlePhotoUrl == null ||
-                      _googlePhotoUrl!
-                          .isEmpty)
-              ? Text(
-                  _username
-                          .isNotEmpty
-                      ? _username[0]
-                          .toUpperCase()
-                      : '?',
-                  style:
-                      TextStyle(
-                    fontSize: 48,
-                    fontWeight:
-                        FontWeight.bold,
-                    color:
-                        accentColor,
-                  ),
-                )
+      backgroundImage: hasLocalImage
+          ? FileImage(File(_profileImagePath!))
+          : _googlePhotoUrl != null && _googlePhotoUrl!.isNotEmpty
+              ? NetworkImage(_googlePhotoUrl!)
               : null,
+      backgroundColor: colors.surfaceContainerHighest,
+      child: !hasLocalImage &&
+              (_googlePhotoUrl == null || _googlePhotoUrl!.isEmpty)
+          ? Text(
+              _username.isNotEmpty
+                  ? _username[0].toUpperCase()
+                  : '?',
+              style: TextStyle(
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
+                color: accentColor,
+              ),
+            )
+          : null,
     );
 
     if (_isHeartShape) {
-      avatar = ClipPath(
-        clipper:
-            HeartClipper(),
-        child: avatar,
-      );
+      avatar = ClipPath(clipper: HeartClipper(), child: avatar);
     }
 
     return Card(
-      child:
-          Padding(
-        padding:
-            const EdgeInsets
-                .all(20),
-        child:
-            Column(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
           children: [
             GestureDetector(
               onTap: () {
-                SoundHelper()
-                    .playClick();
+                SoundHelper().playClick();
 
                 _showImagePickerDialog();
               },
-              child:
-                  Stack(
+              child: Stack(
                 children: [
                   avatar,
-
                   Positioned(
                     bottom: 0,
                     right: 0,
-                    child:
-                        Container(
-                      padding:
-                          const EdgeInsets
-                              .all(4),
-                      decoration:
-                          BoxDecoration(
-                        color:
-                            accentColor,
-                        shape:
-                            BoxShape
-                                .circle,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        shape: BoxShape.circle,
                       ),
-                      child:
-                          Icon(
-                        Icons
-                            .camera_alt,
-                        color:
-                            colors
-                                .onPrimary,
+                      child: Icon(
+                        Icons.camera_alt,
+                        color: colors.onPrimary,
                         size: 20,
                       ),
                     ),
@@ -756,82 +522,41 @@ class _AkunPageState
               ),
             ),
 
-            const SizedBox(
-              height: 16,
-            ),
+            const SizedBox(height: 16),
 
             Text(
-              _username.isEmpty
-                  ? 'Pengguna'
-                  : _username,
-              textAlign:
-                  TextAlign.center,
-              style:
-                  theme.textTheme
-                      .headlineSmall
-                      ?.copyWith(
-                fontWeight:
-                    FontWeight.bold,
-                color:
-                    colors.onSurface,
+              _username.isEmpty ? 'Pengguna' : _username,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colors.onSurface,
               ),
             ),
 
-            const SizedBox(
-              height: 6,
-            ),
+            const SizedBox(height: 6),
 
             Container(
-              padding:
-                  const EdgeInsets
-                      .symmetric(
-                horizontal:
-                    12,
-                vertical: 4,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
-              decoration:
-                  BoxDecoration(
-                color:
-                    accentColor
-                        .withValues(
-                  alpha: 0.1,
-                ),
-                borderRadius:
-                    BorderRadius
-                        .circular(
-                  12,
-                ),
-              ),
-              child:
-                  Text(
-                _role.isEmpty
-                    ? 'Guru'
-                    : _role,
-                style:
-                    TextStyle(
-                  color:
-                      accentColor,
-                  fontWeight:
-                      FontWeight.w500,
+              child: Text(
+                _role.isEmpty ? 'Guru' : _role,
+                style: TextStyle(
+                  color: accentColor,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
 
-            const SizedBox(
-              height: 8,
-            ),
+            const SizedBox(height: 8),
 
             Text(
-              _email.isEmpty
-                  ? '-'
-                  : _email,
-              textAlign:
-                  TextAlign.center,
-              style:
-                  TextStyle(
-                color:
-                    colors
-                        .onSurfaceVariant,
+              _email.isEmpty ? '-' : _email,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
                 fontSize: 14,
               ),
             ),
@@ -846,73 +571,37 @@ class _AkunPageState
   // ============================================================
 
   Widget _buildInfoCard() {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Card(
-      child:
-          Padding(
-        padding:
-            const EdgeInsets
-                .all(16),
-        child:
-            Column(
-          crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Informasi Pengguna',
-              style:
-                  theme.textTheme
-                      .titleMedium
-                      ?.copyWith(
-                fontWeight:
-                    FontWeight.bold,
-                color:
-                    colors.onSurface,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colors.onSurface,
               ),
             ),
 
-            const SizedBox(
-              height: 16,
-            ),
+            const SizedBox(height: 16),
 
-            _buildInfoRow(
-              Icons.badge_outlined,
-              'NIS/NIK',
-              _nis,
-            ),
+            _buildInfoRow(Icons.badge_outlined, 'NIS/NIK', _nis),
 
-            Divider(
-              color:
-                  _getDividerColor(),
-            ),
+            Divider(color: _getDividerColor()),
 
-            _buildInfoRow(
-              Icons.phone_outlined,
-              'No. Telepon',
-              _phone,
-            ),
+            _buildInfoRow(Icons.phone_outlined, 'No. Telepon', _phone),
 
-            Divider(
-              color:
-                  _getDividerColor(),
-            ),
+            Divider(color: _getDividerColor()),
 
-            _buildInfoRow(
-              Icons.location_on_outlined,
-              'Alamat',
-              _address,
-            ),
+            _buildInfoRow(Icons.location_on_outlined, 'Alamat', _address),
 
-            Divider(
-              color:
-                  _getDividerColor(),
-            ),
+            Divider(color: _getDividerColor()),
 
             _buildInfoRow(
               Icons.calendar_today_outlined,
@@ -920,16 +609,9 @@ class _AkunPageState
               _joinedSince,
             ),
 
-            Divider(
-              color:
-                  _getDividerColor(),
-            ),
+            Divider(color: _getDividerColor()),
 
-            _buildInfoRow(
-              Icons.login_outlined,
-              'Provider',
-              'Google',
-            ),
+            _buildInfoRow(Icons.login_outlined, 'Provider', 'Google'),
           ],
         ),
       ),
@@ -945,74 +627,46 @@ class _AkunPageState
     String label,
     String value,
   ) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final String displayValue =
-        value.trim().isEmpty
-            ? '-'
-            : value;
+    final String displayValue = value.trim().isEmpty ? '-' : value;
 
     return Padding(
-      padding:
-          const EdgeInsets
-              .symmetric(
-        vertical: 6,
-      ),
-      child:
-          Row(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .start,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             icon,
-            color:
-                colors
-                    .onSurfaceVariant,
+            color: colors.onSurfaceVariant,
             size: 20,
           ),
 
-          const SizedBox(
-            width: 12,
-          ),
+          const SizedBox(width: 12),
 
           Expanded(
             flex: 2,
-            child:
-                Text(
+            child: Text(
               label,
-              style:
-                  TextStyle(
-                color:
-                    colors
-                        .onSurfaceVariant,
-                fontSize:
-                    13,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
+                fontSize: 13,
               ),
             ),
           ),
 
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
 
           Expanded(
             flex: 3,
-            child:
-                Text(
+            child: Text(
               displayValue,
-              style:
-                  TextStyle(
-                fontWeight:
-                    FontWeight.w500,
-                fontSize:
-                    14,
-                color:
-                    colors.onSurface,
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                color: colors.onSurface,
               ),
             ),
           ),
@@ -1027,61 +681,40 @@ class _AkunPageState
 
   Widget _buildMenuCard() {
     return Card(
-      child:
-          Column(
+      child: Column(
         children: [
           _buildMenuItem(
-            icon:
-                Icons.edit_outlined,
-            title:
-                'Edit Profil',
-            subtitle:
-                'Ubah informasi pribadi',
+            icon: Icons.edit_outlined,
+            title: 'Edit Profil',
+            subtitle: 'Ubah informasi pribadi',
             onTap: () {
-              SoundHelper()
-                  .playClick();
+              SoundHelper().playClick();
 
               _showEditProfileDialog();
             },
           ),
 
-          Divider(
-            height: 1,
-            color:
-                _getDividerColor(),
-          ),
+          Divider(height: 1, color: _getDividerColor()),
 
           _buildMenuItem(
-            icon:
-                Icons.lock_outline,
-            title:
-                'Keamanan Akun',
-            subtitle:
-                'Kelola keamanan dan password',
+            icon: Icons.lock_outline,
+            title: 'Keamanan Akun',
+            subtitle: 'Kelola keamanan dan password',
             onTap: () {
-              SoundHelper()
-                  .playClick();
+              SoundHelper().playClick();
 
               _showChangePasswordDialog();
             },
           ),
 
-          Divider(
-            height: 1,
-            color:
-                _getDividerColor(),
-          ),
+          Divider(height: 1, color: _getDividerColor()),
 
           _buildMenuItem(
-            icon:
-                Icons.logout,
-            title:
-                'Logout',
-            subtitle:
-                'Keluar dari aplikasi',
+            icon: Icons.logout,
+            title: 'Logout',
+            subtitle: 'Keluar dari aplikasi',
             onTap: () {
-              SoundHelper()
-                  .playClick();
+              SoundHelper().playClick();
 
               _showLogoutDialog();
             },
@@ -1103,70 +736,37 @@ class _AkunPageState
     required VoidCallback onTap,
     bool isLogout = false,
   }) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final themeMode =
-        ref.read(
-      themeModeProvider,
-    );
+    final themeMode = ref.read(themeModeProvider);
 
-    final accentColor =
-        ThemeHelper.getAccentColor(
-      themeMode,
-      colors,
-    );
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
 
-    final iconColor =
-        isLogout
-            ? colors.error
-            : accentColor;
+    final iconColor = isLogout ? colors.error : accentColor;
 
-    final titleColor =
-        isLogout
-            ? colors.error
-            : colors.onSurface;
+    final titleColor = isLogout ? colors.error : colors.onSurface;
 
     return ListTile(
-      leading:
-          Icon(
-        icon,
-        color:
-            iconColor,
-      ),
+      leading: Icon(icon, color: iconColor),
 
-      title:
-          Text(
+      title: Text(
         title,
-        style:
-            TextStyle(
-          color:
-              titleColor,
-          fontWeight:
-              FontWeight.w500,
+        style: TextStyle(
+          color: titleColor,
+          fontWeight: FontWeight.w500,
         ),
       ),
 
-      subtitle:
-          Text(
+      subtitle: Text(
         subtitle,
-        style:
-            TextStyle(
-          color:
-              colors
-                  .onSurfaceVariant,
-        ),
+        style: TextStyle(color: colors.onSurfaceVariant),
       ),
 
-      trailing:
-          Icon(
+      trailing: Icon(
         Icons.chevron_right,
-        color:
-            colors
-                .onSurfaceVariant,
+        color: colors.onSurfaceVariant,
       ),
 
       onTap: onTap,
@@ -1178,14 +778,9 @@ class _AkunPageState
   // ============================================================
 
   Color _getDividerColor() {
-    final themeMode =
-        ref.read(
-      themeModeProvider,
-    );
+    final themeMode = ref.read(themeModeProvider);
 
-    return ThemeHelper.dividerColor(
-      themeMode,
-    );
+    return ThemeHelper.dividerColor(themeMode);
   }
 
   // ============================================================
@@ -1193,97 +788,48 @@ class _AkunPageState
   // ============================================================
 
   void _showImagePickerDialog() {
-    final themeMode =
-        ref.read(
-      themeModeProvider,
-    );
+    final themeMode = ref.read(themeModeProvider);
 
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     showModalBottomSheet(
       context: context,
       backgroundColor:
-          ThemeHelper
-              .getScaffoldBackgroundColor(
-        themeMode,
-        colors,
+          ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      shape:
-          const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(
-          top:
-              Radius.circular(24),
-        ),
-      ),
-      builder: (ctx) =>
-          SafeArea(
-        child:
-            Column(
-          mainAxisSize:
-              MainAxisSize.min,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading:
-                  Icon(
-                Icons
-                    .photo_library,
-                color:
-                    ThemeHelper
-                        .getAccentColor(
-                  themeMode,
-                  colors,
-                ),
+              leading: Icon(
+                Icons.photo_library,
+                color: ThemeHelper.getAccentColor(themeMode, colors),
               ),
-              title:
-                  const Text(
-                'Pilih dari Galeri',
-              ),
+              title: const Text('Pilih dari Galeri'),
               onTap: () {
-                SoundHelper()
-                    .playClick();
+                SoundHelper().playClick();
 
-                Navigator.pop(
-                  ctx,
-                );
+                Navigator.pop(ctx);
 
-                _pickImage(
-                  ImageSource
-                      .gallery,
-                );
+                _pickImage(ImageSource.gallery);
               },
             ),
 
             ListTile(
-              leading:
-                  Icon(
-                Icons
-                    .photo_camera,
-                color:
-                    ThemeHelper
-                        .getAccentColor(
-                  themeMode,
-                  colors,
-                ),
+              leading: Icon(
+                Icons.photo_camera,
+                color: ThemeHelper.getAccentColor(themeMode, colors),
               ),
-              title:
-                  const Text(
-                'Ambil Foto',
-              ),
+              title: const Text('Ambil Foto'),
               onTap: () {
-                SoundHelper()
-                    .playClick();
+                SoundHelper().playClick();
 
-                Navigator.pop(
-                  ctx,
-                );
+                Navigator.pop(ctx);
 
-                _pickImage(
-                  ImageSource
-                      .camera,
-                );
+                _pickImage(ImageSource.camera);
               },
             ),
           ],
@@ -1296,12 +842,9 @@ class _AkunPageState
   // PICK IMAGE
   // ============================================================
 
-  Future<void> _pickImage(
-    ImageSource source,
-  ) async {
+  Future<void> _pickImage(ImageSource source) async {
     try {
-      final XFile? image =
-          await _picker.pickImage(
+      final XFile? image = await _picker.pickImage(
         source: source,
         imageQuality: 80,
       );
@@ -1310,59 +853,35 @@ class _AkunPageState
         return;
       }
 
-      final File imageFile =
-          File(
-        image.path,
-      );
+      final File imageFile = File(image.path);
 
       final String? permanentPath =
-          await _copyImageToPermanentDir(
-        imageFile,
-      );
+          await _copyImageToPermanentDir(imageFile);
 
       if (permanentPath != null) {
         setState(() {
-          _profileImagePath =
-              permanentPath;
+          _profileImagePath = permanentPath;
         });
 
         await _saveProfileData();
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Foto profil berhasil diubah.',
-            ),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto profil berhasil diubah.')),
         );
       } else {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Gagal menyimpan foto.',
-            ),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menyimpan foto.')),
         );
       }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Gagal memuat gambar: $e',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat gambar: $e')),
       );
     }
   }
@@ -1371,105 +890,58 @@ class _AkunPageState
   // EDIT PROFILE DIALOG
   // ============================================================
 
-  Future<void>
-      _showEditProfileDialog() async {
-    _nameController.text =
-        _username;
+  Future<void> _showEditProfileDialog() async {
+    _nameController.text = _username;
 
-    _emailController.text =
-        _email;
+    _emailController.text = _email;
 
-    _nisController.text =
-        _nis;
+    _nisController.text = _nis;
 
-    _phoneController.text =
-        _phone;
+    _phoneController.text = _phone;
 
-    _addressController.text =
-        _address;
+    _addressController.text = _address;
 
-    bool localHeartShape =
-        _isHeartShape;
+    bool localHeartShape = _isHeartShape;
 
     bool saving = false;
 
     await showDialog<void>(
       context: context,
-      barrierDismissible:
-          false,
-      builder: (ctx) =>
-          StatefulBuilder(
-        builder: (
-          ctx,
-          setStateDialog,
-        ) {
-          final themeMode =
-              ref.read(
-            themeModeProvider,
-          );
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) {
+          final themeMode = ref.read(themeModeProvider);
 
-          final colors =
-              Theme.of(context)
-                  .colorScheme;
+          final colors = Theme.of(context).colorScheme;
 
-          final accentColor =
-              ThemeHelper
-                  .getAccentColor(
-            themeMode,
-            colors,
-          );
+          final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
 
           return AlertDialog(
-            title:
-                const Text(
-              'Edit Profil',
-            ),
+            title: const Text('Edit Profil'),
 
-            content:
-                SizedBox(
-              width:
-                  double.maxFinite,
-
-              child:
-                  Form(
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Form(
                 key: _formKey,
-
-                child:
-                    SingleChildScrollView(
-                  child:
-                      Column(
-                    mainAxisSize:
-                        MainAxisSize.min,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       TextFormField(
-                        controller:
-                            _nameController,
-                        textCapitalization:
-                            TextCapitalization.words,
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'Nama Lengkap',
-                          prefixIcon:
-                              Icon(
-                            Icons
-                                .person_outline,
-                          ),
+                        controller: _nameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Nama Lengkap',
+                          prefixIcon: Icon(Icons.person_outline),
                         ),
-                        validator:
-                            (v) {
-                          final value =
-                              v?.trim() ??
-                                  '';
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
 
-                          if (value
-                              .isEmpty) {
+                          if (value.isEmpty) {
                             return 'Nama wajib diisi.';
                           }
 
-                          if (value
-                                  .length <
-                              3) {
+                          if (value.length < 3) {
                             return 'Nama terlalu pendek.';
                           }
 
@@ -1477,49 +949,27 @@ class _AkunPageState
                         },
                       ),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+                      const SizedBox(height: 12),
 
                       TextFormField(
-                        controller:
-                            _emailController,
-                        readOnly:
-                            true,
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'Email Google',
-                          prefixIcon:
-                              Icon(
-                            Icons
-                                .email_outlined,
-                          ),
+                        controller: _emailController,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Email Google',
+                          prefixIcon: Icon(Icons.email_outlined),
                         ),
                       ),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+                      const SizedBox(height: 12),
 
                       TextFormField(
-                        controller:
-                            _nisController,
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'NIS/NIK',
-                          prefixIcon:
-                              Icon(
-                            Icons
-                                .badge_outlined,
-                          ),
+                        controller: _nisController,
+                        decoration: const InputDecoration(
+                          labelText: 'NIS/NIK',
+                          prefixIcon: Icon(Icons.badge_outlined),
                         ),
-                        validator:
-                            (v) {
-                          if ((v?.trim() ??
-                                  '')
-                              .isEmpty) {
+                        validator: (v) {
+                          if ((v?.trim() ?? '').isEmpty) {
                             return 'NIS/NIK wajib diisi.';
                           }
 
@@ -1527,48 +977,28 @@ class _AkunPageState
                         },
                       ),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+                      const SizedBox(height: 12),
 
                       TextFormField(
-                        controller:
-                            _phoneController,
-                        keyboardType:
-                            TextInputType.phone,
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'No. Telepon',
-                          prefixIcon:
-                              Icon(
-                            Icons
-                                .phone_outlined,
-                          ),
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'No. Telepon',
+                          prefixIcon: Icon(Icons.phone_outlined),
                         ),
-                        validator:
-                            (v) {
-                          final phone =
-                              v?.trim() ??
-                                  '';
+                        validator: (v) {
+                          final phone = v?.trim() ?? '';
 
-                          if (phone
-                              .isEmpty) {
+                          if (phone.isEmpty) {
                             return 'Nomor telepon wajib diisi.';
                           }
 
-                          final digits =
-                              phone
-                                  .replaceAll(
-                            RegExp(
-                              r'[^0-9+]',
-                            ),
+                          final digits = phone.replaceAll(
+                            RegExp(r'[^0-9+]'),
                             '',
                           );
 
-                          if (digits
-                                  .length <
-                              8) {
+                          if (digits.length < 8) {
                             return 'Nomor telepon tidak valid.';
                           }
 
@@ -1576,30 +1006,17 @@ class _AkunPageState
                         },
                       ),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+                      const SizedBox(height: 12),
 
                       TextFormField(
-                        controller:
-                            _addressController,
-                        maxLines:
-                            3,
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'Alamat',
-                          prefixIcon:
-                              Icon(
-                            Icons
-                                .location_on_outlined,
-                          ),
+                        controller: _addressController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Alamat',
+                          prefixIcon: Icon(Icons.location_on_outlined),
                         ),
-                        validator:
-                            (v) {
-                          if ((v?.trim() ??
-                                  '')
-                              .isEmpty) {
+                        validator: (v) {
+                          if ((v?.trim() ?? '').isEmpty) {
                             return 'Alamat wajib diisi.';
                           }
 
@@ -1607,71 +1024,40 @@ class _AkunPageState
                         },
                       ),
 
-                      const SizedBox(
-                        height: 16,
-                      ),
+                      const SizedBox(height: 16),
 
                       SwitchListTile(
-                        contentPadding:
-                            EdgeInsets.zero,
-
-                        title:
-                            const Text(
-                          'Bentuk Avatar Hati',
-                        ),
-
-                        subtitle:
-                            const Text(
-                          'Ubah avatar menjadi bentuk love',
-                        ),
-
-                        value:
-                            localHeartShape,
-
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Bentuk Avatar Hati'),
+                        subtitle: const Text('Ubah avatar menjadi bentuk love'),
+                        value: localHeartShape,
                         onChanged: saving
                             ? null
                             : (val) {
-                                SoundHelper()
-                                    .playNotification();
+                                SoundHelper().playNotification();
 
-                                if (val &&
-                                    !localHeartShape) {
+                                if (val && !localHeartShape) {
                                   AwesomeDialog(
-                                    context:
-                                        ctx,
-                                    dialogType:
-                                        DialogType.info,
-                                    animType:
-                                        AnimType.bottomSlide,
-                                    headerAnimationLoop:
-                                        false,
-                                    title:
-                                        '💖 Easter Egg!',
+                                    context: ctx,
+                                    dialogType: DialogType.info,
+                                    animType: AnimType.bottomSlide,
+                                    headerAnimationLoop: false,
+                                    title: '💖 Easter Egg!',
                                     desc:
                                         'Selamat! Anda mengaktifkan mode avatar hati.\nSemangat belajar dan berkarya! 🚀',
-                                    btnOkOnPress:
-                                        () {},
-                                    btnOkIcon:
-                                        Icons.favorite,
-                                    btnOkColor:
-                                        accentColor,
-                                    btnOkText:
-                                        '❤️ Mantap!',
-                                    useRootNavigator:
-                                        false,
+                                    btnOkOnPress: () {},
+                                    btnOkIcon: Icons.favorite,
+                                    btnOkColor: accentColor,
+                                    btnOkText: '❤️ Mantap!',
+                                    useRootNavigator: false,
                                   ).show();
                                 }
 
-                                setStateDialog(
-                                  () {
-                                    localHeartShape =
-                                        val;
-                                  },
-                                );
+                                setStateDialog(() {
+                                  localHeartShape = val;
+                                });
                               },
-
-                        activeColor:
-                            accentColor,
+                        activeColor: accentColor,
                       ),
                     ],
                   ),
@@ -1681,160 +1067,97 @@ class _AkunPageState
 
             actions: [
               TextButton(
-                onPressed:
-                    saving
-                        ? null
-                        : () {
-                            SoundHelper()
-                                .playClick();
+                onPressed: saving
+                    ? null
+                    : () {
+                        SoundHelper().playClick();
 
-                            Navigator.pop(
-                              ctx,
-                            );
-                          },
-                child:
-                    const Text(
-                  'Batal',
-                ),
+                        Navigator.pop(ctx);
+                      },
+                child: const Text('Batal'),
               ),
 
               ElevatedButton(
-                onPressed:
-                    saving
-                        ? null
-                        : () async {
-                            SoundHelper()
-                                .playClick();
+                onPressed: saving
+                    ? null
+                    : () async {
+                        SoundHelper().playClick();
 
-                            if (!_formKey
-                                .currentState!
-                                .validate()) {
-                              return;
-                            }
+                        if (!_formKey.currentState!.validate()) {
+                          return;
+                        }
 
-                            final String nama =
-                                _nameController
-                                    .text
-                                    .trim();
+                        final String nama = _nameController.text.trim();
 
-                            final String nis =
-                                _nisController
-                                    .text
-                                    .trim();
+                        final String nis = _nisController.text.trim();
 
-                            final String phone =
-                                _phoneController
-                                    .text
-                                    .trim();
+                        final String phone = _phoneController.text.trim();
 
-                            final String address =
-                                _addressController
-                                    .text
-                                    .trim();
+                        final String address = _addressController.text.trim();
 
-                            setStateDialog(
-                              () {
-                                saving =
-                                    true;
-                              },
-                            );
+                        setStateDialog(() {
+                          saving = true;
+                        });
 
-                            try {
-                              await _saveFirestoreProfile(
-                                nama:
-                                    nama,
-                                nis:
-                                    nis,
-                                phone:
-                                    phone,
-                                address:
-                                    address,
-                              );
+                        try {
+                          await _saveFirestoreProfile(
+                            nama: nama,
+                            nis: nis,
+                            phone: phone,
+                            address: address,
+                          );
 
-                              if (!mounted) {
-                                return;
-                              }
+                          if (!mounted) {
+                            return;
+                          }
 
-                              setState(
-                                () {
-                                  _username =
-                                      nama;
+                          setState(() {
+                            _username = nama;
+                            _nis = nis;
+                            _phone = phone;
+                            _address = address;
+                            _isHeartShape = localHeartShape;
+                          });
 
-                                  _nis =
-                                      nis;
+                          await _saveProfileData();
 
-                                  _phone =
-                                      phone;
+                          if (!mounted) {
+                            return;
+                          }
 
-                                  _address =
-                                      address;
+                          Navigator.pop(ctx);
 
-                                  _isHeartShape =
-                                      localHeartShape;
-                                },
-                              );
-
-                              await _saveProfileData();
-
-                              if (!mounted) {
-                                return;
-                              }
-
-                              Navigator.pop(
-                                ctx,
-                              );
-
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text(
-                                    'Profil berhasil diperbarui.',
-                                  ),
-                                ),
-                              );
-                            } catch (e) {
-                              setStateDialog(
-                                () {
-                                  saving =
-                                      false;
-                                },
-                              );
-
-                              if (!mounted) {
-                                return;
-                              }
-
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(
-                                SnackBar(
-                                  content:
-                                      Text(
-                                    'Gagal menyimpan profil: $e',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-
-                child:
-                    saving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child:
-                                CircularProgressIndicator(
-                              strokeWidth:
-                                  2,
-                              color:
-                                  Colors.white,
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Profil berhasil diperbarui.'),
                             ),
-                          )
-                        : const Text(
-                            'Simpan',
-                          ),
+                          );
+                        } catch (e) {
+                          setStateDialog(() {
+                            saving = false;
+                          });
+
+                          if (!mounted) {
+                            return;
+                          }
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Gagal menyimpan profil: $e'),
+                            ),
+                          );
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Simpan'),
               ),
             ],
           );
@@ -1847,24 +1170,17 @@ class _AkunPageState
   // CHANGE PASSWORD
   // ============================================================
 
-  Future<void>
-      _showChangePasswordDialog() async {
-    final User? user =
-        _firebaseAuth.currentUser;
+  Future<void> _showChangePasswordDialog() async {
+    final User? user = _firebaseAuth.currentUser;
 
     if (user == null) {
-      _showLocalError(
-        'Sesi pengguna tidak ditemukan.',
-      );
+      _showLocalError('Sesi pengguna tidak ditemukan.');
 
       return;
     }
 
-    final bool hasPasswordProvider =
-        user.providerData.any(
-      (provider) =>
-          provider.providerId ==
-          'password',
+    final bool hasPasswordProvider = user.providerData.any(
+      (provider) => provider.providerId == 'password',
     );
 
     // ----------------------------------------------------------
@@ -1874,14 +1190,9 @@ class _AkunPageState
     if (!hasPasswordProvider) {
       await showDialog<void>(
         context: context,
-        builder: (ctx) =>
-            AlertDialog(
-          title:
-              const Text(
-            'Keamanan Akun',
-          ),
-          content:
-              const Text(
+        builder: (ctx) => AlertDialog(
+          title: const Text('Keamanan Akun'),
+          content: const Text(
             'Akun ini menggunakan Google Sign-In.\n\n'
             'Password akun dikelola langsung oleh Google, '
             'bukan oleh aplikasi ini.',
@@ -1889,14 +1200,9 @@ class _AkunPageState
           actions: [
             FilledButton(
               onPressed: () {
-                Navigator.pop(
-                  ctx,
-                );
+                Navigator.pop(ctx);
               },
-              child:
-                  const Text(
-                'Mengerti',
-              ),
+              child: const Text('Mengerti'),
             ),
           ],
         ),
@@ -1909,82 +1215,52 @@ class _AkunPageState
     // PASSWORD PROVIDER
     // ----------------------------------------------------------
 
-    final oldPassword =
-        TextEditingController();
+    final oldPassword = TextEditingController();
 
-    final newPassword =
-        TextEditingController();
+    final newPassword = TextEditingController();
 
-    final confirmPassword =
-        TextEditingController();
+    final confirmPassword = TextEditingController();
 
     bool saving = false;
 
     try {
       await showDialog<void>(
         context: context,
-        barrierDismissible:
-            false,
-        builder: (ctx) =>
-            StatefulBuilder(
-          builder: (
-            ctx,
-            setStateDialog,
-          ) {
+        barrierDismissible: false,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setStateDialog) {
             return AlertDialog(
-              title:
-                  const Text(
-                'Ganti Password',
-              ),
+              title: const Text('Ganti Password'),
 
-              content:
-                  SingleChildScrollView(
-                child:
-                    Column(
-                  mainAxisSize:
-                      MainAxisSize.min,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
-                      controller:
-                          oldPassword,
-                      obscureText:
-                          true,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Password Lama',
+                      controller: oldPassword,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Password Lama',
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 12,
-                    ),
+                    const SizedBox(height: 12),
 
                     TextField(
-                      controller:
-                          newPassword,
-                      obscureText:
-                          true,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Password Baru',
+                      controller: newPassword,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Password Baru',
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 12,
-                    ),
+                    const SizedBox(height: 12),
 
                     TextField(
-                      controller:
-                          confirmPassword,
-                      obscureText:
-                          true,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Konfirmasi Password Baru',
+                      controller: confirmPassword,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Konfirmasi Password Baru',
                       ),
                     ),
                   ],
@@ -1993,151 +1269,97 @@ class _AkunPageState
 
               actions: [
                 TextButton(
-                  onPressed:
-                      saving
-                          ? null
-                          : () {
-                              Navigator.pop(
-                                ctx,
-                              );
-                            },
-                  child:
-                      const Text(
-                    'Batal',
-                  ),
+                  onPressed: saving
+                      ? null
+                      : () {
+                          Navigator.pop(ctx);
+                        },
+                  child: const Text('Batal'),
                 ),
 
                 FilledButton(
-                  onPressed:
-                      saving
-                          ? null
-                          : () async {
-                              final String old =
-                                  oldPassword
-                                      .text;
+                  onPressed: saving
+                    ? null
+                    : () async {
+                        final String old = oldPassword.text;
 
-                              final String next =
-                                  newPassword
-                                      .text;
+                        final String next = newPassword.text;
 
-                              final String confirm =
-                                  confirmPassword
-                                      .text;
+                        final String confirm = confirmPassword.text;
 
-                              if (next
-                                      .length <
-                                  6) {
-                                _showLocalError(
-                                  'Password baru minimal 6 karakter.',
-                                );
+                        if (next.length < 6) {
+                          _showLocalError(
+                            'Password baru minimal 6 karakter.',
+                          );
 
-                                return;
-                              }
+                          return;
+                        }
 
-                              if (next !=
-                                  confirm) {
-                                _showLocalError(
-                                  'Konfirmasi password tidak cocok.',
-                                );
+                        if (next != confirm) {
+                          _showLocalError(
+                            'Konfirmasi password tidak cocok.',
+                          );
 
-                                return;
-                              }
+                          return;
+                        }
 
-                              final String? email =
-                                  user.email;
+                        final String? email = user.email;
 
-                              if (email ==
-                                      null ||
-                                  email.isEmpty) {
-                                _showLocalError(
-                                  'Email akun tidak tersedia.',
-                                );
+                        if (email == null || email.isEmpty) {
+                          _showLocalError('Email akun tidak tersedia.');
 
-                                return;
-                              }
+                          return;
+                        }
 
-                              setStateDialog(
-                                () {
-                                  saving =
-                                      true;
-                                },
-                              );
+                        setStateDialog(() {
+                          saving = true;
+                        });
 
-                              try {
-                                final credential =
-                                    EmailAuthProvider
-                                        .credential(
-                                  email:
-                                      email,
-                                  password:
-                                      old,
-                                );
+                        try {
+                          final credential =
+                              EmailAuthProvider.credential(
+                            email: email,
+                            password: old,
+                          );
 
-                                await user
-                                    .reauthenticateWithCredential(
-                                  credential,
-                                );
+                          await user.reauthenticateWithCredential(credential);
 
-                                await user
-                                    .updatePassword(
-                                  next,
-                                );
+                          await user.updatePassword(next);
 
-                                if (!mounted) {
-                                  return;
-                                }
+                          if (!mounted) {
+                            return;
+                          }
 
-                                Navigator.pop(
-                                  ctx,
-                                );
+                          Navigator.pop(ctx);
 
-                                _showLocalError(
-                                  'Password berhasil diubah.',
-                                  success:
-                                      true,
-                                );
-                              } on FirebaseAuthException catch (e) {
-                                setStateDialog(
-                                  () {
-                                    saving =
-                                        false;
-                                  },
-                                );
+                          _showLocalError(
+                            'Password berhasil diubah.',
+                            success: true,
+                          );
+                        } on FirebaseAuthException catch (e) {
+                          setStateDialog(() {
+                            saving = false;
+                          });
 
-                                _showLocalError(
-                                  _firebaseErrorMessage(
-                                    e,
-                                  ),
-                                );
-                              } catch (e) {
-                                setStateDialog(
-                                  () {
-                                    saving =
-                                        false;
-                                  },
-                                );
+                          _showLocalError(_firebaseErrorMessage(e));
+                        } catch (e) {
+                          setStateDialog(() {
+                            saving = false;
+                          });
 
-                                _showLocalError(
-                                  'Gagal mengubah password: $e',
-                                );
-                              }
-                            },
-                  child:
-                      saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child:
-                                  CircularProgressIndicator(
-                                strokeWidth:
-                                    2,
-                                color:
-                                    Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Simpan',
-                            ),
+                          _showLocalError('Gagal mengubah password: $e');
+                        }
+                      },
+                  child: saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Simpan'),
                 ),
               ],
             );
@@ -2155,9 +1377,7 @@ class _AkunPageState
   // FIREBASE ERROR
   // ============================================================
 
-  String _firebaseErrorMessage(
-    FirebaseAuthException e,
-  ) {
+  String _firebaseErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'wrong-password':
         return 'Password lama salah.';
@@ -2172,8 +1392,7 @@ class _AkunPageState
         return 'Silakan login kembali sebelum mengubah password.';
 
       default:
-        return e.message ??
-            'Terjadi kesalahan autentikasi.';
+        return e.message ?? 'Terjadi kesalahan autentikasi.';
     }
   }
 
@@ -2181,22 +1400,13 @@ class _AkunPageState
   // LOCAL MESSAGE
   // ============================================================
 
-  void _showLocalError(
-    String message, {
-    bool success = false,
-  }) {
+  void _showLocalError(String message, {bool success = false}) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content:
-            Text(
-          message,
-        ),
-        behavior:
-            SnackBarBehavior.floating,
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -2206,64 +1416,42 @@ class _AkunPageState
   // ============================================================
 
   void _showLogoutDialog() {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     showDialog<void>(
       context: context,
-      builder: (ctx) =>
-          AlertDialog(
-        title:
-            const Text(
-          'Konfirmasi Logout',
-        ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Konfirmasi Logout'),
 
-        content:
-            const Text(
+        content: const Text(
           'Apakah Anda yakin ingin keluar dari akun ini?',
         ),
 
         actions: [
           TextButton(
             onPressed: () {
-              SoundHelper()
-                  .playClick();
+              SoundHelper().playClick();
 
-              Navigator.pop(
-                ctx,
-              );
+              Navigator.pop(ctx);
             },
-            child:
-                const Text(
-              'Batal',
-            ),
+            child: const Text('Batal'),
           ),
 
           ElevatedButton(
             onPressed: () async {
-              SoundHelper()
-                  .playClick();
+              SoundHelper().playClick();
 
-              Navigator.pop(
-                ctx,
-              );
+              Navigator.pop(ctx);
 
               await _performLogout();
             },
 
-            style:
-                ElevatedButton.styleFrom(
-              backgroundColor:
-                  colors.error,
-              foregroundColor:
-                  colors.onError,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: colors.onError,
             ),
 
-            child:
-                const Text(
-              'Logout',
-            ),
+            child: const Text('Logout'),
           ),
         ],
       ),
@@ -2271,7 +1459,7 @@ class _AkunPageState
   }
 
   // ============================================================
-  // PERFORM LOGOUT
+  // PERFORM LOGOUT (PERBAIKAN: Gunakan AuthGate, bukan AuthPage)
   // ============================================================
 
   Future<void> _performLogout() async {
@@ -2280,40 +1468,21 @@ class _AkunPageState
       // HAPUS CACHE DATA USER LOKAL
       // --------------------------------------------------------
 
-      final prefs =
-          await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
-      await prefs.remove(
-        'username',
-      );
-
-      await prefs.remove(
-        'email',
-      );
-
-      await prefs.remove(
-        'nis',
-      );
-
-      await prefs.remove(
-        'phone',
-      );
-
-      await prefs.remove(
-        'address',
-      );
-
-      await prefs.remove(
-        'profileImagePath',
-      );
+      await prefs.remove('username');
+      await prefs.remove('email');
+      await prefs.remove('nis');
+      await prefs.remove('phone');
+      await prefs.remove('address');
+      await prefs.remove('profileImagePath');
 
       // --------------------------------------------------------
       // GOOGLE LOGOUT
       // --------------------------------------------------------
 
       try {
-        await GoogleSignIn.instance
-            .signOut();
+        await GoogleSignIn.instance.signOut();
       } catch (_) {}
 
       // --------------------------------------------------------
@@ -2325,32 +1494,24 @@ class _AkunPageState
       if (!mounted) return;
 
       // --------------------------------------------------------
-      // KEMBALI KE AUTH PAGE
+      // KEMBALI KE AUTHGATE (bukan AuthPage)
+      // AuthGate akan listen authStateChanges dan otomatis
+      // navigasi ke dashboard setelah login berhasil
       // --------------------------------------------------------
 
-      Navigator.of(
-        context,
-        rootNavigator: true,
-      ).pushAndRemoveUntil(
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) =>
-              const AuthPage(),
+          builder: (_) => const AuthGate(),
         ),
         (route) => false,
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text(
-            'Gagal logout: $e',
-          ),
-          behavior:
-              SnackBarBehavior.floating,
+          content: Text('Gagal logout: $e'),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }

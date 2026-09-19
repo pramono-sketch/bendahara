@@ -6,7 +6,7 @@ import '../features/settings.dart';
 import '../features/tambahkan.dart';
 import '../features/ai_assistant.dart';
 import '../features/database_akun.dart';
-// import '../features/log_aktivitas.dart';
+import '../features/log_aktivitas.dart';
 import '../features/statistik.dart';
 import '../features/tagihan.dart';
 import '../features/gaji_guru.dart';
@@ -60,11 +60,11 @@ class _MorePageState extends ConsumerState<MorePage> {
         'icon': Icons.vpn_key,
         'page': const DatabaseAkunPage(),
       },
-      // {
-      //   'title': translations.t('activity_log'),
-      //   'icon': Icons.history,
-      //   'page': const LogAktivitasPage(),
-      // },
+      {
+        'title': translations.t('activity_log'),
+        'icon': Icons.history,
+        'page': const LogAktivitasPage(),
+      },
     ];
 
     final List<Map<String, dynamic>> lainnyaItems = [
@@ -73,11 +73,11 @@ class _MorePageState extends ConsumerState<MorePage> {
         'icon': Icons.auto_awesome,
         'page': const AIAssistantPage(),
       },
-      {
-        'title': translations.t('animation_gallery'),
-        'icon': Icons.animation,
-        'page': const LottieAnimationGallery(),
-      },
+      // {
+      //   'title': translations.t('animation_gallery'),
+      //   'icon': Icons.animation,
+      //   'page': const LottieAnimationGallery(),
+      // },
       {
         'title': translations.t('auth'),
         'icon': Icons.account_circle,

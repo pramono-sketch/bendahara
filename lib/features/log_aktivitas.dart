@@ -1,44 +1,64 @@
-// features/log_aktivitas.dart
+// lib/features/log_aktivitas.dart
+import 'dart:ui';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/appearance.dart';
 import '../data.dart';
+import '../helpers/scroll_reveal.dart';
+import '../helpers/sound_helper.dart';
+import '../helpers/theme_helper.dart';
+import '../l10n/translations.dart';
 
-/// Halaman untuk menampilkan log aktivitas dari Firebase dengan filter dan pencarian.
-class LogAktivitasPage extends StatefulWidget {
+/// Menampilkan seluruh riwayat aktivitas yang tersimpan di Firestore.
+/// Collection canonical: log_aktivitas.
+class LogAktivitasPage extends ConsumerStatefulWidget {
   const LogAktivitasPage({super.key});
 
   @override
-  State<LogAktivitasPage> createState() => _LogAktivitasPageState();
+  ConsumerState<LogAktivitasPage> createState() => _LogAktivitasPageState();
 }
 
-class _LogAktivitasPageState extends State<LogAktivitasPage> {
-  // Filter kategori
-  String _selectedFilter = 'Semua';
-  final List<String> _filterOptions = [
-    'Semua',
-    'Siswa',
-    'Transaksi',
-    'Akun Digital',
-    'Pembayaran',
-    'Login/Logout',
+class _LogAktivitasPageState extends ConsumerState<LogAktivitasPage> {
+  // Filter disimpan sebagai key (bukan label localized)
+  // supaya pencarian & kategori konsisten lintas bahasa.
+  String _selectedFilterKey = 'all';
+
+  final List<String> _filterKeys = [
+    'all',
+    'students',
+    'transactions',
+    'digital_account',
+    'payment',
+    // 'login_logout',
+    'system',
   ];
 
-  // Query pencarian
   String _searchQuery = '';
 
-  /// Stream data log aktivitas dari Firestore (diurutkan dari yang terbaru)
-  Stream<QuerySnapshot> _getLogStream() {
+  Stream<QuerySnapshot<Map<String, dynamic>>> _getLogStream() {
+    // Tidak memakai limit agar halaman benar-benar merekap seluruh log.
     return FirebaseFirestore.instance
         .collection('log_aktivitas')
         .orderBy('timestamp', descending: true)
-        .limit(500) // Batasi 500 log terakhir agar tidak berat
         .snapshots();
   }
 
-  /// Menentukan warna berdasarkan action.
-  Color _logColor(ActivityAction action) {
+  // ============================================================
+  // SOUND
+  // ============================================================
+
+  void _playClick() {
+    SoundHelper().playClick();
+  }
+
+  // ============================================================
+  // COLOR BY ACTION
+  // ============================================================
+
+  Color _logColor(ActivityAction action, Color accentColor) {
     switch (action) {
       case ActivityAction.tambah:
         return AppColors.success;
@@ -47,339 +67,616 @@ class _LogAktivitasPageState extends State<LogAktivitasPage> {
       case ActivityAction.hapus:
         return AppColors.error;
       case ActivityAction.login:
-        return AppColors.primary;
+        return accentColor;
       case ActivityAction.logout:
         return AppColors.textSecondary;
       case ActivityAction.bayar:
-        return AppColors.primary;
+        return accentColor;
     }
   }
 
-  /// Mendapatkan label kategori untuk sebuah log.
-  String _getCategoryLabel(ActivityLog log) {
+  // ============================================================
+  // CATEGORY KEY (lintas bahasa)
+  // ============================================================
+
+  String _getCategoryKey(ActivityLog log) {
     final detail = log.detail.toLowerCase();
     final action = log.action;
-    
-    if (action == ActivityAction.bayar) return 'Pembayaran';
+
+    if (action == ActivityAction.bayar) {
+      return 'payment';
+    }
+
     if (action == ActivityAction.login || action == ActivityAction.logout) {
-      return 'Login/Logout';
+      return 'login_logout';
     }
-    if (detail.contains('siswa') || detail.contains('siswa baru')) {
-      return 'Siswa';
+
+    if (detail.contains('siswa') ||
+        detail.contains('guru') ||
+        detail.contains('kenaikan kelas') ||
+        detail.contains('arsip siswa')) {
+      return 'students';
     }
-    if (detail.contains('pemasukan') || detail.contains('pengeluaran') ||
-        detail.contains('transaksi')) {
-      return 'Transaksi';
+
+    if (detail.contains('pemasukan') ||
+        detail.contains('pengeluaran') ||
+        detail.contains('transaksi') ||
+        detail.contains('arsip transaksi')) {
+      return 'transactions';
     }
-    if (detail.contains('akun digital') || detail.contains('akun') ||
-        detail.contains('password')) {
-      return 'Akun Digital';
+
+    if (detail.contains('akun digital') ||
+        detail.contains('akun pengguna') ||
+        detail.contains('akun')) {
+      return 'digital_account';
     }
-    return 'Lainnya';
+
+    if (detail.contains('pembayaran') ||
+        detail.contains('spp') ||
+        detail.contains('gedung')) {
+      return 'payment';
+    }
+
+    return 'system';
   }
 
-  /// Cek apakah log cocok dengan filter kategori yang dipilih
-  bool _matchesFilter(ActivityLog log) {
-    if (_selectedFilter == 'Semua') return true;
-
-    final detail = log.detail.toLowerCase();
-    final action = log.action;
-
-    switch (_selectedFilter) {
-      case 'Siswa':
-        return detail.contains('siswa') ||
-            detail.contains('siswa baru') ||
-            detail.contains('edit data siswa') ||
-            detail.contains('hapus siswa');
-      case 'Transaksi':
-        return detail.contains('pemasukan') ||
-            detail.contains('pengeluaran') ||
-            detail.contains('transaksi');
-      case 'Akun Digital':
-        return detail.contains('akun digital') ||
-            detail.contains('akun') ||
-            detail.contains('google') ||
-            detail.contains('zoom') ||
-            detail.contains('password');
-      case 'Pembayaran':
-        return action == ActivityAction.bayar ||
-            detail.contains('pembayaran') ||
-            detail.contains('spp') ||
-            detail.contains('gedung');
-      case 'Login/Logout':
-        return action == ActivityAction.login ||
-            action == ActivityAction.logout;
+  String _categoryLabel(String key, Translations t) {
+    switch (key) {
+      case 'all':
+        return t.t('cat_all');
+      case 'students':
+        return t.t('cat_students');
+      case 'transactions':
+        return t.t('cat_transactions');
+      case 'digital_account':
+        return t.t('cat_digital_account');
+      case 'payment':
+        return t.t('cat_payment');
+      case 'login_logout':
+        return t.t('cat_login_logout');
+      case 'system':
+        return t.t('cat_system');
       default:
-        return true;
+        return key;
     }
   }
 
-  /// Cek apakah log cocok dengan query pencarian
-  bool _matchesSearch(ActivityLog log) {
+  bool _matchesFilter(ActivityLog log) {
+    if (_selectedFilterKey == 'all') return true;
+    return _getCategoryKey(log) == _selectedFilterKey;
+  }
+
+  bool _matchesSearch(ActivityLog log, Translations t) {
     if (_searchQuery.isEmpty) return true;
 
-    final query = _searchQuery.toLowerCase();
+    final query = _searchQuery.toLowerCase().trim();
+
+    final categoryLabel =
+        _categoryLabel(_getCategoryKey(log), t).toLowerCase();
+
     return log.user.toLowerCase().contains(query) ||
         log.actionText.toLowerCase().contains(query) ||
-        log.detail.toLowerCase().contains(query);
+        log.detail.toLowerCase().contains(query) ||
+        categoryLabel.contains(query);
   }
 
-  /// Format timestamp menjadi string yang rapi.
-  String _formatTimestamp(DateTime timestamp) {
+  // ============================================================
+  // TIMESTAMP
+  // ============================================================
+
+  String _formatTimestamp(DateTime timestamp, Translations t) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
 
-    if (difference.inDays > 7) {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} hari yang lalu';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} jam yang lalu';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} menit yang lalu';
-    } else {
-      return 'Baru saja';
+    if (difference.isNegative) {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year} '
+          '${timestamp.hour.toString().padLeft(2, '0')}:'
+          '${timestamp.minute.toString().padLeft(2, '0')}';
     }
+
+    if (difference.inDays > 7) {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year} '
+          '${timestamp.hour.toString().padLeft(2, '0')}:'
+          '${timestamp.minute.toString().padLeft(2, '0')}';
+    }
+
+    if (difference.inDays > 0) {
+      return t
+          .t('days_ago')
+          .replaceAll('{days}', '${difference.inDays}');
+    }
+
+    if (difference.inHours > 0) {
+      return t
+          .t('hours_ago')
+          .replaceAll('{hours}', '${difference.inHours}');
+    }
+
+    if (difference.inMinutes > 0) {
+      return t
+          .t('minutes_ago')
+          .replaceAll('{minutes}', '${difference.inMinutes}');
+    }
+
+    return t.t('just_now');
   }
+
+  // ============================================================
+  // HELPERS FOR TEXT COLOR BY THEME
+  // ============================================================
+
+  Color _primaryTextColor(AppThemeMode themeMode, ColorScheme colors) {
+    if (ThemeHelper.isGlass(themeMode)) return AppColors.glassTextPrimary;
+    if (ThemeHelper.isAurora(themeMode)) return AppColors.auroraTextPrimary;
+    if (ThemeHelper.isCyber(themeMode)) return AppColors.cyberTextPrimary;
+    return colors.onSurface;
+  }
+
+  Color _secondaryTextColor(AppThemeMode themeMode) {
+    if (ThemeHelper.isGlass(themeMode)) return AppColors.glassTextSecondary;
+    if (ThemeHelper.isAurora(themeMode)) return AppColors.auroraTextSecondary;
+    if (ThemeHelper.isCyber(themeMode)) return AppColors.cyberTextSecondary;
+    return AppColors.textSecondary;
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Log Aktivitas'),
-      ),
-      body: Column(
-        children: [
-          // Filter dan pencarian
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              children: [
-                // Dropdown filter
-                Row(
-                  children: [
-                    const Text('Kategori: '),
-                    Expanded(
-                      child: DropdownButton<String>(
-                        value: _selectedFilter,
-                        isExpanded: true,
-                        items: _filterOptions.map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              _selectedFilter = newValue;
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Search field
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Cari log...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
-                ),
-              ],
-            ),
+    final themeMode = ref.watch(themeModeProvider);
+    final translations = ref.watch(translationsProvider);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final accentColor = ThemeHelper.getAccentColor(themeMode, colors);
+
+    return ThemeHelper.buildThemedBackground(
+      themeMode,
+      Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              _playClick();
+              Navigator.pop(context);
+            },
           ),
-          const Divider(height: 1),
-          
-          // Daftar log dari Firebase
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _getLogStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Terjadi error: ${snapshot.error}'),
-                  );
-                }
-
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Belum ada log aktivitas',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                }
-
-                // Parse semua dokumen Firestore menjadi list ActivityLog
-                List<ActivityLog> allLogs = snapshot.data!.docs.map((doc) {
-                  return ActivityLog.fromMap(doc.data() as Map<String, dynamic>);
-                }).toList();
-
-                // Terapkan filter dan pencarian secara lokal
-                List<ActivityLog> filteredLogs = allLogs.where((log) {
-                  return _matchesFilter(log) && _matchesSearch(log);
-                }).toList();
-
-                if (filteredLogs.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Tidak ada log yang sesuai',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    // Jumlah log
+          title: Text(translations.t('log_activity_title')),
+        ),
+        body: Column(
+          children: [
+            // ==================================================
+            // FILTER + SEARCH (THEMED SECTION GROUP)
+            // ==================================================
+            ScrollReveal(
+              delay: const Duration(milliseconds: 50),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: ThemeHelper.buildSectionGroup(
+                  themeMode,
+                  [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
                       child: Row(
                         children: [
+                          Icon(
+                            Icons.filter_list_outlined,
+                            color: accentColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
                           Text(
-                            'Menampilkan ${filteredLogs.length} log',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
+                            translations.t('category'),
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const Spacer(),
+                          DropdownButton<String>(
+                            value: _selectedFilterKey,
+                            underline: const SizedBox(),
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
+                            items: _filterKeys.map((key) {
+                              return DropdownMenuItem<String>(
+                                value: key,
+                                child: Text(_categoryLabel(key, translations)),
+                              );
+                            }).toList(),
+                            onChanged: (newValue) {
+                              if (newValue == null) return;
+                              _playClick();
+                              setState(() {
+                                _selectedFilterKey = newValue;
+                              });
+                            },
                           ),
                         ],
                       ),
                     ),
-                    // List View
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: filteredLogs.length,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemBuilder: (context, index) {
-                          final log = filteredLogs[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor:
-                                    _logColor(log.action).withOpacity(0.15),
-                                child: Icon(
-                                  log.actionIcon,
-                                  color: _logColor(log.action),
-                                  size: 22,
-                                ),
-                              ),
-                              title: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      log.actionText,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  // Label kategori
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _logColor(log.action).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _logColor(log.action).withOpacity(0.3),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      _getCategoryLabel(log),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: _logColor(log.action),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  Text(log.detail),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.person_outline,
-                                        size: 12,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        log.user,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Icon(
-                                        Icons.access_time,
-                                        size: 12,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _formatTimestamp(log.timestamp),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              isThreeLine: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                            ),
-                          );
+                    Divider(
+                      height: 1,
+                      color: ThemeHelper.dividerColor(themeMode),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: translations.t('search_activity_hint'),
+                          prefixIcon: const Icon(Icons.search),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
                         },
                       ),
                     ),
                   ],
-                );
-              },
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            // ==================================================
+            // STREAM BUILDER
+            // ==================================================
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _getLogStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          '${translations.t('log_read_error')}:\n${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _secondaryTextColor(themeMode),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        translations.t('no_activity_logs'),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: _secondaryTextColor(themeMode),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final allLogs = snapshot.data!.docs
+                      .map((doc) => ActivityLog.fromMap(doc.data()))
+                      .toList();
+
+                  final filteredLogs = allLogs.where((log) {
+                    return _matchesFilter(log) &&
+                        _matchesSearch(log, translations);
+                  }).toList();
+
+                  if (filteredLogs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        translations.t('no_matching_logs'),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: _secondaryTextColor(themeMode),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final countText = translations
+                      .t('showing_count')
+                      .replaceAll('{shown}', '${filteredLogs.length}')
+                      .replaceAll('{total}', '${allLogs.length}');
+
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            countText,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: _secondaryTextColor(themeMode),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: filteredLogs.length,
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                          itemBuilder: (context, index) {
+                            final log = filteredLogs[index];
+                            final logColor = _logColor(log.action, accentColor);
+                            final catKey = _getCategoryKey(log);
+                            final catLabel =
+                                _categoryLabel(catKey, translations);
+
+                            // Stagger reveal per item (capped).
+                            final delay = Duration(
+                              milliseconds: 80 + (index.clamp(0, 8) * 40),
+                            );
+
+                            return ScrollReveal(
+                              delay: delay,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 6,
+                                ),
+                                child: _buildLogCard(
+                                  log: log,
+                                  logColor: logColor,
+                                  categoryLabel: catLabel,
+                                  themeMode: themeMode,
+                                  translations: translations,
+                                  theme: theme,
+                                  colors: colors,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // LOG CARD (PER-THEME)
+  // ============================================================
+
+  Widget _buildLogCard({
+    required ActivityLog log,
+    required Color logColor,
+    required String categoryLabel,
+    required AppThemeMode themeMode,
+    required Translations translations,
+    required ThemeData theme,
+    required ColorScheme colors,
+  }) {
+    if (ThemeHelper.isNeo(themeMode)) {
+      return Container(
+        decoration: neumorphismDecoration(
+          borderRadius: 18,
+          isPressed: false,
+        ),
+        child: _buildCardContent(
+          log: log,
+          logColor: logColor,
+          categoryLabel: categoryLabel,
+          themeMode: themeMode,
+          translations: translations,
+          theme: theme,
+          colors: colors,
+        ),
+      );
+    }
+
+    if (ThemeHelper.isGlass(themeMode)) {
+      return Container(
+        decoration: glassmorphismDecoration(borderRadius: 18),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: _buildCardContent(
+              log: log,
+              logColor: logColor,
+              categoryLabel: categoryLabel,
+              themeMode: themeMode,
+              translations: translations,
+              theme: theme,
+              colors: colors,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (ThemeHelper.isModern(themeMode)) {
+      return Container(
+        decoration: modernDecoration(borderRadius: 18),
+        child: _buildCardContent(
+          log: log,
+          logColor: logColor,
+          categoryLabel: categoryLabel,
+          themeMode: themeMode,
+          translations: translations,
+          theme: theme,
+          colors: colors,
+        ),
+      );
+    }
+
+    if (ThemeHelper.isAurora(themeMode)) {
+      return Container(
+        decoration: auroraDecoration(borderRadius: 18),
+        child: _buildCardContent(
+          log: log,
+          logColor: logColor,
+          categoryLabel: categoryLabel,
+          themeMode: themeMode,
+          translations: translations,
+          theme: theme,
+          colors: colors,
+        ),
+      );
+    }
+
+    if (ThemeHelper.isCyber(themeMode)) {
+      return Container(
+        decoration: cyberpunkDecoration(borderRadius: 10),
+        child: _buildCardContent(
+          log: log,
+          logColor: logColor,
+          categoryLabel: categoryLabel,
+          themeMode: themeMode,
+          translations: translations,
+          theme: theme,
+          colors: colors,
+        ),
+      );
+    }
+
+    // Default Material
+    return Card(
+      margin: EdgeInsets.zero,
+      child: _buildCardContent(
+        log: log,
+        logColor: logColor,
+        categoryLabel: categoryLabel,
+        themeMode: themeMode,
+        translations: translations,
+        theme: theme,
+        colors: colors,
+      ),
+    );
+  }
+
+  // ============================================================
+  // LOG CARD CONTENT
+  // ============================================================
+
+  Widget _buildCardContent({
+    required ActivityLog log,
+    required Color logColor,
+    required String categoryLabel,
+    required AppThemeMode themeMode,
+    required Translations translations,
+    required ThemeData theme,
+    required ColorScheme colors,
+  }) {
+    final textPrimary = _primaryTextColor(themeMode, colors);
+    final textSecondary = _secondaryTextColor(themeMode);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Leading avatar
+          CircleAvatar(
+            backgroundColor: logColor.withValues(alpha: 0.15),
+            child: Icon(
+              log.actionIcon,
+              color: logColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title + category badge
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        log.actionText,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: logColor.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: logColor.withValues(alpha: 0.30),
+                        ),
+                      ),
+                      child: Text(
+                        categoryLabel,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: logColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  log.detail,
+                  style: TextStyle(fontSize: 13, color: textSecondary),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_outline,
+                            size: 12, color: textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          log.user,
+                          style: TextStyle(
+                              fontSize: 12, color: textSecondary),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time,
+                            size: 12, color: textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatTimestamp(log.timestamp, translations),
+                          style: TextStyle(
+                              fontSize: 12, color: textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
