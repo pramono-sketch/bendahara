@@ -1,18 +1,21 @@
 import 'dart:math';
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ================== ACTIVITY LOGGING ==================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+// ============================================================
+// ACTIVITY LOGGING
+// ============================================================
 
 /// Semua activity log aplikasi disimpan di collection ini.
-/// Jangan menyimpan password, API key, token, atau data rahasia ke log.
-final activityLogsCollection =
-    FirebaseFirestore.instance.collection('log_aktivitas');
+///
+/// Jangan menyimpan password, API key, token, atau data rahasia
+/// ke dalam log.
+final activityLogsCollection = FirebaseFirestore.instance.collection(
+  'log_aktivitas',
+);
 
 /// Menulis activity log secara terpusat.
-///
-/// Fungsi ini sengaja tidak melempar error ke caller agar kegagalan
-/// pencatatan log tidak membuat operasi utama aplikasi ikut gagal.
 Future<void> recordActivityLog({
   String user = 'Admin',
   required ActivityAction action,
@@ -26,8 +29,7 @@ Future<void> recordActivityLog({
     timestamp: timestamp ?? DateTime.now(),
   );
 
-  // Hindari duplikasi ketika caller lama masih menulis log manual
-  // untuk operasi yang sekarang sudah dicatat otomatis.
+  // Hindari duplikasi log lokal.
   final duplicate = localLogs.any(
     (existing) =>
         existing.user == log.user &&
@@ -65,10 +67,7 @@ Future<void> logLogout({String user = 'Admin'}) async {
   );
 }
 
-Future<void> logPayment({
-  String user = 'Admin',
-  required String detail,
-}) async {
+Future<void> logPayment({String user = 'Admin', required String detail}) async {
   await recordActivityLog(
     user: user,
     action: ActivityAction.bayar,
@@ -76,7 +75,10 @@ Future<void> logPayment({
   );
 }
 
-// ================== MODEL AKUN DIGITAL (GURU & SISWA) ==================
+// ============================================================
+// MODEL AKUN DIGITAL
+// ============================================================
+
 class AkunDigital {
   final String id;
   String name;
@@ -101,57 +103,60 @@ class AkunDigital {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'namaSiswa': namaSiswa,
-        'email': email,
-        'penanggungJawab': penanggungJawab,
-        'password': password,
-        'keterangan': keterangan,
-        'category': category,
-        'kelas': kelas,
-      };
+    'id': id,
+    'name': name,
+    'namaSiswa': namaSiswa,
+    'email': email,
+    'penanggungJawab': penanggungJawab,
+    'password': password,
+    'keterangan': keterangan,
+    'category': category,
+    'kelas': kelas,
+  };
 
   factory AkunDigital.fromJson(Map<String, dynamic> json) => AkunDigital(
-        id: json['id'] ?? '',
-        name: json['name'] ?? '',
-        namaSiswa: json['namaSiswa'],
-        email: json['email'] ?? '',
-        penanggungJawab: json['penanggungJawab'] ?? '',
-        password: json['password'] ?? '',
-        keterangan: json['keterangan'] ?? '',
-        category: json['category'] ?? '',
-        kelas: json['kelas'],
-      );
+    id: json['id']?.toString() ?? '',
+    name: json['name']?.toString() ?? '',
+    namaSiswa: json['namaSiswa']?.toString(),
+    email: json['email']?.toString() ?? '',
+    penanggungJawab: json['penanggungJawab']?.toString() ?? '',
+    password: json['password']?.toString() ?? '',
+    keterangan: json['keterangan']?.toString() ?? '',
+    category: json['category']?.toString() ?? '',
+    kelas: json['kelas']?.toString(),
+  );
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'namaSiswa': namaSiswa,
-        'email': email,
-        'penanggungJawab': penanggungJawab,
-        'password': password,
-        'keterangan': keterangan,
-        'category': category,
-        'kelas': kelas,
-      };
+    'id': id,
+    'name': name,
+    'namaSiswa': namaSiswa,
+    'email': email,
+    'penanggungJawab': penanggungJawab,
+    'password': password,
+    'keterangan': keterangan,
+    'category': category,
+    'kelas': kelas,
+  };
 
   static AkunDigital fromMap(Map<String, dynamic> map) {
     return AkunDigital(
-      id: map['id'] ?? '',
-      name: map['name'] ?? '',
-      namaSiswa: map['namaSiswa'],
-      email: map['email'] ?? '',
-      penanggungJawab: map['penanggungJawab'] ?? '',
-      password: map['password'] ?? '',
-      keterangan: map['keterangan'] ?? '',
-      category: map['category'] ?? '',
-      kelas: map['kelas'],
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      namaSiswa: map['namaSiswa']?.toString(),
+      email: map['email']?.toString() ?? '',
+      penanggungJawab: map['penanggungJawab']?.toString() ?? '',
+      password: map['password']?.toString() ?? '',
+      keterangan: map['keterangan']?.toString() ?? '',
+      category: map['category']?.toString() ?? '',
+      kelas: map['kelas']?.toString(),
     );
   }
 }
 
-// ================== MODEL DATA LAINNYA ==================
+// ============================================================
+// SISTEM PEMBAYARAN
+// ============================================================
+
 enum PaymentStatus { lunas, belumBayar, sebagian }
 
 class PaymentItem {
@@ -169,47 +174,138 @@ class PaymentItem {
     this.lastPaymentDate,
   });
 
+  static const Object _unset = Object();
+
   PaymentItem copyWith({
     String? type,
     double? amount,
     PaymentStatus? status,
     double? paidAmount,
-    DateTime? lastPaymentDate,
+    Object? lastPaymentDate = _unset,
   }) {
+    final DateTime? resolvedLastPaymentDate = identical(lastPaymentDate, _unset)
+        ? this.lastPaymentDate
+        : lastPaymentDate as DateTime?;
+
     return PaymentItem(
       type: type ?? this.type,
       amount: amount ?? this.amount,
       status: status ?? this.status,
       paidAmount: paidAmount ?? this.paidAmount,
-      lastPaymentDate: lastPaymentDate ?? this.lastPaymentDate,
+      lastPaymentDate: resolvedLastPaymentDate,
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'type': type,
-        'amount': amount,
-        'status': status.index,
-        'paidAmount': paidAmount,
-        'lastPaymentDate': lastPaymentDate?.toIso8601String(),
-      };
+    'type': type,
+    'amount': amount,
+    'status': status.index,
+    'paidAmount': paidAmount,
+    'lastPaymentDate': lastPaymentDate?.toIso8601String(),
+  };
 
   static PaymentItem fromMap(Map<String, dynamic> map) {
     final rawStatus = map['status'];
-    final statusIndex = rawStatus is int
-        ? rawStatus.clamp(0, PaymentStatus.values.length - 1).toInt()
+
+    final int statusIndex = rawStatus is num
+        ? rawStatus.toInt().clamp(0, PaymentStatus.values.length - 1).toInt()
         : 0;
 
+    final rawAmount = map['amount'];
+    final rawPaidAmount = map['paidAmount'];
+
     return PaymentItem(
-      type: map['type'] ?? '',
-      amount: (map['amount'] ?? 0).toDouble(),
+      type: map['type']?.toString() ?? '',
+      amount: rawAmount is num ? rawAmount.toDouble() : 0,
       status: PaymentStatus.values[statusIndex],
-      paidAmount: (map['paidAmount'] ?? 0).toDouble(),
+      paidAmount: rawPaidAmount is num ? rawPaidAmount.toDouble() : 0,
       lastPaymentDate: map['lastPaymentDate'] != null
           ? DateTime.tryParse(map['lastPaymentDate'].toString())
           : null,
     );
   }
 }
+
+// ============================================================
+// CACHE TEMPLATE PEMBAYARAN
+// ============================================================
+
+final Map<String, List<PaymentItem>> paymentTemplatesByGrade = {};
+
+/// Alias kompatibilitas.
+Map<String, List<PaymentItem>> get paymentTemplatesByClass =>
+    paymentTemplatesByGrade;
+
+// ============================================================
+// TINGKAT DAN JURUSAN
+// ============================================================
+
+const List<String> gradeLevels = ['X', 'XI', 'XII'];
+
+const List<String> majors = ['TKJ', 'RPL', 'TKR'];
+
+// ============================================================
+// HELPER TINGKAT PEMBAYARAN
+// ============================================================
+
+String paymentGradeFromClass(String kelas) {
+  final normalized = kelas.trim().toUpperCase();
+
+  if (normalized == 'X' || normalized.startsWith('X ')) {
+    return 'X';
+  }
+
+  if (normalized == 'XI' || normalized.startsWith('XI ')) {
+    return 'XI';
+  }
+
+  if (normalized == 'XII' || normalized.startsWith('XII ')) {
+    return 'XII';
+  }
+
+  return normalized.split(RegExp(r'\s+')).first;
+}
+
+// ============================================================
+// DAFTAR KELAS SISWA
+// ============================================================
+
+List<String> getAllClassNames() {
+  return [
+    for (final grade in gradeLevels)
+      for (final major in majors) '$grade $major',
+  ];
+}
+
+// ============================================================
+// MEMBACA TEMPLATE PEMBAYARAN
+// ============================================================
+
+List<PaymentItem> getConfiguredPaymentsForClass(String kelas) {
+  final grade = paymentGradeFromClass(kelas);
+
+  final list = paymentTemplatesByGrade[grade] ?? [];
+
+  return list
+      .map(
+        (p) => PaymentItem(
+          type: p.type,
+          amount: p.amount,
+          status: PaymentStatus.belumBayar,
+          paidAmount: 0,
+          lastPaymentDate: null,
+        ),
+      )
+      .toList();
+}
+
+List<PaymentItem> getDefaultPaymentsForClass(String kelas) {
+  return getConfiguredPaymentsForClass(kelas);
+}
+
+// ============================================================
+// STUDENT MODEL
+// ============================================================
 
 class Student {
   String id;
@@ -232,46 +328,162 @@ class Student {
     this.isActive = true,
   });
 
-  double get totalDue => payments.fold(0, (sum, p) => sum + p.amount);
+  double get totalDue {
+    return payments.fold(0, (sum, p) => sum + p.amount);
+  }
 
-  double get totalPaid => payments.fold(0, (sum, p) {
-        if (p.status == PaymentStatus.lunas) return sum + p.amount;
-        if (p.status == PaymentStatus.sebagian) return sum + p.paidAmount;
-        return sum;
-      });
+  double get totalPaid {
+    return payments.fold<double>(0, (sum, p) {
+      if (p.status == PaymentStatus.lunas) {
+        return sum + p.amount;
+      }
 
-  double get remaining => totalDue - totalPaid;
+      if (p.status == PaymentStatus.sebagian) {
+        return sum + p.paidAmount;
+      }
 
-  bool get hasOutstanding =>
-      payments.any((p) => p.status != PaymentStatus.lunas);
+      return sum;
+    });
+  }
+
+  double get remaining {
+    return totalDue - totalPaid;
+  }
+
+  bool get hasOutstanding {
+    return payments.any((p) => p.status != PaymentStatus.lunas);
+  }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'nis': nis,
-        'kelas': kelas,
-        'alamat': alamat,
-        'phone': phone,
-        'isActive': isActive,
-        'payments': payments.map((p) => p.toMap()).toList(),
-      };
+    'id': id,
+    'name': name,
+    'nis': nis,
+    'kelas': kelas,
+    'alamat': alamat,
+    'phone': phone,
+    'isActive': isActive,
+    'payments': payments.map((p) => p.toMap()).toList(),
+  };
 
   static Student fromMap(Map<String, dynamic> map) {
+    final rawPayments = map['payments'];
+
     return Student(
-      id: map['id'] ?? '',
-      name: map['name'] ?? '',
-      nis: map['nis'] ?? '',
-      kelas: map['kelas'] ?? '',
-      alamat: map['alamat'] ?? '',
-      phone: map['phone'] ?? '',
-      payments: (map['payments'] as List<dynamic>?)
-              ?.map((e) => PaymentItem.fromMap(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      isActive: map['isActive'] ?? true,
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      nis: map['nis']?.toString() ?? '',
+      kelas: map['kelas']?.toString() ?? '',
+      alamat: map['alamat']?.toString() ?? '',
+      phone: map['phone']?.toString() ?? '',
+      payments: rawPayments is List
+          ? rawPayments
+                .whereType<Map>()
+                .map((e) => PaymentItem.fromMap(Map<String, dynamic>.from(e)))
+                .toList()
+          : [],
+      isActive: map['isActive'] is bool ? map['isActive'] as bool : true,
     );
   }
 }
+
+// ============================================================
+// CREATE STUDENT DENGAN TEMPLATE PEMBAYARAN
+// ============================================================
+
+Student createStudentWithPayments({
+  required String id,
+  required String name,
+  required String nis,
+  required String kelas,
+  required String alamat,
+  required String phone,
+}) {
+  final payments = getConfiguredPaymentsForClass(kelas);
+
+  return Student(
+    id: id,
+    name: name,
+    nis: nis,
+    kelas: kelas,
+    alamat: alamat,
+    phone: phone,
+    payments: payments,
+    isActive: true,
+  );
+}
+
+// ============================================================
+// [TAMBAHAN] SINKRONISASI PEMBAYARAN SISWA DENGAN KONFIGURASI
+// ============================================================
+//
+// Fungsi ini memastikan setiap siswa memiliki item pembayaran
+// yang sesuai dengan konfigurasi payment_management di Firebase.
+//
+// Aturan:
+// 1. Jenis pembayaran baru dari konfigurasi → ditambahkan sebagai belumBayar
+// 2. Jenis pembayaran yang sudah ada → status dipertahankan, amount diupdate
+// 3. Item 'Saldo' atau item lain di luar konfigurasi → tetap dipertahankan
+// ============================================================
+
+List<PaymentItem> syncStudentPaymentsWithConfig(
+  List<PaymentItem> studentPayments,
+  List<PaymentItem> configItems,
+) {
+  final result = <PaymentItem>[];
+  final configTypes = <String>{};
+
+  // 1. Tambahkan semua item dari konfigurasi
+  for (final config in configItems) {
+    final key = config.type.trim().toLowerCase();
+    configTypes.add(key);
+
+    // Cari item pembayaran yang sudah ada di siswa
+    PaymentItem? existing;
+    for (final p in studentPayments) {
+      if (p.type.trim().toLowerCase() == key) {
+        existing = p;
+        break;
+      }
+    }
+
+    if (existing != null) {
+      // Item sudah ada — pertahankan status pembayaran,
+      // tapi gunakan amount terbaru dari konfigurasi.
+      result.add(PaymentItem(
+        type: config.type,
+        amount: config.amount,
+        status: existing.status,
+        paidAmount: existing.paidAmount,
+        lastPaymentDate: existing.lastPaymentDate,
+      ));
+    } else {
+      // Item baru dari konfigurasi — tambahkan sebagai belum bayar.
+      result.add(PaymentItem(
+        type: config.type,
+        amount: config.amount,
+        status: PaymentStatus.belumBayar,
+        paidAmount: 0,
+        lastPaymentDate: null,
+      ));
+    }
+  }
+
+  // 2. Tambahkan item siswa yang TIDAK ada di konfigurasi
+  //    (misalnya 'Saldo' atau jenis pembayaran yang sudah dihapus
+  //    tapi siswa sudah membayar sebagian).
+  for (final p in studentPayments) {
+    final key = p.type.trim().toLowerCase();
+    if (!configTypes.contains(key)) {
+      result.add(p);
+    }
+  }
+
+  return result;
+}
+
+// ============================================================
+// TRANSACTION
+// ============================================================
 
 enum TransType { pemasukan, pengeluaran }
 
@@ -293,35 +505,43 @@ class Transaction {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'type': type.index,
-        'amount': amount,
-        'description': description,
-        'date': Timestamp.fromDate(date),
-        'category': category,
-      };
+    'id': id,
+    'type': type.index,
+    'amount': amount,
+    'description': description,
+    'date': Timestamp.fromDate(date),
+    'category': category,
+  };
 
   static Transaction fromMap(Map<String, dynamic> map) {
     final rawType = map['type'];
-    final typeIndex = rawType is int
-        ? rawType.clamp(0, TransType.values.length - 1).toInt()
+
+    final int typeIndex = rawType is num
+        ? rawType.toInt().clamp(0, TransType.values.length - 1).toInt()
         : 0;
 
     final rawDate = map['date'];
-    final date = rawDate is Timestamp
+
+    final DateTime date = rawDate is Timestamp
         ? rawDate.toDate()
         : DateTime.tryParse(rawDate?.toString() ?? '') ?? DateTime.now();
 
+    final rawAmount = map['amount'];
+
     return Transaction(
-      id: map['id'] ?? '',
+      id: map['id']?.toString() ?? '',
       type: TransType.values[typeIndex],
-      amount: (map['amount'] ?? 0).toDouble(),
-      description: map['description'] ?? '',
+      amount: rawAmount is num ? rawAmount.toDouble() : 0,
+      description: map['description']?.toString() ?? '',
       date: date,
-      category: map['category'] ?? '',
+      category: map['category']?.toString() ?? '',
     );
   }
 }
+
+// ============================================================
+// ACTIVITY LOG MODEL
+// ============================================================
 
 enum ActivityAction { tambah, edit, hapus, login, logout, bayar }
 
@@ -373,40 +593,46 @@ class ActivityLog {
   }
 
   Map<String, dynamic> toMap() => {
-        'user': user,
-        'action': action.index,
-        'detail': detail,
-        'timestamp': Timestamp.fromDate(timestamp),
-      };
+    'user': user,
+    'action': action.index,
+    'detail': detail,
+    'timestamp': Timestamp.fromDate(timestamp),
+  };
 
   static ActivityLog fromMap(Map<String, dynamic> map) {
     final rawAction = map['action'];
-    final actionIndex = rawAction is int
-        ? rawAction.clamp(0, ActivityAction.values.length - 1).toInt()
+
+    final int actionIndex = rawAction is num
+        ? rawAction.toInt().clamp(0, ActivityAction.values.length - 1).toInt()
         : 0;
 
     final rawTimestamp = map['timestamp'];
-    final timestamp = rawTimestamp is Timestamp
+
+    final DateTime timestamp = rawTimestamp is Timestamp
         ? rawTimestamp.toDate()
-        : DateTime.tryParse(rawTimestamp?.toString() ?? '') ??
-            DateTime.now();
+        : DateTime.tryParse(rawTimestamp?.toString() ?? '') ?? DateTime.now();
 
     return ActivityLog(
-      user: map['user'] ?? '',
+      user: map['user']?.toString() ?? '',
       action: ActivityAction.values[actionIndex],
-      detail: map['detail'] ?? '',
+      detail: map['detail']?.toString() ?? '',
       timestamp: timestamp,
     );
   }
 }
 
-// ================== DATA TAMBAHAN SISWA (EXTRA INFO) ==================
+// ============================================================
+// DATA TAMBAHAN SISWA
+// ============================================================
+
 Map<String, Map<String, String>> extraInfo = {};
 
 String getExtraInfo(String id, String key) {
   if (!extraInfo.containsKey(id)) {
     final seed = int.tryParse(id.replaceAll('STD', '')) ?? 0;
+
     final random = Random(seed);
+
     final tempatLahir = [
       'Jakarta',
       'Bandung',
@@ -415,13 +641,17 @@ String getExtraInfo(String id, String key) {
       'Semarang',
       'Medan',
     ][random.nextInt(6)];
+
     final tanggalLahir = DateTime(
       2008 + random.nextInt(4),
       random.nextInt(12) + 1,
       random.nextInt(28) + 1,
     );
+
     final jenisKelamin = random.nextBool() ? 'Laki-laki' : 'Perempuan';
+
     final orangTua = 'Orang Tua ${seed + 1}';
+
     final agama = [
       'Islam',
       'Kristen',
@@ -444,9 +674,13 @@ String getExtraInfo(String id, String key) {
 }
 
 void setExtraInfo(String id, String key, String value) {
-  if (!extraInfo.containsKey(id)) getExtraInfo(id, key);
+  if (!extraInfo.containsKey(id)) {
+    getExtraInfo(id, key);
+  }
+
   if (extraInfo.containsKey(id)) {
     extraInfo[id]?[key] = value;
+
     unawaitedRecordActivity(
       action: ActivityAction.edit,
       detail: 'Mengedit informasi tambahan siswa $id: $key',
@@ -454,8 +688,12 @@ void setExtraInfo(String id, String key, String value) {
   }
 }
 
-// ================== SISTEM TRANSAKSI (Lokal) ==================
+// ============================================================
+// SISTEM TRANSAKSI LOKAL
+// ============================================================
+
 List<Transaction> localTransactions = [];
+
 Map<String, List<Transaction>> arsipTransaksi = {};
 
 void addIncomeTransaction(
@@ -463,12 +701,7 @@ void addIncomeTransaction(
   double amount, {
   String category = 'Pemasukan',
 }) {
-  _addTransaction(
-    TransType.pemasukan,
-    description,
-    amount,
-    category,
-  );
+  _addTransaction(TransType.pemasukan, description, amount, category);
 }
 
 void addExpenseTransaction(
@@ -476,12 +709,7 @@ void addExpenseTransaction(
   double amount, {
   String category = 'Pengeluaran',
 }) {
-  _addTransaction(
-    TransType.pengeluaran,
-    description,
-    amount,
-    category,
-  );
+  _addTransaction(TransType.pengeluaran, description, amount, category);
 }
 
 void _addTransaction(
@@ -490,12 +718,13 @@ void _addTransaction(
   double amount,
   String category,
 ) {
-  int nextId = localTransactions.length + 1;
+  final int nextId = localTransactions.length + 1;
+
   final transaction = Transaction(
     id: 'TRX${nextId.toString().padLeft(3, '0')}',
     type: type,
-    amount: amount,
     description: description,
+    amount: amount,
     date: DateTime.now(),
     category: category,
   );
@@ -510,13 +739,16 @@ void _addTransaction(
 
 void resetMonthlyTransactions() {
   final now = DateTime.now();
-  final monthKey =
-      '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+  final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
   if (localTransactions.isNotEmpty) {
     arsipTransaksi.putIfAbsent(monthKey, () => []);
+
     final count = localTransactions.length;
+
     arsipTransaksi[monthKey]!.addAll(localTransactions);
+
     localTransactions.clear();
 
     unawaitedRecordActivity(
@@ -531,7 +763,9 @@ void generateSampleTransactions() {
 
   for (int i = 1; i <= 6; i++) {
     final month = now.month - i;
+
     final year = now.year;
+
     int m = month;
     int y = year;
 
@@ -541,26 +775,27 @@ void generateSampleTransactions() {
     }
 
     final key = '$y-${m.toString().padLeft(2, '0')}';
+
     arsipTransaksi.putIfAbsent(key, () => []);
 
     final random = Random();
+
     final count = random.nextInt(5) + 3;
 
     for (int j = 0; j < count; j++) {
       final isIncome = random.nextBool();
-      final amount =
-          (random.nextDouble() * 3000000 + 500000).roundToDouble();
+
+      final amount = (random.nextDouble() * 3000000 + 500000).roundToDouble();
+
       final desc = isIncome
-          ? ['Pembayaran SPP', 'Bantuan', 'Sumbangan', 'Pendaftaran'][
-              random.nextInt(4)]
+          ? ['Pembayaran SPP', 'Bantuan', 'Sumbangan', 'Pendaftaran'][random
+                .nextInt(4)]
           : ['ATK', 'Listrik', 'Perbaikan', 'Honor'][random.nextInt(4)];
 
       arsipTransaksi[key]!.add(
         Transaction(
           id: 'TRX${j + 1}',
-          type: isIncome
-              ? TransType.pemasukan
-              : TransType.pengeluaran,
+          type: isIncome ? TransType.pemasukan : TransType.pengeluaran,
           amount: amount,
           description: '$desc (sample)',
           date: DateTime(y, m, random.nextInt(28) + 1),
@@ -571,116 +806,26 @@ void generateSampleTransactions() {
   }
 }
 
-// ================== DATA SISWA ==================
-const List<String> gradeLevels = ['X', 'XI', 'XII'];
-const List<String> majors = ['TKJ', 'RPL', 'TKR'];
-
-Map<String, List<PaymentItem>> defaultPaymentsByClass = {
-  'X': [
-    PaymentItem(type: 'SPP', amount: 200000),
-    PaymentItem(type: 'Gedung', amount: 5000000),
-    PaymentItem(type: 'Seragam', amount: 750000),
-    PaymentItem(type: 'Buku', amount: 300000),
-    PaymentItem(type: 'Study Tour', amount: 1500000),
-    PaymentItem(type: 'Lainnya', amount: 1000000),
-  ],
-  'XI': [
-    PaymentItem(type: 'SPP', amount: 200000),
-    PaymentItem(type: 'Gedung', amount: 5000000),
-    PaymentItem(type: 'Seragam', amount: 750000),
-    PaymentItem(type: 'Buku', amount: 300000),
-    PaymentItem(type: 'Study Tour', amount: 1500000),
-    PaymentItem(type: 'Lainnya', amount: 1000000),
-  ],
-  'XII': [
-    PaymentItem(type: 'SPP', amount: 200000),
-    PaymentItem(type: 'Gedung', amount: 5000000),
-    PaymentItem(type: 'Seragam', amount: 750000),
-    PaymentItem(type: 'Buku', amount: 300000),
-    PaymentItem(type: 'Study Tour', amount: 1500000),
-    PaymentItem(type: 'Lainnya', amount: 1000000),
-  ],
-};
-
-List<PaymentItem> getDefaultPaymentsForClass(String kelas) {
-  String grade = kelas.split(' ').first;
-
-  if (defaultPaymentsByClass.containsKey(grade)) {
-    return defaultPaymentsByClass[grade]!
-        .map(
-          (p) => PaymentItem(
-            type: p.type,
-            amount: p.amount,
-            status: PaymentStatus.belumBayar,
-            paidAmount: 0,
-          ),
-        )
-        .toList();
-  }
-
-  return [
-    PaymentItem(type: 'SPP', amount: 200000),
-    PaymentItem(type: 'Gedung', amount: 5000000),
-  ];
-}
-
-Student createStudentWithPayments({
-  required String id,
-  required String name,
-  required String nis,
-  required String kelas,
-  required String alamat,
-  required String phone,
-}) {
-  final payments = getDefaultPaymentsForClass(kelas);
-
-  return Student(
-    id: id,
-    name: name,
-    nis: nis,
-    kelas: kelas,
-    alamat: alamat,
-    phone: phone,
-    payments: payments,
-    isActive: true,
-  );
-}
+// ============================================================
+// SAMPLE STUDENTS
+// ============================================================
 
 List<Student> generateSampleStudents() {
-  List<Student> students = [];
+  final List<Student> students = [];
+
   int idCounter = 1;
   int nisCounter = 1;
 
-  for (var grade in gradeLevels) {
-    for (var major in majors) {
+  for (final grade in gradeLevels) {
+    for (final major in majors) {
       for (int i = 1; i <= 5; i++) {
         final String kelas = '$grade $major';
+
         final String name = 'Siswa $grade $major $i';
-        final String nis =
-            '2026${(nisCounter++).toString().padLeft(3, '0')}';
-        final String id =
-            'STD${(idCounter++).toString().padLeft(3, '0')}';
 
-        List<PaymentItem> payments =
-            getDefaultPaymentsForClass(kelas);
+        final String nis = '2026${(nisCounter++).toString().padLeft(3, '0')}';
 
-        for (int j = 0; j < payments.length; j++) {
-          if (j == 1 && idCounter % 3 == 0) {
-            payments[j].status = PaymentStatus.belumBayar;
-          } else if (j == 2 && idCounter % 4 == 0) {
-            payments[j].status = PaymentStatus.sebagian;
-          } else {
-            payments[j].status = PaymentStatus.lunas;
-          }
-
-          if (payments[j].status == PaymentStatus.lunas) {
-            payments[j].paidAmount = payments[j].amount;
-            payments[j].lastPaymentDate = DateTime(2026, 6, 10);
-          } else if (payments[j].status == PaymentStatus.sebagian) {
-            payments[j].paidAmount = 400000;
-            payments[j].lastPaymentDate = DateTime(2026, 3, 20);
-          }
-        }
+        final String id = 'STD${idCounter.toString().padLeft(3, '0')}';
 
         students.add(
           Student(
@@ -688,12 +833,14 @@ List<Student> generateSampleStudents() {
             name: name,
             nis: nis,
             kelas: kelas,
-            alamat: 'Jl. Merdeka No. $idCounter',
+            alamat: 'Jl. Merdeka No. ${idCounter + 1}',
             phone: '08123456${(700 + idCounter).toString()}',
-            payments: payments,
+            payments: [],
             isActive: true,
           ),
         );
+
+        idCounter++;
       }
     }
   }
@@ -701,35 +848,39 @@ List<Student> generateSampleStudents() {
   return students;
 }
 
-// ================== SISTEM ARSIP SISWA ==================
+// ============================================================
+// ARSIP SISWA LOKAL
+// ============================================================
+
 Map<String, Map<String, List<Student>>> arsipSiswa = {};
 
 void archiveGraduatedStudents(
   String tahunAjaran,
   List<Student> activeStudents,
 ) {
-  List<Student> graduated = activeStudents
-      .where(
-        (s) => s.kelas.startsWith('XII') && s.isActive,
-      )
+  final List<Student> graduated = activeStudents
+      .where((s) => s.kelas.startsWith('XII') && s.isActive)
       .toList();
 
-  if (graduated.isEmpty) return;
+  if (graduated.isEmpty) {
+    return;
+  }
 
-  Map<String, List<Student>> grouped = {};
-  for (var s in graduated) {
+  final Map<String, List<Student>> grouped = {};
+
+  for (final s in graduated) {
     grouped.putIfAbsent(s.kelas, () => []).add(s);
   }
 
   arsipSiswa.putIfAbsent(tahunAjaran, () => {});
 
-  for (var entry in grouped.entries) {
+  for (final entry in grouped.entries) {
     arsipSiswa[tahunAjaran]!
         .putIfAbsent(entry.key, () => [])
         .addAll(entry.value);
   }
 
-  for (var s in graduated) {
+  for (final s in graduated) {
     s.isActive = false;
   }
 
@@ -740,24 +891,30 @@ void archiveGraduatedStudents(
   );
 }
 
+// ============================================================
+// NAIK KELAS LOKAL
+// ============================================================
+
 void processClassPromotion(List<Student> students) {
   int promotedCount = 0;
 
-  for (var s in students) {
-    if (!s.isActive) continue;
+  for (final s in students) {
+    if (!s.isActive) {
+      continue;
+    }
 
     if (s.kelas.startsWith('XI')) {
       s.kelas = s.kelas.replaceFirst('XI', 'XII');
+
       promotedCount++;
-    } else if (s.kelas.startsWith('X')) {
-      s.kelas = s.kelas.replaceFirst('X', 'XI');
+    } else if (s.kelas.startsWith('X ')) {
+      s.kelas = s.kelas.replaceFirst('X ', 'XI ');
+
       promotedCount++;
     }
   }
 
   if (promotedCount > 0) {
-    // Fungsi ini adalah operasi lokal; log detail dicatat sebagai aktivitas
-    // lokal dan akan muncul juga di localLogs.
     unawaitedRecordActivity(
       action: ActivityAction.edit,
       detail: 'Kenaikan kelas lokal untuk $promotedCount siswa',
@@ -765,14 +922,14 @@ void processClassPromotion(List<Student> students) {
   }
 }
 
-// ================== ARSIP AKUN DIGITAL SISWA ==================
+// ============================================================
+// ARSIP AKUN DIGITAL SISWA
+// ============================================================
+
 Map<String, Map<String, List<AkunDigital>>> arsipAkunSiswa = {};
 
-void archiveGraduatedAccounts(
-  String tahunAjaran,
-  List<AkunDigital> accounts,
-) {
-  List<AkunDigital> graduated = accounts
+void archiveGraduatedAccounts(String tahunAjaran, List<AkunDigital> accounts) {
+  final List<AkunDigital> graduated = accounts
       .where(
         (a) =>
             a.category == 'siswa' &&
@@ -781,23 +938,27 @@ void archiveGraduatedAccounts(
       )
       .toList();
 
-  if (graduated.isEmpty) return;
+  if (graduated.isEmpty) {
+    return;
+  }
 
-  Map<String, List<AkunDigital>> grouped = {};
-  for (var acc in graduated) {
-    String kelasAsal = acc.kelas!;
+  final Map<String, List<AkunDigital>> grouped = {};
+
+  for (final acc in graduated) {
+    final String kelasAsal = acc.kelas!;
+
     grouped.putIfAbsent(kelasAsal, () => []).add(acc);
   }
 
   arsipAkunSiswa.putIfAbsent(tahunAjaran, () => {});
 
-  for (var entry in grouped.entries) {
+  for (final entry in grouped.entries) {
     arsipAkunSiswa[tahunAjaran]!
         .putIfAbsent(entry.key, () => [])
         .addAll(entry.value);
   }
 
-  for (var acc in graduated) {
+  for (final acc in graduated) {
     acc.kelas = 'Lulus';
   }
 
@@ -811,10 +972,13 @@ void archiveGraduatedAccounts(
 void promoteAccounts(List<AkunDigital> accounts) {
   int promotedCount = 0;
 
-  for (var acc in accounts) {
-    if (acc.category != 'siswa' || acc.kelas == null) continue;
+  for (final acc in accounts) {
+    if (acc.category != 'siswa' || acc.kelas == null) {
+      continue;
+    }
 
-    String kelas = acc.kelas!;
+    final String kelas = acc.kelas!;
+
     String? jurusan;
 
     if (kelas.contains('RPL')) {
@@ -844,6 +1008,10 @@ void promoteAccounts(List<AkunDigital> accounts) {
   }
 }
 
+// ============================================================
+// DIGITAL ACCOUNT
+// ============================================================
+
 class DigitalAccount {
   String name;
   String email;
@@ -860,46 +1028,54 @@ class DigitalAccount {
   });
 
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'email': email,
-        'penanggungJawab': penanggungJawab,
-        'keterangan': keterangan,
-        'passwordMasked': passwordMasked,
-      };
+    'name': name,
+    'email': email,
+    'penanggungJawab': penanggungJawab,
+    'keterangan': keterangan,
+    'passwordMasked': passwordMasked,
+  };
 
   static DigitalAccount fromMap(Map<String, dynamic> map) {
     return DigitalAccount(
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      penanggungJawab: map['penanggungJawab'] ?? '',
-      keterangan: map['keterangan'] ?? '',
-      passwordMasked: map['passwordMasked'] ?? '••••••••',
+      name: map['name']?.toString() ?? '',
+      email: map['email']?.toString() ?? '',
+      penanggungJawab: map['penanggungJawab']?.toString() ?? '',
+      keterangan: map['keterangan']?.toString() ?? '',
+      passwordMasked: map['passwordMasked']?.toString() ?? '••••••••',
     );
   }
 }
 
-// ================== AKUN DIGITAL & LOG ==================
+// ============================================================
+// LOG LOKAL
+// ============================================================
+
 List<ActivityLog> localLogs = [];
 
-// Helper fire-and-forget untuk operasi synchronous lama.
 void unawaitedRecordActivity({
   String user = 'Admin',
   required ActivityAction action,
   required String detail,
 }) {
-  recordActivityLog(
-    user: user,
-    action: action,
-    detail: detail,
-  );
+  recordActivityLog(user: user, action: action, detail: detail);
 }
 
-// ================== INISIALISASI DATA (Lokal) ==================
+// ============================================================
+// INISIALISASI DATA LOKAL
+// ============================================================
+
 void initData() {
+  paymentTemplatesByGrade.clear();
+
   generateSampleTransactions();
+
   localTransactions.clear();
+
   sampleStudents = generateSampleStudents();
 }
 
-// ================== SAMPLE STUDENTS GLOBAL ==================
+// ============================================================
+// SAMPLE STUDENTS GLOBAL
+// ============================================================
+
 List<Student> sampleStudents = [];

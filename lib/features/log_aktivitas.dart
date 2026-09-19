@@ -10,6 +10,7 @@ import '../data.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/sound_helper.dart';
 import '../helpers/theme_helper.dart';
+import '../helpers/custom_animation.dart';
 import '../l10n/translations.dart';
 
 /// Menampilkan seluruh riwayat aktivitas yang tersimpan di Firestore.
@@ -91,6 +92,18 @@ class _LogAktivitasPageState extends ConsumerState<LogAktivitasPage> {
       return 'login_logout';
     }
 
+    // Payment configuration and sync logs
+    if (detail.contains('konfigurasi pembayaran') ||
+        detail.contains('sinkronisasi') ||
+        detail.contains('simulasi') ||
+        detail.contains('spp') ||
+        detail.contains('gedung') ||
+        detail.contains('seragam') ||
+        detail.contains('pembayaran')) {
+      return 'payment';
+    }
+
+    // Student related logs
     if (detail.contains('siswa') ||
         detail.contains('guru') ||
         detail.contains('kenaikan kelas') ||
@@ -98,6 +111,7 @@ class _LogAktivitasPageState extends ConsumerState<LogAktivitasPage> {
       return 'students';
     }
 
+    // Transaction related logs
     if (detail.contains('pemasukan') ||
         detail.contains('pengeluaran') ||
         detail.contains('transaksi') ||
@@ -105,16 +119,11 @@ class _LogAktivitasPageState extends ConsumerState<LogAktivitasPage> {
       return 'transactions';
     }
 
+    // Digital account related logs
     if (detail.contains('akun digital') ||
         detail.contains('akun pengguna') ||
         detail.contains('akun')) {
       return 'digital_account';
-    }
-
-    if (detail.contains('pembayaran') ||
-        detail.contains('spp') ||
-        detail.contains('gedung')) {
-      return 'payment';
     }
 
     return 'system';
@@ -349,12 +358,9 @@ class _LogAktivitasPageState extends ConsumerState<LogAktivitasPage> {
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return Center(
-                      child: Text(
-                        translations.t('no_activity_logs'),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: _secondaryTextColor(themeMode),
-                        ),
+                      child: LottieError(
+                        size: 150,
+                        message: translations.t('no_activity_logs'),
                       ),
                     );
                   }
@@ -370,12 +376,9 @@ class _LogAktivitasPageState extends ConsumerState<LogAktivitasPage> {
 
                   if (filteredLogs.isEmpty) {
                     return Center(
-                      child: Text(
-                        translations.t('no_matching_logs'),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: _secondaryTextColor(themeMode),
-                        ),
+                      child: LottieError(
+                        size: 150,
+                        message: translations.t('no_matching_logs'),
                       ),
                     );
                   }

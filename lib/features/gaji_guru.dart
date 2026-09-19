@@ -7,10 +7,11 @@ import 'package:fl_chart/fl_chart.dart';
 import '../helpers/sound_helper.dart';
 import '../helpers/scroll_reveal.dart';
 import '../service/export_gaji_guru.dart';
-import '../simulation/cheat_guru.dart';
+import '../simulation/guru_manager.dart';
 import '../firebase/firestore_service.dart';
 import '../constants/appearance.dart';
 import '../helpers/theme_helper.dart';
+import '../helpers/custom_animation.dart';
 
 // ================== KOMPONEN GAJI ==================
 class KomponenGaji {
@@ -775,18 +776,10 @@ class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerPr
                       child: _isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : teacherList.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.people_outline, size: 64, color: colors.outline),
-                                      const SizedBox(height: 12),
-                                      Text('Daftar masih kosong', style: TextStyle(color: colors.onSurfaceVariant)),
-                                      const SizedBox(height: 8),
-                                      Text('Gunakan Mode Developer (FAB) untuk tambah data default',
-                                          style: TextStyle(color: colors.outline, fontSize: 12),
-                                          textAlign: TextAlign.center),
-                                    ],
+                              ? const Center(
+                                  child: LottieError(
+                                    size: 120,
+                                    message: 'Daftar masih kosong. Gunakan Mode Developer (FAB) untuk tambah data default',
                                   ),
                                 )
                               : ListView.separated(
@@ -1569,7 +1562,7 @@ class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerPr
           onAutoLunas: autoLunas,
           onClearAllData: clearAllData,
           onSeedDefaultTeachers: seedDefaultTeachers,
-          onDeleteAllTeachers: deleteAllTeachers, // <--- Parameter Baru
+          onDeleteAllTeachers: deleteAllTeachers,
           currentBulan: currentBulan,
           currentTahun: currentTahun,
         ),
@@ -1715,7 +1708,10 @@ class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerPr
         themeMode,
         child: const Padding(
           padding: EdgeInsets.all(32),
-          child: Center(child: Text('Belum ada data gaji')),
+          child: LottieError(
+            size: 120,
+            message: 'Belum ada data gaji',
+          ),
         ),
       );
     }
@@ -1952,7 +1948,10 @@ class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerPr
             Text('Top 5 Gaji Tertinggi Bulan Ini', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.onSurface)),
             const SizedBox(height: 8),
             if (topGaji.isEmpty)
-              Center(child: Text('Belum ada data', style: TextStyle(color: colors.onSurfaceVariant)))
+              const LottieError(
+                size: 80,
+                message: 'Belum ada data',
+              )
             else
               ...topGaji.asMap().entries.map((entry) {
                 int rank = entry.key + 1;
@@ -2174,7 +2173,6 @@ class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerPr
   // ==================== TAB DAFTAR GAJI ====================
   Widget _buildListTab() {
     final themeMode = ref.watch(themeModeProvider);
-    final colors = Theme.of(context).colorScheme;
     final guruData = _guruListWithSalary;
     int selectedCount = selectedIds.length;
 
@@ -2287,14 +2285,10 @@ class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerPr
           ),
         Expanded(
           child: guruData.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 64, color: colors.outline),
-                      const SizedBox(height: 16),
-                      Text('Tidak ada guru yang cocok', style: TextStyle(color: colors.onSurfaceVariant)),
-                    ],
+              ? const Center(
+                  child: LottieError(
+                    size: 150,
+                    message: 'Tidak ada guru yang cocok',
                   ),
                 )
               : ListView.builder(
@@ -2579,7 +2573,12 @@ class _GajiGuruPageState extends ConsumerState<GajiGuruPage> with SingleTickerPr
     var tahunKeys = groupedByYear.keys.toList()..sort((a, b) => b.compareTo(a));
 
     if (tahunKeys.isEmpty) {
-      return Center(child: Text('Belum ada data gaji yang diarsipkan', style: TextStyle(color: colors.onSurfaceVariant)));
+      return const Center(
+        child: LottieError(
+          size: 180,
+          message: 'Belum ada data gaji yang diarsipkan',
+        ),
+      );
     }
 
     return ListView.builder(
@@ -2692,7 +2691,12 @@ class RiwayatBulanPage extends ConsumerWidget {
           ],
         ),
         body: bulanKeys.isEmpty
-            ? Center(child: Text('Tidak ada data bulan', style: TextStyle(color: colors.onSurfaceVariant)))
+            ? const Center(
+                child: LottieError(
+                  size: 180,
+                  message: 'Tidak ada data bulan',
+                ),
+              )
             : ListView.builder(
                 padding: const EdgeInsets.all(8),
                 itemCount: bulanKeys.length,
@@ -2802,102 +2806,109 @@ class RiwayatGuruPage extends ConsumerWidget {
         appBar: AppBar(
           title: Text('${getBulanNama(bulan)} $tahun'),
         ),
-        body: ListView.builder(
-          padding: const EdgeInsets.all(8),
-          itemCount: data.length,
-          itemBuilder: (context, index) {
-            final gaji = data[index];
-            return _buildThemedContainer(
-              themeMode,
-              radius: 12,
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: gaji.isPaid ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
-                  child: Icon(gaji.isPaid ? Icons.check_circle : Icons.pending, color: gaji.isPaid ? Colors.green : Colors.red, size: 18),
+        body: data.isEmpty
+            ? const Center(
+                child: LottieError(
+                  size: 180,
+                  message: 'Tidak ada data gaji',
                 ),
-                title: Text(gaji.namaGuru, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.onSurface)),
-                subtitle: Text(
-                  gaji.komponen.isEmpty ? 'Belum ada komponen' : 'Rp ${formatCurrency(gaji.totalGaji)}',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: colors.onSurfaceVariant),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (gaji.isPaid && gaji.tanggalBayar != null)
-                      Text(
-                        '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}',
-                        style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: data.length,
+                itemBuilder: (context, index) {
+                  final gaji = data[index];
+                  return _buildThemedContainer(
+                    themeMode,
+                    radius: 12,
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: gaji.isPaid ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                        child: Icon(gaji.isPaid ? Icons.check_circle : Icons.pending, color: gaji.isPaid ? Colors.green : Colors.red, size: 18),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.visibility, size: 18),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: isGlass ? AppColors.glassBg1 : null,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            title: Text('Slip Gaji ${gaji.namaGuru}', style: TextStyle(color: isGlass ? Colors.white : null)),
-                            content: Container(
-                              width: double.maxFinite,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildDetailRowStatic('ID', gaji.id, colors, isGlass),
-                                  _buildDetailRowStatic('Nama Guru', gaji.namaGuru, colors, isGlass),
-                                  _buildDetailRowStatic('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}', colors, isGlass),
-                                  _buildDetailRowStatic('Role', gaji.role == 'guru' ? 'Guru' : 'Karyawan', colors, isGlass),
-                                  if (gaji.keterangan != null && gaji.keterangan!.isNotEmpty) _buildDetailRowStatic('Keterangan', gaji.keterangan!, colors, isGlass),
-                                  Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
-                                  if (gaji.komponen.isNotEmpty) ...[
-                                    Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
-                                    const SizedBox(height: 8),
-                                    SizedBox(height: 120, child: _buildPieChartStatic(gaji.komponen)),
-                                    Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
-                                  ],
-                                  Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
-                                  if (gaji.komponen.isEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text('Tidak ada komponen gaji', style: TextStyle(color: isGlass ? Colors.white70 : colors.onSurfaceVariant)),
-                                    )
-                                  else
-                                    ...gaji.komponen.map(
-                                      (k) => Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 2),
-                                        child: Row(
-                                          children: [
-                                            Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
-                                            Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
-                                  _buildDetailRowStatic('Total', 'Rp ${formatCurrency(gaji.totalGaji)}', colors, isGlass, bold: true),
-                                  _buildDetailRowStatic('Status', gaji.isPaid ? 'Lunas' : 'Belum', colors, isGlass),
-                                  if (gaji.isPaid && gaji.tanggalBayar != null)
-                                    _buildDetailRowStatic('Tanggal Bayar', '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}', colors, isGlass),
-                                  if (gaji.metodeBayar != null) _buildDetailRowStatic('Metode', gaji.metodeBayar!, colors, isGlass),
-                                  if (gaji.catatan != null && gaji.catatan!.isNotEmpty) _buildDetailRowStatic('Catatan', gaji.catatan!, colors, isGlass),
-                                ],
-                              ),
+                      title: Text(gaji.namaGuru, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.onSurface)),
+                      subtitle: Text(
+                        gaji.komponen.isEmpty ? 'Belum ada komponen' : 'Rp ${formatCurrency(gaji.totalGaji)}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: colors.onSurfaceVariant),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (gaji.isPaid && gaji.tanggalBayar != null)
+                            Text(
+                              '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}',
+                              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                             ),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
-                            ],
+                          IconButton(
+                            icon: const Icon(Icons.visibility, size: 18),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: isGlass ? AppColors.glassBg1 : null,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  title: Text('Slip Gaji ${gaji.namaGuru}', style: TextStyle(color: isGlass ? Colors.white : null)),
+                                  content: Container(
+                                    width: double.maxFinite,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildDetailRowStatic('ID', gaji.id, colors, isGlass),
+                                        _buildDetailRowStatic('Nama Guru', gaji.namaGuru, colors, isGlass),
+                                        _buildDetailRowStatic('Periode', '${getBulanNama(gaji.bulan)} ${gaji.tahun}', colors, isGlass),
+                                        _buildDetailRowStatic('Role', gaji.role == 'guru' ? 'Guru' : 'Karyawan', colors, isGlass),
+                                        if (gaji.keterangan != null && gaji.keterangan!.isNotEmpty) _buildDetailRowStatic('Keterangan', gaji.keterangan!, colors, isGlass),
+                                        Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                        if (gaji.komponen.isNotEmpty) ...[
+                                          Text('Komposisi Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
+                                          const SizedBox(height: 8),
+                                          SizedBox(height: 120, child: _buildPieChartStatic(gaji.komponen)),
+                                          Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                        ],
+                                        Text('Komponen Gaji:', style: TextStyle(fontWeight: FontWeight.bold, color: isGlass ? Colors.white : colors.onSurface)),
+                                        if (gaji.komponen.isEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Text('Tidak ada komponen gaji', style: TextStyle(color: isGlass ? Colors.white70 : colors.onSurfaceVariant)),
+                                          )
+                                        else
+                                          ...gaji.komponen.map(
+                                            (k) => Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 2),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(flex: 2, child: Text('${k.isTunjangan ? '+' : '-'} ${k.nama} (${k.kategori})', overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
+                                                  Expanded(flex: 1, child: Text('Rp ${formatCurrency(k.jumlah)}', textAlign: TextAlign.right, overflow: TextOverflow.ellipsis, style: TextStyle(color: isGlass ? Colors.white : colors.onSurface))),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        Divider(color: isGlass ? Colors.white.withValues(alpha: 0.3) : null),
+                                        _buildDetailRowStatic('Total', 'Rp ${formatCurrency(gaji.totalGaji)}', colors, isGlass, bold: true),
+                                        _buildDetailRowStatic('Status', gaji.isPaid ? 'Lunas' : 'Belum', colors, isGlass),
+                                        if (gaji.isPaid && gaji.tanggalBayar != null)
+                                          _buildDetailRowStatic('Tanggal Bayar', '${gaji.tanggalBayar!.day}/${gaji.tanggalBayar!.month}/${gaji.tanggalBayar!.year}', colors, isGlass),
+                                        if (gaji.metodeBayar != null) _buildDetailRowStatic('Metode', gaji.metodeBayar!, colors, isGlass),
+                                        if (gaji.catatan != null && gaji.catatan!.isNotEmpty) _buildDetailRowStatic('Catatan', gaji.catatan!, colors, isGlass),
+                                      ],
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+                                  ],
+                                ),
+                              );
+                            },
+                            tooltip: 'Detail',
                           ),
-                        );
-                      },
-                      tooltip: 'Detail',
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
-            );
-          },
-        ),
       ),
     );
   }
@@ -2969,7 +2980,12 @@ class ArchiveUnpaidPage extends ConsumerWidget {
         backgroundColor: ThemeHelper.getScaffoldBackgroundColor(themeMode, colors),
         appBar: AppBar(title: const Text('Arsip Belum Bayar')),
         body: records.isEmpty
-            ? Center(child: Text('Tidak ada data belum bayar di arsip', style: TextStyle(color: colors.onSurfaceVariant)))
+            ? const Center(
+                child: LottieError(
+                  size: 180,
+                  message: 'Tidak ada data belum bayar di arsip',
+                ),
+              )
             : ListView.builder(
                 padding: const EdgeInsets.all(8),
                 itemCount: records.length,

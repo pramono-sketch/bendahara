@@ -8,13 +8,13 @@ import '../features/ai_assistant.dart';
 import '../features/database_akun.dart';
 import '../features/log_aktivitas.dart';
 import '../features/statistik.dart';
-import '../features/tagihan.dart';
+// import '../features/tagihan.dart';
 import '../features/gaji_guru.dart';
 import '../helpers/scroll_reveal.dart';
 import '../helpers/theme_helper.dart';
 import '../l10n/translations.dart';
 import '../helpers/sound_helper.dart';
-import '../simulation/lottie_prev.dart';
+// import '../simulation/lottie_prev.dart';
 import '../auth/auth_page.dart';
 
 class MorePage extends ConsumerStatefulWidget {
